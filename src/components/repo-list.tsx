@@ -9,22 +9,29 @@ import {  FolderPlus, FolderOpen } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+import { FileSystemBrowser } from './fs-browser';
+
 export function RepoList() {
   const { data: repos, isLoading } = useRepositories();
   const addRepo = useAddRepository();
   const [newPath, setNewPath] = useState('');
+  const [browserOpen, setBrowserOpen] = useState(false);
   const router = useRouter();
 
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPath) return;
+  const handleAdd = async (path: string) => {
+    if (!path) return;
     try {
-        await addRepo.mutateAsync({ path: newPath });
+        await addRepo.mutateAsync({ path });
         setNewPath('');
     } catch (error) {
         alert('Failed to add repo');
     }
   };
+
+  const manuallyAdd = (e: React.FormEvent) => {
+      e.preventDefault();
+      handleAdd(newPath);
+  }
 
   if (isLoading) return <div>Loading repositories...</div>;
 
@@ -34,15 +41,29 @@ export function RepoList() {
       
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Add New Repo Card */}
-        <Card>
+        <Card className="flex flex-col">
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <FolderPlus className="w-5 h-5" />
                     Open Repository
                 </CardTitle>
             </CardHeader>
-            <CardContent>
-                <form onSubmit={handleAdd} className="flex gap-2">
+            <CardContent className="flex-1 flex flex-col gap-4">
+                <Button variant="outline" className="w-full h-24 flex flex-col gap-2 border-dashed" onClick={() => setBrowserOpen(true)}>
+                    <FolderOpen className="w-8 h-8 text-muted-foreground" />
+                    <span>Browse System</span>
+                </Button>
+                
+                <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">Or path</span>
+                    </div>
+                </div>
+
+                <form onSubmit={manuallyAdd} className="flex gap-2">
                     <Input 
                         placeholder="/path/to/repo" 
                         value={newPath}
@@ -77,6 +98,12 @@ export function RepoList() {
             </Card>
         ))}
       </div>
+      
+      <FileSystemBrowser 
+        open={browserOpen} 
+        onOpenChange={setBrowserOpen} 
+        onSelect={(path) => handleAdd(path)} 
+      />
     </div>
   );
 }
