@@ -102,7 +102,7 @@ export function useGitBranches(repoPath: string | null) {
 }
 
 export function useGitDiff(repoPath: string | null, filePath: string | null) {
-  return useQuery<{ diff: string }>({
+  return useQuery<{ diff: string; left: string; right: string }>({
     queryKey: ['git', repoPath, 'diff', filePath],
     queryFn: async () => {
       if (!repoPath || !filePath) return null;
