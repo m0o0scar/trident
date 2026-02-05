@@ -84,8 +84,25 @@ export function useGitLog(repoPath: string | null, limit: number = 50) {
   });
 }
 
+// ... UseGitLog ...
+
+export function useGitBranches(repoPath: string | null) {
+  return useQuery<{ branches: string[], current: string }>({
+    queryKey: ['git', repoPath, 'branches'],
+    queryFn: async () => {
+      if (!repoPath) return null;
+      const res = await fetch(`${API_BASE}/git/branches?path=${encodeURIComponent(repoPath)}`);
+      if (!res.ok) {
+        throw new Error('Failed to fetch branches');
+      }
+      return res.json();
+    },
+    enabled: !!repoPath,
+  });
+}
+
 export function useGitDiff(repoPath: string | null, filePath: string | null) {
-  return useQuery<{ diff: string }>({
+  return useQuery<{ diff: string; left: string; right: string }>({
     queryKey: ['git', repoPath, 'diff', filePath],
     queryFn: async () => {
       if (!repoPath || !filePath) return null;
@@ -107,7 +124,7 @@ export function useGitDiff(repoPath: string | null, filePath: string | null) {
 }
 
 // Actions
-export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage';
+export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'branch' | 'delete-branch';
 
 interface GitActionPayload {
   repoPath: string;

@@ -163,7 +163,7 @@ export function StatusView({ repoPath }: { repoPath: string }) {
             <div className="flex-1 flex flex-col overflow-hidden">
                 {selectedFile ? (
                     <div className="h-full flex flex-col">
-                        <div className="mb-2 font-mono text-sm font-semibold">{selectedFile}</div>
+
                         <div className="flex-1 overflow-auto border rounded-md">
                             <DiffView repoPath={repoPath} filePath={selectedFile} />
                         </div>
