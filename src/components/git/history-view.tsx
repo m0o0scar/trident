@@ -7,46 +7,46 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'; // need to chec
 // Assuming yes since I initialized defaults. If not, I'll remove it.
 // I'll assume Avatar is standard Shadcn.
 
+
+import { GitGraph } from './git-graph';
+import { useState } from 'react';
+
 export function HistoryView({ repoPath }: { repoPath: string }) {
-  const { data: log, isLoading } = useGitLog(repoPath);
+  const { data: log, isLoading } = useGitLog(repoPath, 100); // Fetch more for graph
+  const [selectedHash, setSelectedHash] = useState<string | null>(null);
 
   if (isLoading) {
-    return <div className="flex items-center justify-center p-8"><Loader2 className="animate-spin" /></div>;
+    return <div className="flex items-center justify-center p-8 h-full"><Loader2 className="animate-spin" /></div>;
   }
 
   if (!log) return <div>Failed to load history</div>;
 
   return (
-    <div className="max-w-4xl space-y-6">
-        <h1 className="text-2xl font-bold">Commit History</h1>
-        <div className="relative border-l border-muted ml-3 space-y-6 pb-6">
-            {log.all.map((commit) => (
-                <div key={commit.hash} className="ml-6 relative">
-                    {/* Dot */}
-                    <div className="absolute -left-[31px] top-1 h-4 w-4 rounded-full border bg-background flex items-center justify-center">
-                        <div className="h-2 w-2 rounded-full bg-primary" />
-                    </div>
-                    
-                    <Card>
-                        <CardHeader className="py-3">
-                             <div className="flex justify-between items-start">
-                                <div className="space-y-1">
-                                    <h3 className="font-semibold leading-none">{commit.message}</h3>
-                                    <div className="text-sm text-muted-foreground flex items-center gap-2">
-                                        <span>{commit.author_name}</span>
-                                        <span>•</span>
-                                        <span>{new Date(commit.date).toLocaleString()}</span>
-                                    </div>
-                                </div>
-                                <div className="text-xs font-mono bg-muted px-2 py-1 rounded">
-                                    {commit.hash.substring(0, 7)}
-                                </div>
-                             </div>
-                        </CardHeader>
-                    </Card>
-                </div>
-            ))}
+    <div className="flex flex-col h-[calc(100vh-100px)] space-y-4">
+        <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold">Commit History</h1>
         </div>
+        
+        <div className="flex-1 overflow-hidden border rounded-md">
+             <GitGraph 
+                commits={log.all} 
+                selectedHash={selectedHash || undefined}
+                onSelectCommit={setSelectedHash}
+             />
+        </div>
+        
+        {/* Detail View (Optional, placeholder for now) */}
+        {selectedHash && (
+             <Card className="h-32 overflow-auto">
+                <CardHeader className="py-2">
+                    <CardTitle className="text-sm">Selected Commit: {selectedHash}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                     {/* We could show fuller details or diff here */}
+                     <p className="text-xs text-muted-foreground">{log.all.find(c => c.hash === selectedHash)?.body}</p>
+                </CardContent>
+             </Card>
+        )}
     </div>
   );
 }

@@ -34,9 +34,38 @@ export class GitService {
     return status as unknown as GitStatus;
   }
 
-  async getLog(limit: number = 50): Promise<GitLog> {
-    const log = await this.git.log(['--max-count=' + limit]);
-    return log as unknown as GitLog;
+  async getLog(limit: number = 100): Promise<GitLog> {
+      // Custom format to ensure we get parents and refs correctly
+      const log = await this.git.log({
+          '--all': null,
+          '--max-count': limit,
+          format: {
+              hash: '%h',
+              parents: '%p',
+              date: '%ai',
+              message: '%s',
+              refs: '%d',
+              author_name: '%an',
+              author_email: '%ae',
+              body: '%b'
+          }
+      });
+      
+      // Transform simple-git ListLogLine to our Commit type
+      // simple-git handles the parsing if we pass the format object keys correctly matching our type, mostly.
+      // Parents in simple-git are usually just space separated string in the custom format result unless processed.
+      // We might need to map it.
+      
+      const commits = log.all.map((c: any) => ({
+          ...c,
+          parents: c.parents ? c.parents.split(' ').filter(Boolean) : []
+      }));
+
+      return {
+          all: commits,
+          total: log.total,
+          latest: commits[0] || null
+      } as unknown as GitLog;
   }
 
   async fetch(): Promise<void> {

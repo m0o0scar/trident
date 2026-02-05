@@ -33,6 +33,7 @@ export interface Commit {
   body: string;
   author_name: string;
   author_email: string;
+  parents: string[];
 }
 
 export interface GitLog {
