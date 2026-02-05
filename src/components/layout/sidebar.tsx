@@ -1,10 +1,10 @@
-
 'use client';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { GitBranch, Clock, FileDiff, Settings, ArrowLeft } from 'lucide-react';
+import { GitBranch, Clock, Settings, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   activeView: 'status' | 'history' | 'settings';
@@ -21,37 +21,40 @@ export function Sidebar({ className, activeView, onChangeView, repoPath }: Sideb
             <h2 className="text-lg font-semibold tracking-tight">
               Workspace
             </h2>
-            <Button variant="ghost" size="icon" asChild title="Back to Dashboard">
-                 <Link href="/">
-                    <ArrowLeft className="h-4 w-4" />
-                 </Link>
-            </Button>
+            <div className="flex items-center gap-1">
+              <ThemeToggle />
+              <Button variant="ghost" size="icon" asChild title="Back to Dashboard">
+                <Link href="/">
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
+              </Button>
+            </div>
           </div>
           <p className="px-4 text-xs text-muted-foreground break-all mb-4" title={repoPath}>
             {repoPath.split('/').pop()}
           </p>
 
           <div className="space-y-1">
-            <Button 
-                variant={activeView === 'status' ? 'secondary' : 'ghost'} 
-                className="w-full justify-start"
-                onClick={() => onChangeView('status')}
+            <Button
+              variant={activeView === 'status' ? 'secondary' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => onChangeView('status')}
             >
               <GitBranch className="mr-2 h-4 w-4" />
               Changes
             </Button>
-            <Button 
-                variant={activeView === 'history' ? 'secondary' : 'ghost'} 
-                className="w-full justify-start"
-                onClick={() => onChangeView('history')}
+            <Button
+              variant={activeView === 'history' ? 'secondary' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => onChangeView('history')}
             >
               <Clock className="mr-2 h-4 w-4" />
               History
             </Button>
-            <Button 
-                variant={activeView === 'settings' ? 'secondary' : 'ghost'} 
-                className="w-full justify-start"
-                onClick={() => onChangeView('settings')}
+            <Button
+              variant={activeView === 'settings' ? 'secondary' : 'ghost'}
+              className="w-full justify-start"
+              onClick={() => onChangeView('settings')}
             >
               <Settings className="mr-2 h-4 w-4" />
               Settings
