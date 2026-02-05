@@ -11,10 +11,11 @@ import { GitGraph } from './git-graph';
 import { useState } from 'react';
 
 export function HistoryView({ repoPath }: { repoPath: string }) {
-  const { data: log, isLoading, isError, error, refetch } = useGitLog(repoPath, 100); // Fetch more for graph
+  const [limit, setLimit] = useState(100);
+  const { data: log, isLoading, isError, error, refetch, isFetching } = useGitLog(repoPath, limit);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
 
-  if (isLoading) {
+  if (isLoading && limit === 100) {
     return <div className="flex items-center justify-center p-8 h-full"><Loader2 className="animate-spin" /></div>;
   }
 
@@ -45,6 +46,9 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     <div className="flex flex-col h-[calc(100vh-100px)] space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Commit History</h1>
+        <div className="text-xs text-muted-foreground">
+          {log.all.length} commits {isFetching && <Loader2 className="inline ml-2 h-3 w-3 animate-spin" />}
+        </div>
       </div>
 
       <div className="flex-1 overflow-hidden border rounded-md">
@@ -52,6 +56,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           commits={log.all}
           selectedHash={selectedHash || undefined}
           onSelectCommit={setSelectedHash}
+          onEndReached={() => {
+            if (!isFetching && log.all.length >= limit) {
+              setLimit(l => l + 50);
+            }
+          }}
         />
       </div>
 

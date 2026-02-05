@@ -76,6 +76,7 @@ export function useGitLog(repoPath: string | null, limit: number = 50) {
       return res.json();
     },
     enabled: !!repoPath,
+    placeholderData: (previousData) => previousData,
     retry: (failureCount, error: any) => {
       if (error.status === 404 || error.status === 400) return false;
       return failureCount < 3;
