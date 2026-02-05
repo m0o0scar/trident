@@ -125,4 +125,12 @@ export class GitService {
       current: branchSummary.current,
     };
   }
+
+  async checkout(branch: string): Promise<void> {
+    await this.git.checkout(branch);
+  }
+
+  async createBranch(branch: string): Promise<void> {
+    await this.git.checkoutLocalBranch(branch);
+  }
 }

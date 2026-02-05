@@ -6,7 +6,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -43,6 +43,14 @@ export async function POST(request: Request) {
       case 'unstage':
         if (!data?.files) throw new Error('Files are required for unstaging');
         await git.unstage(data.files);
+        break;
+      case 'checkout':
+        if (!data?.branch) throw new Error('Branch name is required for checkout');
+        await git.checkout(data.branch);
+        break;
+      case 'branch':
+        if (!data?.branch) throw new Error('Branch name is required to create branch');
+        await git.createBranch(data.branch);
         break;
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

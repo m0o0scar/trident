@@ -1,6 +1,6 @@
 'use client';
 
-import { useGitLog, useGitBranches } from '@/hooks/use-git';
+import { useGitLog, useGitBranches, useGitAction } from '@/hooks/use-git';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCcw, GitBranch } from 'lucide-react';
@@ -9,6 +9,21 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { GitGraph } from './git-graph';
 import { useState } from 'react';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 
 export function HistoryView({ repoPath }: { repoPath: string }) {
   const [limit, setLimit] = useState(100);
@@ -16,12 +31,47 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const { data: branchData } = useGitBranches(repoPath);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
 
+  const { mutateAsync: runGitAction } = useGitAction();
+  const [iscreateBranchOpen, setIsCreateBranchOpen] = useState(false);
+  const [newBranchName, setNewBranchName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+
+  const handleCheckout = async (branchName: string) => {
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'checkout',
+        data: { branch: branchName }
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleCreateBranch = async () => {
+    if (!newBranchName) return;
+    setIsCreating(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'branch',
+        data: { branch: newBranchName }
+      });
+      setIsCreateBranchOpen(false);
+      setNewBranchName('');
+    } catch (e) {
+      console.error(e);
+      // alert or toast error
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   if (isLoading && limit === 100) {
     return <div className="flex items-center justify-center p-8 h-full"><Loader2 className="animate-spin" /></div>;
   }
 
   if (isError) {
-    // ... error handling
     return (
       <div className="flex items-center justify-center p-8 h-full">
         <Card className="w-full max-w-md border-destructive">
@@ -55,18 +105,59 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <ScrollArea className="flex-1">
           <div className="p-2 space-y-1">
             {branchData?.branches.map((branch) => (
-              <div key={branch} className={cn(
-                "flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-muted",
-                branch === branchData.current && "bg-muted font-medium"
-              )}>
-                <GitBranch className="h-3 w-3 text-muted-foreground" />
-                <span className="truncate flex-1">{branch}</span>
-                {branch === branchData.current && <Badge variant="secondary" className="text-[10px] h-5 px-1">Current</Badge>}
-              </div>
+              <ContextMenu key={branch}>
+                <ContextMenuTrigger>
+                  <div className={cn(
+                    "flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-muted",
+                    branch === branchData.current && "bg-muted font-medium"
+                  )}>
+                    <GitBranch className="h-3 w-3 text-muted-foreground" />
+                    <span className="truncate flex-1">{branch}</span>
+                    {branch === branchData.current && <Badge variant="secondary" className="text-[10px] h-5 px-1">Current</Badge>}
+                  </div>
+                </ContextMenuTrigger>
+                <ContextMenuContent>
+                  <ContextMenuItem
+                    disabled={branch === branchData.current}
+                    onSelect={() => handleCheckout(branch)}
+                  >
+                    Checkout
+                  </ContextMenuItem>
+                  <ContextMenuItem onSelect={() => setIsCreateBranchOpen(true)}>
+                    Create Branch...
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
             ))}
           </div>
         </ScrollArea>
       </div>
+
+      <Dialog open={iscreateBranchOpen} onOpenChange={setIsCreateBranchOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Branch</DialogTitle>
+            <DialogDescription>
+              Create a new branch from the current HEAD and switch to it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={newBranchName}
+              onChange={e => setNewBranchName(e.target.value)}
+              placeholder="Branch name"
+              disabled={isCreating}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateBranchOpen(false)} disabled={isCreating}>Cancel</Button>
+            <Button onClick={handleCreateBranch} disabled={!newBranchName || isCreating}>
+              {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create & Checkout'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col space-y-4 min-w-0">

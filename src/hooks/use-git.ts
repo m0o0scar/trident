@@ -124,7 +124,7 @@ export function useGitDiff(repoPath: string | null, filePath: string | null) {
 }
 
 // Actions
-export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage';
+export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'branch';
 
 interface GitActionPayload {
   repoPath: string;
