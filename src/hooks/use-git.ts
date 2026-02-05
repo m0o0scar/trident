@@ -39,11 +39,25 @@ export function useGitStatus(repoPath: string | null) {
     queryFn: async () => {
       if (!repoPath) return null;
       const res = await fetch(`${API_BASE}/git/status?path=${encodeURIComponent(repoPath)}`);
-      if (!res.ok) throw new Error('Failed to fetch status');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const err = new Error(errorData.error || 'Failed to fetch status');
+        (err as any).status = res.status;
+        throw err;
+      }
       return res.json();
     },
     enabled: !!repoPath,
-    refetchInterval: 2000, // Poll every 2 seconds
+    refetchInterval: (query) => {
+      // Stop polling if we have an error
+      if (query.state.error) return false;
+      return 2000;
+    },
+    retry: (failureCount, error: any) => {
+      // Don't retry for 404 or 400 errors
+      if (error.status === 404 || error.status === 400) return false;
+      return failureCount < 3;
+    },
   });
 }
 
@@ -51,12 +65,21 @@ export function useGitLog(repoPath: string | null, limit: number = 50) {
   return useQuery<GitLog>({
     queryKey: ['git', repoPath, 'log', limit],
     queryFn: async () => {
-       if (!repoPath) return null;
+      if (!repoPath) return null;
       const res = await fetch(`${API_BASE}/git/log?path=${encodeURIComponent(repoPath)}&limit=${limit}`);
-      if (!res.ok) throw new Error('Failed to fetch log');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const err = new Error(errorData.error || 'Failed to fetch log');
+        (err as any).status = res.status;
+        throw err;
+      }
       return res.json();
     },
     enabled: !!repoPath,
+    retry: (failureCount, error: any) => {
+      if (error.status === 404 || error.status === 400) return false;
+      return failureCount < 3;
+    },
   });
 }
 
@@ -66,10 +89,19 @@ export function useGitDiff(repoPath: string | null, filePath: string | null) {
     queryFn: async () => {
       if (!repoPath || !filePath) return null;
       const res = await fetch(`${API_BASE}/git/diff?path=${encodeURIComponent(repoPath)}&file=${encodeURIComponent(filePath)}`);
-      if (!res.ok) throw new Error('Failed to fetch diff');
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const err = new Error(errorData.error || 'Failed to fetch diff');
+        (err as any).status = res.status;
+        throw err;
+      }
       return res.json();
     },
     enabled: !!repoPath && !!filePath,
+    retry: (failureCount, error: any) => {
+      if (error.status === 404 || error.status === 400) return false;
+      return failureCount < 3;
+    },
   });
 }
 
@@ -92,8 +124,8 @@ export function useGitAction() {
         body: JSON.stringify({ repoPath, action, data }),
       });
       if (!res.ok) {
-          const error = await res.json();
-          throw new Error(error.error || 'Failed to execute action');
+        const error = await res.json();
+        throw new Error(error.error || 'Failed to execute action');
       }
       return res.json();
     },
