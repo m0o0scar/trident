@@ -1,0 +1,21 @@
+
+import { NextRequest, NextResponse } from 'next/server';
+import { GitService } from '@/lib/git';
+
+export async function GET(req: NextRequest) {
+    const searchParams = req.nextUrl.searchParams;
+    const path = searchParams.get('path');
+
+    if (!path) {
+        return NextResponse.json({ error: 'Path is required' }, { status: 400 });
+    }
+
+    try {
+        const git = new GitService(path);
+        const branches = await git.getBranches();
+        return NextResponse.json(branches);
+    } catch (err: any) {
+        console.error('Git branches error:', err);
+        return NextResponse.json({ error: err.message || 'Failed to fetch branches' }, { status: 500 });
+    }
+}
