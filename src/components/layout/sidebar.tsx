@@ -5,14 +5,29 @@ import { Button } from '@/components/ui/button';
 import { GitBranch, Clock, Settings, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { usePathname, useSearchParams } from 'next/navigation';
 
-interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
-  activeView: 'status' | 'history' | 'settings';
-  onChangeView: (view: 'status' | 'history' | 'settings') => void;
-  repoPath: string;
-}
+type SidebarProps = React.HTMLAttributes<HTMLDivElement>;
 
-export function Sidebar({ className, activeView, onChangeView, repoPath }: SidebarProps) {
+export function Sidebar({ className }: SidebarProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const repoPath = searchParams.get('path') || '';
+
+  const getHref = (subPath: string = '') => {
+    const p = new URLSearchParams(searchParams.toString());
+    // Clean up tab if it exists from previous version, though we are moving away from it.
+    p.delete('tab');
+    return `/workspace${subPath}?${p.toString()}`;
+  };
+
+  const isActive = (view: 'status' | 'history' | 'settings') => {
+    if (view === 'status') return pathname === '/workspace';
+    if (view === 'history') return pathname.startsWith('/workspace/history');
+    if (view === 'settings') return pathname.startsWith('/workspace/settings');
+    return false;
+  };
+
   return (
     <div className={cn("pb-12 w-64 border-r min-h-screen bg-gray-50/40 dark:bg-gray-900/40", className)}>
       <div className="space-y-4 py-4">
@@ -36,28 +51,34 @@ export function Sidebar({ className, activeView, onChangeView, repoPath }: Sideb
 
           <div className="space-y-1">
             <Button
-              variant={activeView === 'status' ? 'secondary' : 'ghost'}
+              variant={isActive('status') ? 'secondary' : 'ghost'}
               className="w-full justify-start"
-              onClick={() => onChangeView('status')}
+              asChild
             >
-              <GitBranch className="mr-2 h-4 w-4" />
-              Changes
+              <Link href={getHref()}>
+                <GitBranch className="mr-2 h-4 w-4" />
+                Changes
+              </Link>
             </Button>
             <Button
-              variant={activeView === 'history' ? 'secondary' : 'ghost'}
+              variant={isActive('history') ? 'secondary' : 'ghost'}
               className="w-full justify-start"
-              onClick={() => onChangeView('history')}
+              asChild
             >
-              <Clock className="mr-2 h-4 w-4" />
-              History
+              <Link href={getHref('/history')}>
+                <Clock className="mr-2 h-4 w-4" />
+                History
+              </Link>
             </Button>
             <Button
-              variant={activeView === 'settings' ? 'secondary' : 'ghost'}
+              variant={isActive('settings') ? 'secondary' : 'ghost'}
               className="w-full justify-start"
-              onClick={() => onChangeView('settings')}
+              asChild
             >
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
+              <Link href={getHref('/settings')}>
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </Link>
             </Button>
           </div>
         </div>
