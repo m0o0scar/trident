@@ -133,4 +133,8 @@ export class GitService {
   async createBranch(branch: string): Promise<void> {
     await this.git.checkoutLocalBranch(branch);
   }
+
+  async deleteBranch(branch: string): Promise<void> {
+    await this.git.deleteLocalBranch(branch, true);
+  }
 }

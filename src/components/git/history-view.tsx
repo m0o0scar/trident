@@ -25,6 +25,17 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
 export function HistoryView({ repoPath }: { repoPath: string }) {
   const [limit, setLimit] = useState(100);
   const { data: log, isLoading, isError, error, refetch, isFetching } = useGitLog(repoPath, limit);
@@ -36,7 +47,35 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [newBranchName, setNewBranchName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [branchToDelete, setBranchToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const confirmDeleteBranch = (branch: string) => {
+    setBranchToDelete(branch);
+    setIsDeleteOpen(true);
+  }
+
+  const handleDeleteBranch = async () => {
+    if (!branchToDelete) return;
+    setIsDeleting(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'delete-branch',
+        data: { branch: branchToDelete }
+      });
+      setIsDeleteOpen(false);
+      setBranchToDelete(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   const handleCheckout = async (branchName: string) => {
+
     try {
       await runGitAction({
         repoPath,
@@ -95,7 +134,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   if (!log) return <div className="flex items-center justify-center p-8 h-full">No history data available</div>;
 
   return (
-    <div className="flex h-[calc(100vh-100px)] gap-4">
+    <div className="flex h-full gap-4">
       {/* Branch Sidebar */}
       <div className="w-64 flex flex-col border rounded-md bg-card">
         <div className="p-3 border-b font-medium text-sm flex items-center gap-2">
@@ -123,8 +162,16 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   >
                     Checkout
                   </ContextMenuItem>
+
                   <ContextMenuItem onSelect={() => setIsCreateBranchOpen(true)}>
                     Create Branch...
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    disabled={branch === branchData.current}
+                    className="text-destructive focus:text-destructive"
+                    onSelect={() => confirmDeleteBranch(branch)}
+                  >
+                    Delete Branch...
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
@@ -133,7 +180,30 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         </ScrollArea>
       </div>
 
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Branch</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the branch <span className="font-semibold text-foreground">{branchToDelete}</span>?
+              This action cannot be undone and any uncommitted changes on that branch will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleDeleteBranch(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={isDeleting}
+            >
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Dialog open={iscreateBranchOpen} onOpenChange={setIsCreateBranchOpen}>
+
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Branch</DialogTitle>

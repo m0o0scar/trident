@@ -6,7 +6,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch', 'delete-branch']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -51,6 +51,10 @@ export async function POST(request: Request) {
       case 'branch':
         if (!data?.branch) throw new Error('Branch name is required to create branch');
         await git.createBranch(data.branch);
+        break;
+      case 'delete-branch':
+        if (!data?.branch) throw new Error('Branch name is required to delete branch');
+        await git.deleteBranch(data.branch);
         break;
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
