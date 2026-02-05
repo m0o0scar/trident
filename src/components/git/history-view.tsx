@@ -1,10 +1,8 @@
 'use client';
 
 import { useGitLog, useGitBranches, useGitAction } from '@/hooks/use-git';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCcw, GitBranch } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Loader2, RefreshCcw, GitBranch, Plus } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { GitGraph } from './git-graph';
@@ -107,52 +105,50 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   };
 
   if (isLoading && limit === 100) {
-    return <div className="flex items-center justify-center p-8 h-full"><Loader2 className="animate-spin" /></div>;
+    return <div className="flex items-center justify-center p-8 h-full"><Loader2 className="animate-spin text-muted-foreground" /></div>;
   }
 
   if (isError) {
     return (
-      <div className="flex items-center justify-center p-8 h-full">
-        <Card className="w-full max-w-md border-destructive">
-          <CardHeader>
-            <CardTitle className="text-destructive flex items-center gap-2">
-              <span className="text-lg">Error Loading History</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">{(error as Error)?.message || 'An unknown error occurred'}</p>
-            <Button onClick={() => refetch()} variant="outline" className="w-full">
-              <RefreshCcw className="w-4 h-4 mr-2" />
-              Try Again
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-center p-8 h-full flex-col gap-4">
+        <p className="text-destructive font-medium">Error Loading History</p>
+        <p className="text-sm text-muted-foreground">{(error as Error)?.message || 'An unknown error occurred'}</p>
+        <Button onClick={() => refetch()} variant="outline">
+            <RefreshCcw className="w-4 h-4 mr-2" />
+            Try Again
+        </Button>
       </div>
     );
   }
 
-  if (!log) return <div className="flex items-center justify-center p-8 h-full">No history data available</div>;
+  if (!log) return <div className="flex items-center justify-center p-8 h-full text-muted-foreground">No history data available</div>;
 
   return (
-    <div className="flex h-full gap-4">
+    <div className="flex h-[calc(100vh-64px)] overflow-hidden">
       {/* Branch Sidebar */}
-      <div className="w-64 flex flex-col border rounded-md bg-card">
-        <div className="p-3 border-b font-medium text-sm flex items-center gap-2">
-          <GitBranch className="h-4 w-4" />
-          Branches
+      <div className="w-64 flex flex-col border-r bg-muted/10">
+        <div className="p-4 border-b flex items-center justify-between bg-background h-[57px]">
+          <div className="flex items-center gap-2 font-semibold">
+             <GitBranch className="h-4 w-4" />
+             Branches
+          </div>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsCreateBranchOpen(true)} title="Create Branch">
+            <Plus className="h-4 w-4" />
+          </Button>
         </div>
         <ScrollArea className="flex-1">
-          <div className="p-2 space-y-1">
+          <div className="p-2 space-y-0.5">
             {branchData?.branches.map((branch) => (
               <ContextMenu key={branch}>
                 <ContextMenuTrigger>
                   <div className={cn(
-                    "flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-muted",
-                    branch === branchData.current && "bg-muted font-medium"
-                  )}>
-                    <GitBranch className="h-3 w-3 text-muted-foreground" />
+                    "flex items-center gap-2 px-3 py-2 text-sm rounded-md cursor-pointer hover:bg-muted/50 transition-colors",
+                    branch === branchData.current && "bg-muted font-medium text-primary"
+                  )}
+                  >
+                    <GitBranch className={cn("h-3 w-3 text-muted-foreground", branch === branchData.current && "text-primary")} />
                     <span className="truncate flex-1">{branch}</span>
-                    {branch === branchData.current && <Badge variant="secondary" className="text-[10px] h-5 px-1">Current</Badge>}
+                    {branch === branchData.current && <span className="w-2 h-2 rounded-full bg-primary" />}
                   </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent>
@@ -186,7 +182,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <AlertDialogTitle>Delete Branch</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete the branch <span className="font-semibold text-foreground">{branchToDelete}</span>?
-              This action cannot be undone and any uncommitted changes on that branch will be lost.
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -208,7 +204,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           <DialogHeader>
             <DialogTitle>Create New Branch</DialogTitle>
             <DialogDescription>
-              Create a new branch from the current HEAD and switch to it.
+              Create a new branch from the current HEAD.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2">
@@ -230,15 +226,15 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col space-y-4 min-w-0">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold">Commit History</h1>
-          <div className="text-xs text-muted-foreground">
+      <div className="flex-1 flex flex-col min-w-0 bg-background">
+        <div className="h-[57px] flex items-center justify-between px-6 border-b shrink-0">
+          <h1 className="font-semibold text-lg">History</h1>
+          <div className="text-xs text-muted-foreground font-mono">
             {log.all.length} commits {isFetching && <Loader2 className="inline ml-2 h-3 w-3 animate-spin" />}
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden border rounded-md">
+        <div className="flex-1 overflow-hidden relative">
           <GitGraph
             commits={log.all}
             selectedHash={selectedHash || undefined}
@@ -252,18 +248,21 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         </div>
 
         {selectedHash && (
-          <Card className="h-48 flex flex-col overflow-hidden p-0 gap-0">
-            <CardHeader className="flex flex-row items-center py-3 px-4 border-b bg-card shrink-0 !pb-3">
-              <CardTitle className="text-sm font-semibold leading-normal truncate">
+          <div className="h-48 flex flex-col overflow-hidden border-t bg-muted/10">
+            <div className="flex flex-row items-center py-2 px-4 border-b bg-background shrink-0 justify-between">
+              <span className="text-sm font-semibold truncate flex-1 mr-4">
                 {log.all.find(c => c.hash === selectedHash)?.message}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 overflow-auto p-4">
+              </span>
+              <span className="text-xs font-mono text-muted-foreground">
+                  {selectedHash.substring(0, 7)}
+              </span>
+            </div>
+            <div className="flex-1 overflow-auto p-4 bg-background">
               <div className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
                 {log.all.find(c => c.hash === selectedHash)?.body}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         )}
       </div>
     </div>
