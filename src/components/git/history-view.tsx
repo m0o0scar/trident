@@ -3,10 +3,8 @@
 import { useGitLog } from '@/hooks/use-git';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Loader2, GitCommit, RefreshCcw } from 'lucide-react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'; // need to check if Avatar exists in shadcn
-// Assuming yes since I initialized defaults. If not, I'll remove it.
-// I'll assume Avatar is standard Shadcn.
+import { Loader2, RefreshCcw } from 'lucide-react';
+
 
 
 import { GitGraph } from './git-graph';
@@ -59,13 +57,16 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
       {/* Detail View (Optional, placeholder for now) */}
       {selectedHash && (
-        <Card className="h-32 overflow-auto">
-          <CardHeader className="py-2">
-            <CardTitle className="text-sm">Selected Commit: {selectedHash}</CardTitle>
+        <Card className="h-48 flex flex-col overflow-hidden p-0 gap-0">
+          <CardHeader className="flex flex-row items-center py-3 px-4 border-b bg-card shrink-0 !pb-3">
+            <CardTitle className="text-sm font-semibold leading-normal truncate">
+              {log.all.find(c => c.hash === selectedHash)?.message}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            {/* We could show fuller details or diff here */}
-            <p className="text-xs text-muted-foreground">{log.all.find(c => c.hash === selectedHash)?.body}</p>
+          <CardContent className="flex-1 overflow-auto p-4">
+            <div className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+              {log.all.find(c => c.hash === selectedHash)?.body}
+            </div>
           </CardContent>
         </Card>
       )}
