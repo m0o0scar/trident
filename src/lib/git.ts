@@ -152,6 +152,10 @@ export class GitService {
     await this.git.deleteLocalBranch(branch, true);
   }
 
+  async renameBranch(oldName: string, newName: string): Promise<void> {
+    await this.git.branch(['-m', oldName, newName]);
+  }
+
   async getCommitDiff(commitHash: string): Promise<{ files: { path: string; additions: number; deletions: number; status: string }[]; diff: string }> {
     // Get the list of files changed in this commit with stats
     const diffStat = await this.git.raw(['diff-tree', '--no-commit-id', '--name-status', '-r', commitHash]);

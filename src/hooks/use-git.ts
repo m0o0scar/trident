@@ -175,7 +175,7 @@ export function useCommitFileDiff(repoPath: string | null, commitHash: string | 
 }
 
 // Actions
-export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'branch' | 'delete-branch';
+export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'branch' | 'delete-branch' | 'rename-branch';
 
 interface GitActionPayload {
   repoPath: string;

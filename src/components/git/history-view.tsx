@@ -290,6 +290,7 @@ function BranchTreeItem({
   onCheckout,
   onCreateBranch,
   onDeleteBranch,
+  onRenameBranch,
   onBranchClick,
   visibilityMap,
   onToggleVisibility,
@@ -303,6 +304,7 @@ function BranchTreeItem({
   onCheckout: (branch: string) => void;
   onCreateBranch: () => void;
   onDeleteBranch: (branch: string) => void;
+  onRenameBranch: (branch: string) => void;
   onBranchClick?: (branch: string) => void;
   visibilityMap: VisibilityMap;
   onToggleVisibility: (path: string, type: 'visible' | 'hidden') => void;
@@ -378,6 +380,7 @@ function BranchTreeItem({
                   onCheckout={onCheckout}
                   onCreateBranch={onCreateBranch}
                   onDeleteBranch={onDeleteBranch}
+                  onRenameBranch={onRenameBranch}
                   onBranchClick={onBranchClick}
                   visibilityMap={visibilityMap}
                   onToggleVisibility={onToggleVisibility}
@@ -438,6 +441,9 @@ function BranchTreeItem({
               <ContextMenuItem onSelect={onCreateBranch}>
                 Create Branch...
               </ContextMenuItem>
+              <ContextMenuItem onSelect={() => onRenameBranch(child.fullPath!)}>
+                Rename Branch...
+              </ContextMenuItem>
               <ContextMenuItem
                 disabled={isCurrent}
                 className="text-destructive focus:text-destructive"
@@ -467,6 +473,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [branchToDelete, setBranchToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [branchToRename, setBranchToRename] = useState<string | null>(null);
+  const [newBranchNameForRename, setNewBranchNameForRename] = useState('');
+  const [isRenaming, setIsRenaming] = useState(false);
 
   // Ref for GitGraph to scroll to commits
   const gitGraphRef = useRef<GitGraphHandle>(null);
@@ -829,6 +840,36 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }
 
+  const confirmRenameBranch = (branch: string) => {
+    setBranchToRename(branch);
+    // Pre-fill with current branch name
+    setNewBranchNameForRename(branch);
+    setIsRenameOpen(true);
+  }
+
+  const handleRenameBranch = async () => {
+    if (!branchToRename || !newBranchNameForRename) return;
+    if (branchToRename === newBranchNameForRename) {
+      setIsRenameOpen(false);
+      return;
+    }
+    setIsRenaming(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'rename-branch',
+        data: { oldName: branchToRename, newName: newBranchNameForRename }
+      });
+      setIsRenameOpen(false);
+      setBranchToRename(null);
+      setNewBranchNameForRename('');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRenaming(false);
+    }
+  }
+
   const handleCheckout = async (branchName: string) => {
 
     try {
@@ -917,6 +958,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 onCheckout={handleCheckout}
                 onCreateBranch={() => setIsCreateBranchOpen(true)}
                 onDeleteBranch={confirmDeleteBranch}
+                onRenameBranch={confirmRenameBranch}
                 onBranchClick={handleBranchClick}
                 visibilityMap={visibilityMap}
                 onToggleVisibility={handleToggleVisibility}
@@ -947,6 +989,34 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Branch</DialogTitle>
+            <DialogDescription>
+              Enter a new name for the branch <span className="font-semibold text-foreground">{branchToRename}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Input
+              value={newBranchNameForRename}
+              onChange={e => setNewBranchNameForRename(e.target.value)}
+              placeholder="New branch name"
+              disabled={isRenaming}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRenameOpen(false)} disabled={isRenaming}>Cancel</Button>
+            <Button 
+              onClick={handleRenameBranch} 
+              disabled={!newBranchNameForRename || newBranchNameForRename === branchToRename || isRenaming}
+            >
+              {isRenaming ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Rename'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={iscreateBranchOpen} onOpenChange={setIsCreateBranchOpen}>
 
