@@ -120,9 +120,23 @@ export class GitService {
 
   async getBranches() {
     const branchSummary = await this.git.branchLocal();
+    
+    // Get commit hash for each branch
+    const branchCommits: Record<string, string> = {};
+    for (const branch of branchSummary.all) {
+      try {
+        // Get the short hash of the latest commit on this branch
+        const result = await this.git.revparse(['--short', branch]);
+        branchCommits[branch] = result.trim();
+      } catch (e) {
+        console.error(`Failed to get commit for branch ${branch}:`, e);
+      }
+    }
+    
     return {
       branches: branchSummary.all,
       current: branchSummary.current,
+      branchCommits,
     };
   }
 
@@ -136,5 +150,42 @@ export class GitService {
 
   async deleteBranch(branch: string): Promise<void> {
     await this.git.deleteLocalBranch(branch, true);
+  }
+
+  async getCommitDiff(commitHash: string): Promise<{ files: { path: string; additions: number; deletions: number; status: string }[]; diff: string }> {
+    // Get the list of files changed in this commit with stats
+    const diffStat = await this.git.raw(['diff-tree', '--no-commit-id', '--name-status', '-r', commitHash]);
+    const files = diffStat.trim().split('\n').filter(Boolean).map(line => {
+      const [status, ...pathParts] = line.split('\t');
+      const path = pathParts.join('\t'); // Handle paths with tabs (rare)
+      return { path, status, additions: 0, deletions: 0 };
+    });
+
+    // Get the full diff for this commit
+    const diff = await this.git.raw(['show', '--format=', commitHash]);
+
+    return { files, diff };
+  }
+
+  async getCommitFileDiff(commitHash: string, filePath: string): Promise<{ before: string; after: string }> {
+    // Get file content before the commit (parent)
+    let before = '';
+    let after = '';
+    
+    try {
+      before = await this.git.show([`${commitHash}^:${filePath}`]);
+    } catch {
+      // File didn't exist before this commit (new file)
+      before = '';
+    }
+    
+    try {
+      after = await this.git.show([`${commitHash}:${filePath}`]);
+    } catch {
+      // File was deleted in this commit
+      after = '';
+    }
+    
+    return { before, after };
   }
 }

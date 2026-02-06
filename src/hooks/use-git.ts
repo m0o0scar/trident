@@ -87,7 +87,7 @@ export function useGitLog(repoPath: string | null, limit: number = 50) {
 // ... UseGitLog ...
 
 export function useGitBranches(repoPath: string | null) {
-  return useQuery<{ branches: string[], current: string }>({
+  return useQuery<{ branches: string[], current: string, branchCommits: Record<string, string> }>({
     queryKey: ['git', repoPath, 'branches'],
     queryFn: async () => {
       if (!repoPath) return null;
@@ -116,6 +116,57 @@ export function useGitDiff(repoPath: string | null, filePath: string | null) {
       return res.json();
     },
     enabled: !!repoPath && !!filePath,
+    retry: (failureCount, error: any) => {
+      if (error.status === 404 || error.status === 400) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export interface CommitFile {
+  path: string;
+  status: string;
+  additions: number;
+  deletions: number;
+}
+
+export function useCommitDiff(repoPath: string | null, commitHash: string | null) {
+  return useQuery<{ files: CommitFile[]; diff: string }>({
+    queryKey: ['git', repoPath, 'commit-diff', commitHash],
+    queryFn: async () => {
+      if (!repoPath || !commitHash) return null;
+      const res = await fetch(`${API_BASE}/git/diff?path=${encodeURIComponent(repoPath)}&commit=${encodeURIComponent(commitHash)}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const err = new Error(errorData.error || 'Failed to fetch commit diff');
+        (err as any).status = res.status;
+        throw err;
+      }
+      return res.json();
+    },
+    enabled: !!repoPath && !!commitHash,
+    retry: (failureCount, error: any) => {
+      if (error.status === 404 || error.status === 400) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export function useCommitFileDiff(repoPath: string | null, commitHash: string | null, filePath: string | null) {
+  return useQuery<{ left: string; right: string }>({
+    queryKey: ['git', repoPath, 'commit-file-diff', commitHash, filePath],
+    queryFn: async () => {
+      if (!repoPath || !commitHash || !filePath) return null;
+      const res = await fetch(`${API_BASE}/git/diff?path=${encodeURIComponent(repoPath)}&commit=${encodeURIComponent(commitHash)}&file=${encodeURIComponent(filePath)}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const err = new Error(errorData.error || 'Failed to fetch file diff');
+        (err as any).status = res.status;
+        throw err;
+      }
+      return res.json();
+    },
+    enabled: !!repoPath && !!commitHash && !!filePath,
     retry: (failureCount, error: any) => {
       if (error.status === 404 || error.status === 400) return false;
       return failureCount < 3;
