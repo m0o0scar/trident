@@ -65,6 +65,15 @@ export function StatusView({ repoPath }: { repoPath: string }) {
         setSelectedFile(null);
     };
 
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+            e.preventDefault();
+            if (staged.length > 0 && message && !action.isPending) {
+                handleCommit();
+            }
+        }
+    };
+
     return (
         <div className="flex h-full overflow-hidden">
             {/* Left Panel: File List */}
@@ -137,6 +146,7 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                         placeholder="Commit message..."
                         value={message}
                         onChange={e => setMessage(e.target.value)}
+                        onKeyDown={handleKeyDown}
                         className="min-h-[80px] text-sm resize-none mb-3 bg-muted/20 focus:bg-background transition-colors"
                     />
                     <Button className="w-full" size="sm" onClick={handleCommit} disabled={staged.length === 0 || !message || action.isPending}>
