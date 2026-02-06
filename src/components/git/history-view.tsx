@@ -2,11 +2,11 @@
 
 import { useGitLog, useGitBranches, useGitAction } from '@/hooks/use-git';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCcw, GitBranch, Plus } from 'lucide-react';
+import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { GitGraph } from './git-graph';
-import { useState } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -34,6 +34,156 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
+// Tree node type for branch hierarchy
+interface BranchTreeNode {
+  name: string;
+  fullPath?: string; // Only set for leaf nodes (actual branches)
+  children: Map<string, BranchTreeNode>;
+}
+
+// Build tree structure from flat branch list
+function buildBranchTree(branches: string[]): BranchTreeNode {
+  const root: BranchTreeNode = { name: '', children: new Map() };
+
+  for (const branch of branches) {
+    const parts = branch.split('/');
+    let current = root;
+
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      if (!current.children.has(part)) {
+        current.children.set(part, {
+          name: part,
+          children: new Map(),
+        });
+      }
+      current = current.children.get(part)!;
+
+      // If this is the last part, mark it as a leaf with full path
+      if (i === parts.length - 1) {
+        current.fullPath = branch;
+      }
+    }
+  }
+
+  return root;
+}
+
+// Recursive component to render branch tree
+function BranchTreeItem({
+  node,
+  currentBranch,
+  expandedFolders,
+  onToggleFolder,
+  onCheckout,
+  onCreateBranch,
+  onDeleteBranch,
+  depth = 0,
+}: {
+  node: BranchTreeNode;
+  currentBranch?: string;
+  expandedFolders: Set<string>;
+  onToggleFolder: (path: string) => void;
+  onCheckout: (branch: string) => void;
+  onCreateBranch: () => void;
+  onDeleteBranch: (branch: string) => void;
+  depth?: number;
+}) {
+  const children = Array.from(node.children.values());
+  const sortedChildren = children.sort((a, b) => {
+    // Folders (non-leaf) come first, then alphabetical
+    const aIsFolder = a.children.size > 0 && !a.fullPath;
+    const bIsFolder = b.children.size > 0 && !b.fullPath;
+    if (aIsFolder && !bIsFolder) return -1;
+    if (!aIsFolder && bIsFolder) return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <>
+      {sortedChildren.map((child) => {
+        const isLeaf = child.fullPath !== undefined;
+        const isFolder = child.children.size > 0 && !isLeaf;
+        const folderPath = child.fullPath || (node.name ? `${node.name}/${child.name}` : child.name);
+        const isExpanded = expandedFolders.has(folderPath);
+        const isCurrent = isLeaf && child.fullPath === currentBranch;
+
+        if (isFolder) {
+          // Render folder
+          return (
+            <div key={folderPath}>
+              <div
+                className={cn(
+                  "flex items-center gap-1 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-muted/50 transition-colors text-muted-foreground",
+                )}
+                style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                onClick={() => onToggleFolder(folderPath)}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="h-3 w-3 shrink-0" />
+                ) : (
+                  <ChevronRight className="h-3 w-3 shrink-0" />
+                )}
+                <Folder className="h-3 w-3 shrink-0" />
+                <span className="truncate">{child.name}</span>
+              </div>
+              {isExpanded && (
+                <BranchTreeItem
+                  node={child}
+                  currentBranch={currentBranch}
+                  expandedFolders={expandedFolders}
+                  onToggleFolder={onToggleFolder}
+                  onCheckout={onCheckout}
+                  onCreateBranch={onCreateBranch}
+                  onDeleteBranch={onDeleteBranch}
+                  depth={depth + 1}
+                />
+              )}
+            </div>
+          );
+        }
+
+        // Render leaf (actual branch)
+        return (
+          <ContextMenu key={child.fullPath}>
+            <ContextMenuTrigger>
+              <div
+                className={cn(
+                  "flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-muted/50 transition-colors",
+                  isCurrent && "bg-muted font-medium text-primary"
+                )}
+                style={{ paddingLeft: `${depth * 12 + 8}px` }}
+              >
+                <GitBranch className={cn("h-3 w-3 shrink-0 text-muted-foreground", isCurrent && "text-primary")} />
+                <span className="truncate flex-1" title={child.fullPath}>{child.name}</span>
+                {isCurrent && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
+              </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem
+                disabled={isCurrent}
+                onSelect={() => onCheckout(child.fullPath!)}
+              >
+                Checkout
+              </ContextMenuItem>
+              <ContextMenuItem onSelect={onCreateBranch}>
+                Create Branch...
+              </ContextMenuItem>
+              <ContextMenuItem
+                disabled={isCurrent}
+                className="text-destructive focus:text-destructive"
+                onSelect={() => onDeleteBranch(child.fullPath!)}
+              >
+                Delete Branch...
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+        );
+      })}
+    </>
+  );
+}
+
 export function HistoryView({ repoPath }: { repoPath: string }) {
   const [limit, setLimit] = useState(100);
   const { data: log, isLoading, isError, error, refetch, isFetching } = useGitLog(repoPath, limit);
@@ -48,6 +198,51 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [branchToDelete, setBranchToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Build branch tree and manage expanded state
+  const branchTree = useMemo(() => {
+    if (!branchData?.branches) return null;
+    return buildBranchTree(branchData.branches);
+  }, [branchData?.branches]);
+
+  // Storage key for this repo's expanded folders
+  const storageKey = `git-web:branch-tree-expanded:${repoPath}`;
+
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
+    // Load from local storage on initial render
+    if (typeof window === 'undefined') return new Set();
+    try {
+      const key = `git-web:branch-tree-expanded:${repoPath}`;
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        return new Set(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error('Failed to load expanded folders from localStorage:', e);
+    }
+    return new Set();
+  });
+
+  // Save to local storage whenever expanded folders change
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(Array.from(expandedFolders)));
+    } catch (e) {
+      console.error('Failed to save expanded folders to localStorage:', e);
+    }
+  }, [expandedFolders, storageKey]);
+
+  const toggleFolder = useCallback((path: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      return next;
+    });
+  }, []);
 
   const confirmDeleteBranch = (branch: string) => {
     setBranchToDelete(branch);
@@ -138,40 +333,17 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         </div>
         <ScrollArea className="flex-1 overflow-auto">
           <div className="p-2 space-y-0.5">
-            {branchData?.branches.map((branch) => (
-              <ContextMenu key={branch}>
-                <ContextMenuTrigger>
-                  <div className={cn(
-                    "flex items-center gap-2 px-3 py-2 text-sm rounded-md cursor-pointer hover:bg-muted/50 transition-colors",
-                    branch === branchData.current && "bg-muted font-medium text-primary"
-                  )}
-                  >
-                    <GitBranch className={cn("h-3 w-3 text-muted-foreground", branch === branchData.current && "text-primary")} />
-                    <span className="truncate flex-1" title={branch}>{branch}</span>
-                    {branch === branchData.current && <span className="w-2 h-2 rounded-full bg-primary" />}
-                  </div>
-                </ContextMenuTrigger>
-                <ContextMenuContent>
-                  <ContextMenuItem
-                    disabled={branch === branchData.current}
-                    onSelect={() => handleCheckout(branch)}
-                  >
-                    Checkout
-                  </ContextMenuItem>
-
-                  <ContextMenuItem onSelect={() => setIsCreateBranchOpen(true)}>
-                    Create Branch...
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    disabled={branch === branchData.current}
-                    className="text-destructive focus:text-destructive"
-                    onSelect={() => confirmDeleteBranch(branch)}
-                  >
-                    Delete Branch...
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
-            ))}
+            {branchTree && (
+              <BranchTreeItem
+                node={branchTree}
+                currentBranch={branchData?.current}
+                expandedFolders={expandedFolders}
+                onToggleFolder={toggleFolder}
+                onCheckout={handleCheckout}
+                onCreateBranch={() => setIsCreateBranchOpen(true)}
+                onDeleteBranch={confirmDeleteBranch}
+              />
+            )}
           </div>
         </ScrollArea>
       </div>
