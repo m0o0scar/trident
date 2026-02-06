@@ -86,33 +86,6 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
-                    {/* Staged Changes */}
-                    <div className="p-2">
-                         <div className="flex items-center justify-between px-2 py-2 mb-1">
-                            <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Staged ({staged.length})</h3>
-                        </div>
-                        <div className="space-y-0.5">
-                            {staged.length === 0 && <p className="px-2 py-2 text-xs text-muted-foreground italic">No staged changes</p>}
-                            {staged.map(path => (
-                                <div
-                                    key={path}
-                                    className={cn(
-                                        "flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer group hover:bg-muted/50 transition-colors text-sm",
-                                        selectedFile === path && "bg-muted font-medium text-primary"
-                                    )}
-                                    onClick={() => setSelectedFile(path)}
-                                >
-                                    <span className="truncate flex-1 font-mono text-xs" title={path}>{path}</span>
-                                    <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); handleUnstage(path); }}>
-                                        <Minus className="h-3 w-3" />
-                                    </Button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                     <div className="h-px bg-border mx-4 my-2" />
-
                     {/* Unstaged Changes */}
                     <div className="p-2">
                         <div className="flex items-center justify-between px-2 py-2 mb-1">
@@ -133,6 +106,33 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                                     <span className="truncate flex-1 font-mono text-xs" title={path}>{path}</span>
                                     <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30" onClick={(e) => { e.stopPropagation(); handleStage(path); }}>
                                         <Plus className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                     <div className="h-px bg-border mx-4 my-2" />
+
+                    {/* Staged Changes */}
+                    <div className="p-2">
+                         <div className="flex items-center justify-between px-2 py-2 mb-1">
+                            <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Staged ({staged.length})</h3>
+                        </div>
+                        <div className="space-y-0.5">
+                            {staged.length === 0 && <p className="px-2 py-2 text-xs text-muted-foreground italic">No staged changes</p>}
+                            {staged.map(path => (
+                                <div
+                                    key={path}
+                                    className={cn(
+                                        "flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer group hover:bg-muted/50 transition-colors text-sm",
+                                        selectedFile === path && "bg-muted font-medium text-primary"
+                                    )}
+                                    onClick={() => setSelectedFile(path)}
+                                >
+                                    <span className="truncate flex-1 font-mono text-xs" title={path}>{path}</span>
+                                    <Button size="icon" variant="ghost" className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-destructive/10" onClick={(e) => { e.stopPropagation(); handleUnstage(path); }}>
+                                        <Minus className="h-3 w-3" />
                                     </Button>
                                 </div>
                             ))}
