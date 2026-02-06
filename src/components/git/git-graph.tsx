@@ -9,8 +9,8 @@ import { Loader2 } from 'lucide-react';
 
 
 const ROW_HEIGHT = 24; // Compact rows like Fork
-const LANE_WIDTH = 16;
-const DOT_SIZE = 4;
+const LANE_WIDTH = 12;
+const DOT_SIZE = 3;
 const STROKE_WIDTH = 2;
 
 export interface GitGraphHandle {
