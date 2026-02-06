@@ -1925,20 +1925,27 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         </div>
 
         <div className="flex-1 overflow-hidden relative">
-          <GitGraph
-            ref={gitGraphRef}
-            commits={filteredCommits}
-            selectedHash={selectedHash || undefined}
-            onSelectCommit={setSelectedHash}
-            onEndReached={() => {
-              if (!isFetching && log.all.length >= limit) {
-                setLimit(l => l + 50);
-              }
-            }}
-            isLoadingMore={isFetching && limit > 100}
-            currentBranch={branchData?.current}
-            hiddenBranches={hiddenBranches}
-          />
+          {/* Show loading spinner while branches are loading if visibility filters are set */}
+          {hasVisibilityFilters && isBranchesLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <GitGraph
+              ref={gitGraphRef}
+              commits={filteredCommits}
+              selectedHash={selectedHash || undefined}
+              onSelectCommit={setSelectedHash}
+              onEndReached={() => {
+                if (!isFetching && log.all.length >= limit) {
+                  setLimit(l => l + 50);
+                }
+              }}
+              isLoadingMore={isFetching && limit > 100}
+              currentBranch={branchData?.current}
+              hiddenBranches={hiddenBranches}
+            />
+          )}
         </div>
 
         {selectedHash && (
