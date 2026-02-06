@@ -2,7 +2,8 @@
 
 import { useGitDiff } from '@/hooks/use-git';
 import { Loader2 } from 'lucide-react';
-import ReactDiffViewer from 'react-diff-viewer';
+import ReactDiffViewer from '@alexbruf/react-diff-viewer';
+import '@alexbruf/react-diff-viewer/index.css';
 import { useState } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -80,21 +81,7 @@ export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: s
           newValue={data.right || ''}
           splitView={splitView}
           useDarkTheme={resolvedTheme === 'dark'}
-          styles={{
-            diffContainer: {
-              fontSize: '11px',
-              fontFamily: 'monospace',
-            },
-            line: {
-              lineHeight: '1.3',
-            },
-            gutter: {
-              lineHeight: '1.3',
-            },
-            contentText: {
-              lineHeight: '1.3',
-            },
-          }}
+
         />
       </div>
     </div>

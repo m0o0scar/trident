@@ -289,9 +289,21 @@ export default function CredentialsPage() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {formType === 'github'
-                    ? 'Token needs repo scope for repository access'
-                    : 'Token needs api scope for GitLab access'}
+                  {formType === 'github' ? (
+                    <>
+                      Token needs repo scope for repository access.{' '}
+                      <a
+                        href="https://github.com/settings/tokens/new?description=Trident&scopes=repo,user,notifications,workflow"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        Create new token
+                      </a>
+                    </>
+                  ) : (
+                    'Token needs api scope for GitLab access'
+                  )}
                 </p>
               </div>
 

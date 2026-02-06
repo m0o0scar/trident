@@ -7,7 +7,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn, sanitizeBranchName } from '@/lib/utils';
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import ReactDiffViewer from 'react-diff-viewer';
+import ReactDiffViewer from '@alexbruf/react-diff-viewer';
+import '@alexbruf/react-diff-viewer/index.css';
 import { useTheme } from 'next-themes';
 import {
   ContextMenu,
@@ -119,21 +120,7 @@ function CommitFileDiffView({ repoPath, commitHash, filePath }: { repoPath: stri
         newValue={data.right || ''}
         splitView={false}
         useDarkTheme={resolvedTheme === 'dark'}
-        styles={{
-          diffContainer: {
-            fontSize: '11px',
-            fontFamily: 'monospace',
-          },
-          line: {
-            lineHeight: '1.3',
-          },
-          gutter: {
-            lineHeight: '1.3',
-          },
-          contentText: {
-            lineHeight: '1.3',
-          },
-        }}
+
       />
     </div>
   );
