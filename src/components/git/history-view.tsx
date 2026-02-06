@@ -1004,6 +1004,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               onChange={e => setNewBranchNameForRename(e.target.value)}
               placeholder="New branch name"
               disabled={isRenaming}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && newBranchNameForRename && newBranchNameForRename !== branchToRename && !isRenaming) {
+                  handleRenameBranch();
+                }
+              }}
             />
           </div>
           <DialogFooter>
@@ -1033,6 +1038,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               onChange={e => setNewBranchName(e.target.value)}
               placeholder="Branch name"
               disabled={isCreating}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && newBranchName && !isCreating) {
+                  handleCreateBranch();
+                }
+              }}
             />
           </div>
           <DialogFooter>
