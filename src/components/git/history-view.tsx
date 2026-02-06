@@ -2,7 +2,7 @@
 
 import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile } from '@/hooks/use-git';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal } from 'lucide-react';
+import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal, X } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn, sanitizeBranchName } from '@/lib/utils';
 import { GitGraph, GitGraphHandle } from './git-graph';
@@ -1333,6 +1333,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   onClick={() => setActiveTab('changes')}
                 >
                   Changes
+                </button>
+                <button
+                  className="ml-2 p-1 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+                  onClick={() => setSelectedHash(null)}
+                  title="Close"
+                >
+                  <X className="h-4 w-4" />
                 </button>
               </div>
             </div>
