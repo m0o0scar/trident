@@ -13,7 +13,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
     const repoName = repoPath ? repoPath.split('/').pop() : 'Workspace';
     
     return {
-        title: `${repoName} - Forkly`,
+        title: `${repoName} - Trident`,
     };
 }
 

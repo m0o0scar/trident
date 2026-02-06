@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Forkly",
+  title: "Trident",
   description: "Git repository management tool"
 };
 
