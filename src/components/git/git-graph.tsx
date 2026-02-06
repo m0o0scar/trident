@@ -23,14 +23,16 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     selectedHash?: string,
     onEndReached?: () => void,
     isLoadingMore?: boolean,
-    currentBranch?: string
+    currentBranch?: string,
+    hiddenBranches?: Set<string>
 }>(function GitGraph({
     commits,
     onSelectCommit,
     selectedHash,
     onEndReached,
     isLoadingMore,
-    currentBranch
+    currentBranch,
+    hiddenBranches
 }, ref) {
     const nodes = useMemo(() => generateGraphData(commits), [commits]);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -155,15 +157,20 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                         {node.refs && node.refs.split(', ').map((ref, idx) => {
                                             // remove potential leading and trailing brackets
                                             let displayName = ref.replace(/^\s*\(|\)\s*$/g, '');
+                                            // Clean up "HEAD -> " prefix for display but keep for checking
+                                            const cleanDisplayName = displayName.replace(/^HEAD\s*->\s*/, '');
+                                            
+                                            // Skip hidden branches
+                                            if (hiddenBranches && hiddenBranches.has(cleanDisplayName)) {
+                                                return null;
+                                            }
+                                            
                                             // Check if this is the current branch by checking if it contains "HEAD -> branchName"
                                             const isCurrentBranch = currentBranch && (
                                                 displayName === currentBranch || 
                                                 displayName === `HEAD -> ${currentBranch}` ||
                                                 displayName.includes(`HEAD -> ${currentBranch}`)
                                             );
-                                            // Clean up "HEAD -> " prefix for display but keep for checking
-                                            const cleanDisplayName = displayName.replace(/^HEAD\s*->\s*/, '');
-                                            console.log('displayName', displayName, 'cleanDisplayName', cleanDisplayName, 'currentBranch', currentBranch, 'isCurrentBranch', isCurrentBranch);
                                             return (
                                                 <span key={idx}
                                                     className={cn(

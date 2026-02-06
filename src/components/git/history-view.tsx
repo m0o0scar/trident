@@ -631,6 +631,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     // Calculate effective visibility for each branch
     const visibleBranches = new Set<string>();
     const hiddenBranches = new Set<string>();
+    const nonHiddenBranches = new Set<string>(); // Branches that are not hidden (for hidden-only mode)
     
     for (const branch of branchData.branches) {
       const effectiveVis = getEffectiveVisibility(branch, visibilityMap);
@@ -638,15 +639,14 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         visibleBranches.add(branch);
       } else if (effectiveVis === 'hidden') {
         hiddenBranches.add(branch);
+      } else {
+        // No visibility set - this branch is "neutral" (non-hidden)
+        nonHiddenBranches.add(branch);
       }
     }
 
     // Build a map from commit hash to commit for quick lookup
     const commitMap = new Map(log.all.map(c => [c.hash, c]));
-    
-    // Find commits reachable from visible branches (using BFS/DFS through parent chain)
-    const reachableFromVisible = new Set<string>();
-    const reachableFromHidden = new Set<string>();
     
     // Helper to mark all ancestors as reachable
     const markReachable = (startHash: string, reachableSet: Set<string>) => {
@@ -669,7 +669,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       }
     };
     
-    // Mark commits reachable from visible branches
+    // Find commits reachable from visible branches
+    const reachableFromVisible = new Set<string>();
     for (const branch of visibleBranches) {
       const headHash = branchData.branchCommits[branch];
       if (headHash) {
@@ -677,45 +678,46 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       }
     }
     
-    // Mark commits reachable from hidden branches
-    for (const branch of hiddenBranches) {
-      const headHash = branchData.branchCommits[branch];
-      if (headHash) {
-        markReachable(headHash, reachableFromHidden);
-      }
+    // If there are visible markers, only show commits reachable from visible branches
+    if (hasVisibleMarkers) {
+      return log.all.filter(commit => reachableFromVisible.has(commit.hash));
     }
     
-    // Filter commits based on reachability
-    return log.all.filter(commit => {
-      const isInVisible = reachableFromVisible.has(commit.hash);
-      const isInHidden = reachableFromHidden.has(commit.hash);
-      
-      // If there are visible markers, only show commits reachable from visible branches
-      if (hasVisibleMarkers) {
-        return isInVisible;
+    // If only hidden markers exist, show commits reachable from any non-hidden branch
+    // A commit should only be hidden if it's EXCLUSIVELY reachable from hidden branches
+    if (hasHiddenMarkers) {
+      const reachableFromNonHidden = new Set<string>();
+      for (const branch of nonHiddenBranches) {
+        const headHash = branchData.branchCommits[branch];
+        if (headHash) {
+          markReachable(headHash, reachableFromNonHidden);
+        }
       }
       
-      // If only hidden markers exist, hide commits that are ONLY reachable from hidden branches
-      // (commits shared with non-hidden branches should still show)
-      if (hasHiddenMarkers) {
-        // If commit is in hidden set and not in any visible branch's history
-        // Since we don't have visible markers, we need to check if it's exclusively in hidden
-        // For simplicity: hide if it's reachable from hidden branch
-        // But we should not hide commits that are ancestors of non-hidden branches too
-        // This requires checking all non-hidden branches...
-        
-        // Simpler approach: if no visible markers, just hide commits directly reachable from hidden
-        return !isInHidden;
-      }
-      
-      return true;
-    });
+      return log.all.filter(commit => reachableFromNonHidden.has(commit.hash));
+    }
+    
+    return log.all;
   }, [log?.all, branchData?.branches, branchData?.branchCommits, visibilityMap]);
 
   // Check if visibility filters are active
   const hasVisibilityFilters = useMemo(() => {
     return Object.values(visibilityMap).some(v => v === 'visible' || v === 'hidden');
   }, [visibilityMap]);
+
+  // Compute hidden branches set for filtering branch tags in git graph
+  const hiddenBranches = useMemo(() => {
+    if (!branchData?.branches) return new Set<string>();
+    
+    const hidden = new Set<string>();
+    for (const branch of branchData.branches) {
+      const effectiveVis = getEffectiveVisibility(branch, visibilityMap);
+      if (effectiveVis === 'hidden') {
+        hidden.add(branch);
+      }
+    }
+    return hidden;
+  }, [branchData?.branches, visibilityMap]);
 
   // Auto-fetch more commits when filtered results are too few
   const MIN_FILTERED_COMMITS = 50;
@@ -998,6 +1000,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             }}
             isLoadingMore={isFetching && limit > 100}
             currentBranch={branchData?.current}
+            hiddenBranches={hiddenBranches}
           />
         </div>
 
