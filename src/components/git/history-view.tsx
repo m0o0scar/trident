@@ -142,6 +142,13 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
     setSelectedFile(null);
   }, [commitHash]);
 
+  // Auto-select first file when data loads and no file is selected
+  useEffect(() => {
+    if (!selectedFile && data?.files && data.files.length > 0) {
+      setSelectedFile(data.files[0].path);
+    }
+  }, [data?.files, selectedFile]);
+
   if (isLoading) {
     return <div className="flex items-center justify-center p-8 h-full"><Loader2 className="animate-spin text-muted-foreground" /></div>;
   }
