@@ -5,6 +5,7 @@ import { Commit } from '@/lib/types';
 import { generateGraphData, GraphNode } from '@/lib/graph-utils';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Loader2 } from 'lucide-react';
 
 
 const ROW_HEIGHT = 24; // Compact rows like Fork
@@ -16,12 +17,14 @@ export function GitGraph({
     commits,
     onSelectCommit,
     selectedHash,
-    onEndReached
+    onEndReached,
+    isLoadingMore
 }: {
     commits: Commit[],
     onSelectCommit?: (hash: string) => void,
     selectedHash?: string,
-    onEndReached?: () => void
+    onEndReached?: () => void,
+    isLoadingMore?: boolean
 }) {
     const nodes = useMemo(() => generateGraphData(commits), [commits]);
 
@@ -163,6 +166,14 @@ export function GitGraph({
                                 </div>
                             </div>
                         ))}
+                        
+                        {/* Loading More Indicator */}
+                        {isLoadingMore && (
+                            <div className="flex items-center justify-center py-8 border-b">
+                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                                <span className="ml-2 text-sm text-muted-foreground">Loading more commits...</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </ScrollArea>

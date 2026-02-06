@@ -244,6 +244,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 setLimit(l => l + 50);
               }
             }}
+            isLoadingMore={isFetching && limit > 100}
           />
         </div>
 
