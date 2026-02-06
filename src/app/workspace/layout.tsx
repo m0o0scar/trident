@@ -1,6 +1,21 @@
 import { Sidebar } from '@/components/layout/sidebar';
 import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
+import type { Metadata } from 'next';
+
+type Props = {
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+};
+
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+    const params = await searchParams;
+    const repoPath = params?.path as string | undefined;
+    const repoName = repoPath ? repoPath.split('/').pop() : 'Workspace';
+    
+    return {
+        title: `${repoName} - Forkly`,
+    };
+}
 
 export default function WorkspaceLayout({
     children,
