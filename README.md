@@ -1,6 +1,6 @@
 # 🔱 Trident
 
-A modern, web-based Git client built with Next.js and TypeScript. Manage your repositories, view commit history with a visual graph, and perform common Git operations through an intuitive interface.
+A modern, web-based Git client built with Next.js. Manage your repositories, view commit history with a visual graph, and perform common Git operations through an intuitive interface.
 
 ![](./docs/poster.jpeg)
 
