@@ -119,13 +119,45 @@ export class GitService {
   }
 
   async getBranches() {
-    const branchSummary = await this.git.branchLocal();
+    // Get local branches
+    const localBranchSummary = await this.git.branchLocal();
     
-    // Get commit hash for each branch
+    // Get all branches including remotes
+    const allBranchSummary = await this.git.branch(['-a']);
+    
+    // Parse remote branches and group by remote name
+    // Remote branches look like: remotes/origin/main, remotes/upstream/feature
+    const remotes: Record<string, string[]> = {};
+    const remoteBranchList: string[] = [];
+    
+    for (const branch of allBranchSummary.all) {
+      if (branch.startsWith('remotes/')) {
+        // Extract remote name and branch name
+        // Format: remotes/origin/branch-name or remotes/origin/HEAD -> origin/main
+        const withoutPrefix = branch.slice('remotes/'.length);
+        const slashIndex = withoutPrefix.indexOf('/');
+        if (slashIndex > 0) {
+          const remoteName = withoutPrefix.slice(0, slashIndex);
+          const branchName = withoutPrefix.slice(slashIndex + 1);
+          
+          // Skip HEAD symbolic refs
+          if (branchName === 'HEAD' || branchName.startsWith('HEAD ')) continue;
+          
+          if (!remotes[remoteName]) {
+            remotes[remoteName] = [];
+          }
+          remotes[remoteName].push(branchName);
+          remoteBranchList.push(branch);
+        }
+      }
+    }
+    
+    // Get commit hash for each branch (local and remote)
     const branchCommits: Record<string, string> = {};
-    for (const branch of branchSummary.all) {
+    
+    // Local branches
+    for (const branch of localBranchSummary.all) {
       try {
-        // Get the short hash of the latest commit on this branch
         const result = await this.git.revparse(['--short', branch]);
         branchCommits[branch] = result.trim();
       } catch (e) {
@@ -133,10 +165,21 @@ export class GitService {
       }
     }
     
+    // Remote branches - store with full ref path (e.g., "remotes/origin/main")
+    for (const branch of remoteBranchList) {
+      try {
+        const result = await this.git.revparse(['--short', branch]);
+        branchCommits[branch] = result.trim();
+      } catch (e) {
+        console.error(`Failed to get commit for remote branch ${branch}:`, e);
+      }
+    }
+    
     return {
-      branches: branchSummary.all,
-      current: branchSummary.current,
+      branches: localBranchSummary.all,
+      current: localBranchSummary.current,
       branchCommits,
+      remotes, // { "origin": ["main", "feature"], "upstream": ["main"] }
     };
   }
 

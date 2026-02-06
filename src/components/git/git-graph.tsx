@@ -161,7 +161,12 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                             const cleanDisplayName = displayName.replace(/^HEAD\s*->\s*/, '');
                                             
                                             // Skip hidden branches
-                                            if (hiddenBranches && hiddenBranches.has(cleanDisplayName)) {
+                                            // Check both the display name and remotes/ prefixed version
+                                            // (remote branches are stored as "remotes/origin/branch" but displayed as "origin/branch")
+                                            if (hiddenBranches && (
+                                                hiddenBranches.has(cleanDisplayName) ||
+                                                hiddenBranches.has(`remotes/${cleanDisplayName}`)
+                                            )) {
                                                 return null;
                                             }
                                             

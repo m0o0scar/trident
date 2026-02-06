@@ -2,7 +2,7 @@
 
 import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile } from '@/hooks/use-git';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal, X } from 'lucide-react';
+import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal, X, Globe } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn, sanitizeBranchName } from '@/lib/utils';
 import { GitGraph, GitGraphHandle } from './git-graph';
@@ -206,7 +206,7 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
 }
 
 // Build tree structure from flat branch list
-function buildBranchTree(branches: string[]): BranchTreeNode {
+function buildBranchTree(branches: string[], pathPrefix: string = ''): BranchTreeNode {
   const root: BranchTreeNode = { name: '', children: new Map() };
 
   for (const branch of branches) {
@@ -225,7 +225,8 @@ function buildBranchTree(branches: string[]): BranchTreeNode {
 
       // If this is the last part, mark it as a leaf with full path
       if (i === parts.length - 1) {
-        current.fullPath = branch;
+        // Use the full path with prefix for remote branches
+        current.fullPath = pathPrefix ? `${pathPrefix}/${branch}` : branch;
       }
     }
   }
@@ -233,10 +234,24 @@ function buildBranchTree(branches: string[]): BranchTreeNode {
   return root;
 }
 
+// Build tree structure for remote branches, grouped by remote name
+function buildRemoteBranchTree(remotes: Record<string, string[]>): Map<string, BranchTreeNode> {
+  const result = new Map<string, BranchTreeNode>();
+  
+  for (const [remoteName, branches] of Object.entries(remotes)) {
+    // Build tree for this remote's branches, with full ref path prefix
+    result.set(remoteName, buildBranchTree(branches, `remotes/${remoteName}`));
+  }
+  
+  return result;
+}
+
 // Get the effective visibility for a path (considering parent inheritance)
+// groupPath is used for checking group-level visibility (e.g., "__local__" or "__remotes__" or "__remotes__/origin")
 function getEffectiveVisibility(
   path: string,
-  visibilityMap: VisibilityMap
+  visibilityMap: VisibilityMap,
+  groupPath?: string
 ): VisibilityState {
   // Check if this path has explicit visibility
   if (visibilityMap[path]) {
@@ -251,8 +266,85 @@ function getEffectiveVisibility(
       return visibilityMap[parentPath];
     }
   }
+  
+  // Check group-level visibility
+  if (groupPath) {
+    // Check if any parent group has visibility set
+    const groupParts = groupPath.split('/');
+    for (let i = groupParts.length; i > 0; i--) {
+      const parentGroupPath = groupParts.slice(0, i).join('/');
+      if (visibilityMap[parentGroupPath]) {
+        return visibilityMap[parentGroupPath];
+      }
+    }
+  }
 
   return null;
+}
+
+// Group header component with visibility controls
+function GroupHeader({
+  name,
+  groupPath,
+  icon,
+  isExpanded,
+  onToggle,
+  visibilityMap,
+  onToggleVisibility,
+  depth = 0,
+}: {
+  name: string;
+  groupPath: string;
+  icon: React.ReactNode;
+  isExpanded: boolean;
+  onToggle: () => void;
+  visibilityMap: VisibilityMap;
+  onToggleVisibility: (path: string, type: 'visible' | 'hidden') => void;
+  depth?: number;
+}) {
+  const directVisibility = visibilityMap[groupPath];
+  // Check parent group visibility for inheritance
+  const parentGroupPath = groupPath.includes('/') 
+    ? groupPath.split('/').slice(0, -1).join('/') 
+    : undefined;
+  const parentVisibility = parentGroupPath ? visibilityMap[parentGroupPath] : null;
+  const effectiveVisibility = directVisibility || parentVisibility;
+  const isInherited = !directVisibility && parentVisibility !== null;
+  
+  return (
+    <div
+      className={cn(
+        "group flex items-center gap-1 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-muted/50 transition-colors font-medium",
+      )}
+      style={{ paddingLeft: `${depth * 12 + 8}px` }}
+    >
+      <div className="flex items-center gap-1.5 flex-1 min-w-0" onClick={onToggle}>
+        {isExpanded ? (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+        )}
+        {icon}
+        <span className="truncate">{name}</span>
+      </div>
+      <div className="flex items-center gap-0.5 ml-auto">
+        <VisibilityToggle
+          type="visible"
+          isActive={directVisibility === 'visible' || (isInherited && effectiveVisibility === 'visible')}
+          isInherited={isInherited && effectiveVisibility === 'visible'}
+          onClick={(e) => { e.stopPropagation(); onToggleVisibility(groupPath, 'visible'); }}
+          showOnHover={directVisibility === 'visible' || (isInherited && effectiveVisibility === 'visible')}
+        />
+        <VisibilityToggle
+          type="hidden"
+          isActive={directVisibility === 'hidden' || (isInherited && effectiveVisibility === 'hidden')}
+          isInherited={isInherited && effectiveVisibility === 'hidden'}
+          onClick={(e) => { e.stopPropagation(); onToggleVisibility(groupPath, 'hidden'); }}
+          showOnHover={directVisibility === 'hidden' || (isInherited && effectiveVisibility === 'hidden')}
+        />
+      </div>
+    </div>
+  );
 }
 
 
@@ -308,6 +400,8 @@ function BranchTreeItem({
   onToggleVisibility,
   parentPath = '',
   depth = 0,
+  groupPath,
+  isRemote = false,
 }: {
   node: BranchTreeNode;
   currentBranch?: string;
@@ -324,6 +418,8 @@ function BranchTreeItem({
   onToggleVisibility: (path: string, type: 'visible' | 'hidden') => void;
   parentPath?: string;
   depth?: number;
+  groupPath?: string;
+  isRemote?: boolean;
 }) {
   const children = Array.from(node.children.values());
   const sortedChildren = children.sort((a, b) => {
@@ -346,7 +442,7 @@ function BranchTreeItem({
 
         // Get visibility state for this item
         const directVisibility = visibilityMap[itemPath];
-        const effectiveVisibility = getEffectiveVisibility(itemPath, visibilityMap);
+        const effectiveVisibility = getEffectiveVisibility(itemPath, visibilityMap, groupPath);
         const isInherited = !directVisibility && effectiveVisibility !== null;
 
         if (isFolder) {
@@ -402,6 +498,8 @@ function BranchTreeItem({
                   onToggleVisibility={onToggleVisibility}
                   parentPath={itemPath}
                   depth={depth + 1}
+                  groupPath={groupPath}
+                  isRemote={isRemote}
                 />
               )}
             </div>
@@ -428,6 +526,8 @@ function BranchTreeItem({
                     <span className="w-3 h-3 flex items-center justify-center shrink-0">
                       <span className="w-2 h-2 rounded-full bg-primary" />
                     </span>
+                  ) : isRemote ? (
+                    <Globe className="h-3 w-3 shrink-0 text-muted-foreground" />
                   ) : (
                     <GitBranch className="h-3 w-3 shrink-0 text-muted-foreground" />
                   )}
@@ -456,33 +556,37 @@ function BranchTreeItem({
                 disabled={isCurrent}
                 onSelect={() => onCheckout(child.fullPath!)}
               >
-                Checkout
+                {isRemote ? 'Checkout (detached HEAD)' : 'Checkout'}
               </ContextMenuItem>
               <ContextMenuItem onSelect={onCreateBranch}>
                 Create Branch...
               </ContextMenuItem>
-              <ContextMenuItem onSelect={() => onRenameBranch(child.fullPath!)}>
-                Rename Branch...
-              </ContextMenuItem>
+              {!isRemote && (
+                <ContextMenuItem onSelect={() => onRenameBranch(child.fullPath!)}>
+                  Rename Branch...
+                </ContextMenuItem>
+              )}
               <ContextMenuItem
                 disabled={isCurrent}
                 onSelect={() => onRebase(child.fullPath!)}
               >
-                Rebase {currentBranch} onto {child.fullPath}
+                Rebase {currentBranch} onto {child.name}
               </ContextMenuItem>
               <ContextMenuItem
                 disabled={isCurrent}
                 onSelect={() => onMerge(child.fullPath!)}
               >
-                Merge {currentBranch} onto {child.fullPath}
+                Merge {child.name} into {currentBranch}
               </ContextMenuItem>
-              <ContextMenuItem
-                disabled={isCurrent}
-                className="text-destructive focus:text-destructive"
-                onSelect={() => onDeleteBranch(child.fullPath!)}
-              >
-                Delete Branch...
-              </ContextMenuItem>
+              {!isRemote && (
+                <ContextMenuItem
+                  disabled={isCurrent}
+                  className="text-destructive focus:text-destructive"
+                  onSelect={() => onDeleteBranch(child.fullPath!)}
+                >
+                  Delete Branch...
+                </ContextMenuItem>
+              )}
             </ContextMenuContent>
           </ContextMenu>
         );
@@ -494,7 +598,7 @@ function BranchTreeItem({
 export function HistoryView({ repoPath }: { repoPath: string }) {
   const [limit, setLimit] = useState(100);
   const { data: log, isLoading, isError, error, refetch, isFetching } = useGitLog(repoPath, limit);
-  const { data: branchData } = useGitBranches(repoPath);
+  const { data: branchData, isLoading: isBranchesLoading } = useGitBranches(repoPath);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
 
   const { mutateAsync: runGitAction } = useGitAction();
@@ -593,11 +697,23 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     };
   }, [isResizing]);
 
-  // Build branch tree and manage expanded state
-  const branchTree = useMemo(() => {
+  // Build branch trees for local and remote branches
+  const localBranchTree = useMemo(() => {
     if (!branchData?.branches) return null;
     return buildBranchTree(branchData.branches);
   }, [branchData?.branches]);
+  
+  const remoteBranchTrees = useMemo(() => {
+    if (!branchData?.remotes) return null;
+    return buildRemoteBranchTree(branchData.remotes);
+  }, [branchData?.remotes]);
+  
+  // Check if we have any remote branches
+  const hasRemotes = remoteBranchTrees && remoteBranchTrees.size > 0;
+  
+  // Group expanded state (for "Branches" and "Remotes" group headers)
+  const [localGroupExpanded, setLocalGroupExpanded] = useState(true);
+  const [remotesGroupExpanded, setRemotesGroupExpanded] = useState(true);
 
   // Storage key for this repo's expanded folders
   const storageKey = `git-web:branch-tree-expanded:${repoPath}`;
@@ -672,6 +788,34 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setVisibilityMap({});
   }, []);
 
+  // Helper to get effective visibility for a branch considering group paths
+  const getBranchEffectiveVisibility = useCallback((branch: string, isRemoteBranch: boolean) => {
+    // First check the branch itself
+    const directVis = getEffectiveVisibility(branch, visibilityMap);
+    if (directVis) return directVis;
+    
+    // Check group-level visibility
+    if (isRemoteBranch) {
+      // Remote branch format: remotes/origin/branch-name
+      const parts = branch.split('/');
+      if (parts.length >= 2 && parts[0] === 'remotes') {
+        const remoteName = parts[1];
+        // Check remote-specific group
+        const remoteGroupVis = visibilityMap[`__remotes__/${remoteName}`];
+        if (remoteGroupVis) return remoteGroupVis;
+        // Check all remotes group
+        const remotesVis = visibilityMap['__remotes__'];
+        if (remotesVis) return remotesVis;
+      }
+    } else {
+      // Local branch - check __local__ group
+      const localVis = visibilityMap['__local__'];
+      if (localVis) return localVis;
+    }
+    
+    return null;
+  }, [visibilityMap]);
+
   // Compute which branches should be visible based on visibility map
   const filteredCommits = useMemo(() => {
     if (!log?.all || !branchData?.branches || !branchData?.branchCommits) return log?.all || [];
@@ -684,17 +828,31 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       return log.all;
     }
 
+    // Get all branches (local + remote)
+    const allBranches: { branch: string; isRemote: boolean }[] = [
+      ...branchData.branches.map(b => ({ branch: b, isRemote: false })),
+    ];
+    
+    // Add remote branches
+    if (branchData.remotes) {
+      for (const [remoteName, branches] of Object.entries(branchData.remotes)) {
+        for (const branch of branches) {
+          allBranches.push({ branch: `remotes/${remoteName}/${branch}`, isRemote: true });
+        }
+      }
+    }
+
     // Calculate effective visibility for each branch
     const visibleBranches = new Set<string>();
-    const hiddenBranches = new Set<string>();
+    const hiddenBranchesSet = new Set<string>();
     const nonHiddenBranches = new Set<string>(); // Branches that are not hidden (for hidden-only mode)
     
-    for (const branch of branchData.branches) {
-      const effectiveVis = getEffectiveVisibility(branch, visibilityMap);
+    for (const { branch, isRemote } of allBranches) {
+      const effectiveVis = getBranchEffectiveVisibility(branch, isRemote);
       if (effectiveVis === 'visible') {
         visibleBranches.add(branch);
       } else if (effectiveVis === 'hidden') {
-        hiddenBranches.add(branch);
+        hiddenBranchesSet.add(branch);
       } else {
         // No visibility set - this branch is "neutral" (non-hidden)
         nonHiddenBranches.add(branch);
@@ -754,7 +912,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
     
     return log.all;
-  }, [log?.all, branchData?.branches, branchData?.branchCommits, visibilityMap]);
+  }, [log?.all, branchData?.branches, branchData?.branchCommits, branchData?.remotes, visibilityMap, getBranchEffectiveVisibility]);
 
   // Check if visibility filters are active
   const hasVisibilityFilters = useMemo(() => {
@@ -763,17 +921,33 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   // Compute hidden branches set for filtering branch tags in git graph
   const hiddenBranches = useMemo(() => {
-    if (!branchData?.branches) return new Set<string>();
-    
     const hidden = new Set<string>();
-    for (const branch of branchData.branches) {
-      const effectiveVis = getEffectiveVisibility(branch, visibilityMap);
-      if (effectiveVis === 'hidden') {
-        hidden.add(branch);
+    
+    // Check local branches
+    if (branchData?.branches) {
+      for (const branch of branchData.branches) {
+        const effectiveVis = getBranchEffectiveVisibility(branch, false);
+        if (effectiveVis === 'hidden') {
+          hidden.add(branch);
+        }
       }
     }
+    
+    // Check remote branches
+    if (branchData?.remotes) {
+      for (const [remoteName, branches] of Object.entries(branchData.remotes)) {
+        for (const branch of branches) {
+          const fullRef = `remotes/${remoteName}/${branch}`;
+          const effectiveVis = getBranchEffectiveVisibility(fullRef, true);
+          if (effectiveVis === 'hidden') {
+            hidden.add(fullRef);
+          }
+        }
+      }
+    }
+    
     return hidden;
-  }, [branchData?.branches, visibilityMap]);
+  }, [branchData?.branches, branchData?.remotes, getBranchEffectiveVisibility]);
 
   // Auto-fetch more commits when filtered results are too few
   const MIN_FILTERED_COMMITS = 50;
@@ -1051,22 +1225,98 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         </div>
         <ScrollArea className="flex-1 overflow-auto">
           <div className="p-2 space-y-0.5">
-            {branchTree && (
-              <BranchTreeItem
-                node={branchTree}
-                currentBranch={branchData?.current}
-                expandedFolders={expandedFolders}
-                onToggleFolder={toggleFolder}
-                onCheckout={handleCheckout}
-                onCreateBranch={() => setIsCreateBranchOpen(true)}
-                onDeleteBranch={confirmDeleteBranch}
-                onRenameBranch={confirmRenameBranch}
-                onRebase={confirmRebase}
-                onMerge={confirmMerge}
-                onBranchClick={handleBranchClick}
-                visibilityMap={visibilityMap}
-                onToggleVisibility={handleToggleVisibility}
-              />
+            {/* Local Branches Group */}
+            {localBranchTree && (
+              <>
+                <GroupHeader
+                  name="Branches"
+                  groupPath="__local__"
+                  icon={<GitBranch className="h-3.5 w-3.5 shrink-0" />}
+                  isExpanded={localGroupExpanded}
+                  onToggle={() => setLocalGroupExpanded(!localGroupExpanded)}
+                  visibilityMap={visibilityMap}
+                  onToggleVisibility={handleToggleVisibility}
+                />
+                {localGroupExpanded && (
+                  <BranchTreeItem
+                    node={localBranchTree}
+                    currentBranch={branchData?.current}
+                    expandedFolders={expandedFolders}
+                    onToggleFolder={toggleFolder}
+                    onCheckout={handleCheckout}
+                    onCreateBranch={() => setIsCreateBranchOpen(true)}
+                    onDeleteBranch={confirmDeleteBranch}
+                    onRenameBranch={confirmRenameBranch}
+                    onRebase={confirmRebase}
+                    onMerge={confirmMerge}
+                    onBranchClick={handleBranchClick}
+                    visibilityMap={visibilityMap}
+                    onToggleVisibility={handleToggleVisibility}
+                    depth={1}
+                    groupPath="__local__"
+                  />
+                )}
+              </>
+            )}
+            
+            {/* Remote Branches Group */}
+            {(hasRemotes || isBranchesLoading) && (
+              <>
+                <GroupHeader
+                  name="Remotes"
+                  groupPath="__remotes__"
+                  icon={<Globe className="h-3.5 w-3.5 shrink-0" />}
+                  isExpanded={remotesGroupExpanded}
+                  onToggle={() => setRemotesGroupExpanded(!remotesGroupExpanded)}
+                  visibilityMap={visibilityMap}
+                  onToggleVisibility={handleToggleVisibility}
+                />
+                {remotesGroupExpanded && isBranchesLoading && !remoteBranchTrees && (
+                  <div className="flex items-center gap-2 px-2 py-2 text-sm text-muted-foreground" style={{ paddingLeft: '20px' }}>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <span>Loading remotes...</span>
+                  </div>
+                )}
+                {remotesGroupExpanded && remoteBranchTrees && Array.from(remoteBranchTrees.entries()).map(([remoteName, tree]) => {
+                  const remoteGroupPath = `__remotes__/${remoteName}`;
+                  const isRemoteExpanded = expandedFolders.has(remoteGroupPath);
+                  
+                  return (
+                    <div key={remoteName}>
+                      <GroupHeader
+                        name={remoteName}
+                        groupPath={remoteGroupPath}
+                        icon={<Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                        isExpanded={isRemoteExpanded}
+                        onToggle={() => toggleFolder(remoteGroupPath)}
+                        visibilityMap={visibilityMap}
+                        onToggleVisibility={handleToggleVisibility}
+                        depth={1}
+                      />
+                      {isRemoteExpanded && (
+                        <BranchTreeItem
+                          node={tree}
+                          currentBranch={branchData?.current}
+                          expandedFolders={expandedFolders}
+                          onToggleFolder={toggleFolder}
+                          onCheckout={handleCheckout}
+                          onCreateBranch={() => setIsCreateBranchOpen(true)}
+                          onDeleteBranch={confirmDeleteBranch}
+                          onRenameBranch={confirmRenameBranch}
+                          onRebase={confirmRebase}
+                          onMerge={confirmMerge}
+                          onBranchClick={handleBranchClick}
+                          visibilityMap={visibilityMap}
+                          onToggleVisibility={handleToggleVisibility}
+                          depth={2}
+                          groupPath={remoteGroupPath}
+                          isRemote={true}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </>
             )}
           </div>
         </ScrollArea>
