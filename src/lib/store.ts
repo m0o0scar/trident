@@ -42,6 +42,21 @@ export function addRepository(repoPath: string, name?: string): Repository {
   return newRepo;
 }
 
+export function updateRepository(repoPath: string, updates: Partial<Repository>): Repository {
+  const repos = getRepositories();
+  const repoIndex = repos.findIndex(r => r.path === repoPath);
+  
+  if (repoIndex === -1) {
+    throw new Error('Repository not found');
+  }
+
+  const updatedRepo = { ...repos[repoIndex], ...updates };
+  repos[repoIndex] = updatedRepo;
+  
+  fs.writeFileSync(DATA_FILE, JSON.stringify(repos, null, 2));
+  return updatedRepo;
+}
+
 export function removeRepository(repoPath: string): void {
   let repos = getRepositories();
   repos = repos.filter(r => r.path !== repoPath);

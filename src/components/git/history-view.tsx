@@ -7,7 +7,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn, sanitizeBranchName } from '@/lib/utils';
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import ReactDiffViewer from 'react-diff-viewer';
+import ReactDiffViewer from '@alexbruf/react-diff-viewer';
+import '@alexbruf/react-diff-viewer/index.css';
 import { useTheme } from 'next-themes';
 import {
   ContextMenu,
@@ -26,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
@@ -93,7 +95,7 @@ function FileStatusIcon({ status }: { status: string }) {
 }
 
 // Component to show commit file diff
-function CommitFileDiffView({ repoPath, commitHash, filePath }: { repoPath: string; commitHash: string; filePath: string }) {
+function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { repoPath: string; commitHash: string; filePath: string; splitView: boolean }) {
   const { data, isLoading } = useCommitFileDiff(repoPath, commitHash, filePath);
   const { resolvedTheme } = useTheme();
 
@@ -117,23 +119,9 @@ function CommitFileDiffView({ repoPath, commitHash, filePath }: { repoPath: stri
       <ReactDiffViewer
         oldValue={data.left || ''}
         newValue={data.right || ''}
-        splitView={false}
+        splitView={splitView}
         useDarkTheme={resolvedTheme === 'dark'}
-        styles={{
-          diffContainer: {
-            fontSize: '11px',
-            fontFamily: 'monospace',
-          },
-          line: {
-            lineHeight: '1.3',
-          },
-          gutter: {
-            lineHeight: '1.3',
-          },
-          contentText: {
-            lineHeight: '1.3',
-          },
-        }}
+        disableWordDiff={true}
       />
     </div>
   );
@@ -143,6 +131,29 @@ function CommitFileDiffView({ repoPath, commitHash, filePath }: { repoPath: stri
 function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitHash: string }) {
   const { data, isLoading } = useCommitDiff(repoPath, commitHash);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  
+  // Storage key for split view preference - same as in DiffView
+  const storageKey = 'git-web:diff-view-split';
+  
+  const [splitView, setSplitView] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      return stored !== null ? JSON.parse(stored) : true;
+    } catch (e) {
+      console.error('Failed to load split view preference:', e);
+      return true;
+    }
+  });
+
+  // Save split view preference when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(splitView));
+    } catch (e) {
+      console.error('Failed to save split view preference:', e);
+    }
+  }, [splitView]);
 
   // Reset selected file when commit changes
   useEffect(() => {
@@ -195,11 +206,20 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
       <div className="flex-1 overflow-hidden">
         {selectedFile ? (
           <div className="h-full flex flex-col">
-            <div className="px-4 py-2 text-xs font-mono text-muted-foreground border-b bg-background shrink-0 truncate">
-              {selectedFile}
+            <div className="px-4 py-2 text-xs font-mono text-muted-foreground border-b bg-background shrink-0 truncate flex items-center justify-between">
+              <span className="truncate">{selectedFile}</span>
+              <div className="flex items-center gap-2 shrink-0 ml-4">
+                <Label htmlFor="commit-diff-split-view" className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer">Split View</Label>
+                <Switch
+                  id="commit-diff-split-view"
+                  checked={splitView}
+                  onCheckedChange={setSplitView}
+                  className="scale-75 origin-right"
+                />
+              </div>
             </div>
-            <div className="flex-1 overflow-auto">
-              <CommitFileDiffView repoPath={repoPath} commitHash={commitHash} filePath={selectedFile} />
+            <div className="flex-1 overflow-auto diff-viewer-wrapper">
+              <CommitFileDiffView repoPath={repoPath} commitHash={commitHash} filePath={selectedFile} splitView={splitView} />
             </div>
           </div>
         ) : (
