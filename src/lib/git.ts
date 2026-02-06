@@ -410,6 +410,94 @@ export class GitService {
     }
   }
 
+  async pullFromRemote(
+    localBranch: string,
+    remote: string,
+    remoteBranch: string,
+    options: {
+      rebase?: boolean;
+    } = {}
+  ): Promise<void> {
+    const { rebase = true } = options;
+    
+    console.log('[pullFromRemote] Starting pull:', { localBranch, remote, remoteBranch, options });
+    
+    // First, fetch from remote to get latest refs
+    console.log('[pullFromRemote] Fetching from remote:', remote);
+    await this.git.fetch(remote);
+    console.log('[pullFromRemote] Fetch completed');
+    
+    const remoteFull = `${remote}/${remoteBranch}`;
+    
+    // Check if remote branch exists
+    try {
+      await this.git.revparse(['--verify', `refs/remotes/${remoteFull}`]);
+      console.log('[pullFromRemote] Remote branch exists:', remoteFull);
+    } catch {
+      throw new Error(`Remote branch '${remoteFull}' does not exist`);
+    }
+    
+    // Check if we have uncommitted changes
+    const status = await this.git.status();
+    const hasChanges = status.files.length > 0;
+    console.log('[pullFromRemote] Has uncommitted changes:', hasChanges);
+    
+    if (hasChanges) {
+      // Stash changes before pull
+      console.log('[pullFromRemote] Stashing changes...');
+      await this.git.stash(['push', '-m', 'auto-stash before pull']);
+    }
+    
+    try {
+      if (rebase) {
+        // Rebase onto remote branch
+        console.log('[pullFromRemote] Rebasing onto:', remoteFull);
+        await this.git.rebase([remoteFull]);
+        console.log('[pullFromRemote] Rebase completed');
+      } else {
+        // Merge remote branch
+        console.log('[pullFromRemote] Merging:', remoteFull);
+        await this.git.merge([remoteFull]);
+        console.log('[pullFromRemote] Merge completed');
+      }
+      
+      // Pop stashed changes if we stashed them
+      if (hasChanges) {
+        try {
+          console.log('[pullFromRemote] Popping stashed changes...');
+          await this.git.stash(['pop']);
+        } catch {
+          throw new Error('Pull succeeded but failed to restore local changes. Run "git stash pop" manually.');
+        }
+      }
+      
+      console.log('[pullFromRemote] Operation completed successfully');
+    } catch (e) {
+      console.error('[pullFromRemote] Error:', e);
+      
+      // Abort the operation if it failed
+      try {
+        if (rebase) {
+          await this.git.rebase(['--abort']);
+        } else {
+          await this.git.merge(['--abort']);
+        }
+      } catch {
+        // Abort might fail if there's nothing to abort
+      }
+      
+      // Try to restore stashed changes on error
+      if (hasChanges) {
+        try {
+          await this.git.stash(['pop']);
+        } catch {
+          // Ignore stash pop errors during error handling
+        }
+      }
+      throw e;
+    }
+  }
+
   async pushToRemote(
     localBranch: string,
     remote: string,

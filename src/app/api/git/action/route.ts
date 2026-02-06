@@ -6,7 +6,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch', 'delete-branch', 'rename-branch', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch', 'delete-branch', 'rename-branch', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -103,6 +103,17 @@ export async function POST(request: Request) {
           setUpstream: data.setUpstream ?? false,
         });
         console.log('[API] git.pushToRemote completed');
+        break;
+      case 'pull-from-remote':
+        console.log('[API] pull-from-remote action received:', data);
+        if (!data?.localBranch) throw new Error('Local branch is required');
+        if (!data?.remote) throw new Error('Remote is required');
+        if (!data?.remoteBranch) throw new Error('Remote branch is required');
+        console.log('[API] Calling git.pullFromRemote...');
+        await git.pullFromRemote(data.localBranch, data.remote, data.remoteBranch, {
+          rebase: data.rebase ?? true,
+        });
+        console.log('[API] git.pullFromRemote completed');
         break;
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

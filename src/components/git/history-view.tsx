@@ -403,6 +403,7 @@ function BranchTreeItem({
   onRebase,
   onMerge,
   onPushToRemote,
+  onPullFromRemote,
   onBranchClick,
   visibilityMap,
   onToggleVisibility,
@@ -423,6 +424,7 @@ function BranchTreeItem({
   onRebase: (targetBranch: string) => void;
   onMerge: (targetBranch: string) => void;
   onPushToRemote: (branch: string) => void;
+  onPullFromRemote: (branch: string) => void;
   onBranchClick?: (branch: string) => void;
   visibilityMap: VisibilityMap;
   onToggleVisibility: (path: string, type: 'visible' | 'hidden') => void;
@@ -505,6 +507,7 @@ function BranchTreeItem({
                   onRebase={onRebase}
                   onMerge={onMerge}
                   onPushToRemote={onPushToRemote}
+                  onPullFromRemote={onPullFromRemote}
                   onBranchClick={onBranchClick}
                   visibilityMap={visibilityMap}
                   onToggleVisibility={onToggleVisibility}
@@ -605,6 +608,11 @@ function BranchTreeItem({
                   Push to Remote...
                 </ContextMenuItem>
               )}
+              {!isRemote && (
+                <ContextMenuItem onSelect={() => onPullFromRemote(child.fullPath!)}>
+                  Pull from Remote...
+                </ContextMenuItem>
+              )}
               <ContextMenuItem
                 disabled={isCurrent}
                 onSelect={() => onRebase(child.fullPath!)}
@@ -681,6 +689,20 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [pushError, setPushError] = useState<string | null>(null);
   const [pushLoadingRemotes, setPushLoadingRemotes] = useState(false);
   const [pushLoadingBranches, setPushLoadingBranches] = useState(false);
+
+  // Pull from remote dialog state
+  const [isPullOpen, setIsPullOpen] = useState(false);
+  const [pullBranch, setPullBranch] = useState<string | null>(null);
+  const [pullRemotes, setPullRemotes] = useState<string[]>([]);
+  const [pullSelectedRemote, setPullSelectedRemote] = useState<string>('');
+  const [pullRemoteBranches, setPullRemoteBranches] = useState<string[]>([]);
+  const [pullSelectedRemoteBranch, setPullSelectedRemoteBranch] = useState<string>('');
+  const [pullTrackingBranch, setPullTrackingBranch] = useState<{ remote: string; branch: string } | null>(null);
+  const [pullRebase, setPullRebase] = useState(true);
+  const [isPulling, setIsPulling] = useState(false);
+  const [pullError, setPullError] = useState<string | null>(null);
+  const [pullLoadingRemotes, setPullLoadingRemotes] = useState(false);
+  const [pullLoadingBranches, setPullLoadingBranches] = useState(false);
 
   // Ref for GitGraph to scroll to commits
   const gitGraphRef = useRef<GitGraphHandle>(null);
@@ -1341,6 +1363,134 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }
 
+  const confirmPullFromRemote = async (branch: string) => {
+    setPullBranch(branch);
+    setPullError(null);
+    setPullRemotes([]);
+    setPullRemoteBranches([]);
+    setPullSelectedRemote('');
+    setPullSelectedRemoteBranch('');
+    setPullTrackingBranch(null);
+    setPullRebase(true);
+    setIsPullOpen(true);
+    
+    // Load remotes
+    setPullLoadingRemotes(true);
+    try {
+      const result = await runGitAction({
+        repoPath,
+        action: 'get-remotes',
+        data: {}
+      });
+      
+      if (!result.remotes || result.remotes.length === 0) {
+        setPullError('No remote repository configured. Please add a remote first.');
+        setPullLoadingRemotes(false);
+        return;
+      }
+      
+      setPullRemotes(result.remotes);
+      
+      // Get tracking branch info
+      const trackingResult = await runGitAction({
+        repoPath,
+        action: 'get-tracking-branch',
+        data: { branch }
+      });
+      
+      setPullTrackingBranch(trackingResult.tracking);
+      
+      // Set default remote - use tracking remote if available and exists in remotes list, otherwise first remote
+      const trackingRemote = trackingResult.tracking?.remote;
+      const defaultRemote = (trackingRemote && result.remotes.includes(trackingRemote)) 
+        ? trackingRemote 
+        : result.remotes[0];
+      setPullSelectedRemote(defaultRemote);
+      
+      // Load branches for the default remote
+      setPullLoadingBranches(true);
+      const branchesResult = await runGitAction({
+        repoPath,
+        action: 'get-remote-branches',
+        data: { remote: defaultRemote }
+      });
+      
+      setPullRemoteBranches(branchesResult.branches || []);
+      
+      // Set default remote branch - use tracking branch if on same remote
+      if (trackingResult.tracking?.remote === defaultRemote && trackingResult.tracking?.branch) {
+        setPullSelectedRemoteBranch(trackingResult.tracking.branch);
+      } else {
+        // No tracking branch on this remote - leave empty to show error
+        setPullSelectedRemoteBranch('');
+      }
+    } catch (e) {
+      console.error(e);
+      setPullError((e as Error).message || 'Failed to load remote information');
+    } finally {
+      setPullLoadingRemotes(false);
+      setPullLoadingBranches(false);
+    }
+  }
+
+  const handlePullRemoteChange = async (remote: string) => {
+    setPullSelectedRemote(remote);
+    setPullLoadingBranches(true);
+    setPullRemoteBranches([]);
+    setPullSelectedRemoteBranch('');
+    
+    try {
+      const branchesResult = await runGitAction({
+        repoPath,
+        action: 'get-remote-branches',
+        data: { remote }
+      });
+      
+      setPullRemoteBranches(branchesResult.branches || []);
+      
+      // Set default branch - tracking branch if on this remote
+      if (pullTrackingBranch?.remote === remote && pullTrackingBranch?.branch) {
+        setPullSelectedRemoteBranch(pullTrackingBranch.branch);
+      } else {
+        // No tracking branch on this remote - leave empty
+        setPullSelectedRemoteBranch('');
+      }
+    } catch (e) {
+      console.error(e);
+      setPullError((e as Error).message || 'Failed to load remote branches');
+    } finally {
+      setPullLoadingBranches(false);
+    }
+  }
+
+  const handlePullFromRemote = async () => {
+    if (!pullBranch || !pullSelectedRemote || !pullSelectedRemoteBranch) return;
+    
+    setIsPulling(true);
+    setPullError(null);
+    
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'pull-from-remote',
+        data: {
+          localBranch: pullBranch,
+          remote: pullSelectedRemote,
+          remoteBranch: pullSelectedRemoteBranch,
+          rebase: pullRebase,
+        }
+      });
+      
+      setIsPullOpen(false);
+      setPullBranch(null);
+    } catch (e) {
+      console.error(e);
+      setPullError((e as Error).message || 'Failed to pull from remote');
+    } finally {
+      setIsPulling(false);
+    }
+  }
+
   const handleFetchFromAllRemotes = async () => {
     try {
       await runGitAction({
@@ -1469,6 +1619,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                     onRebase={confirmRebase}
                     onMerge={confirmMerge}
                     onPushToRemote={confirmPushToRemote}
+                    onPullFromRemote={confirmPullFromRemote}
                     onBranchClick={handleBranchClick}
                     visibilityMap={visibilityMap}
                     onToggleVisibility={handleToggleVisibility}
@@ -1545,6 +1696,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                           onRebase={confirmRebase}
                           onMerge={confirmMerge}
                           onPushToRemote={confirmPushToRemote}
+                          onPullFromRemote={confirmPullFromRemote}
                           onBranchClick={handleBranchClick}
                           visibilityMap={visibilityMap}
                           onToggleVisibility={handleToggleVisibility}
@@ -1874,6 +2026,143 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               >
                 {isPushing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
                 Push
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPullOpen} onOpenChange={setIsPullOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Pull from Remote</DialogTitle>
+            <DialogDescription>
+              Pull changes from a remote branch into <span className="font-semibold text-foreground">{pullBranch}</span>.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {pullError && pullRemotes.length === 0 ? (
+            // Error state when no remotes
+            <div className="py-4">
+              <div className="flex items-start gap-3 p-4 rounded-md bg-destructive/10 border border-destructive/20">
+                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-destructive">Error</p>
+                  <p className="text-sm text-muted-foreground">{pullError}</p>
+                </div>
+              </div>
+            </div>
+          ) : pullLoadingRemotes ? (
+            // Loading state
+            <div className="py-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            // Normal state with remotes
+            <div className="py-2 space-y-4">
+              {/* Remote selection */}
+              <div className="space-y-2">
+                <Label htmlFor="pull-remote" className="text-sm font-medium">Remote Repository</Label>
+                <Select
+                  value={pullSelectedRemote}
+                  onValueChange={handlePullRemoteChange}
+                  disabled={isPulling}
+                >
+                  <SelectTrigger id="pull-remote">
+                    <SelectValue placeholder="Select remote" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pullRemotes.map((remote) => (
+                      <SelectItem key={remote} value={remote}>
+                        {remote}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Remote branch selection */}
+              <div className="space-y-2">
+                <Label htmlFor="pull-remote-branch" className="text-sm font-medium">Remote Branch</Label>
+                {pullLoadingBranches ? (
+                  <div className="flex items-center gap-2 h-9 px-3 border rounded-md bg-muted/50">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm text-muted-foreground">Loading branches...</span>
+                  </div>
+                ) : (
+                  <Select
+                    value={pullSelectedRemoteBranch}
+                    onValueChange={setPullSelectedRemoteBranch}
+                    disabled={isPulling}
+                  >
+                    <SelectTrigger id="pull-remote-branch">
+                      <SelectValue placeholder="Select branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {pullRemoteBranches.map((branch) => (
+                        <SelectItem key={branch} value={branch}>
+                          {branch}
+                          {pullTrackingBranch?.remote === pullSelectedRemote && 
+                           pullTrackingBranch?.branch === branch && 
+                           ' (tracking)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                
+                {/* Error message when no tracking branch is selected */}
+                {!pullLoadingBranches && pullRemoteBranches.length > 0 && !pullSelectedRemoteBranch && (
+                  <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                    <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                    <p className="text-sm text-destructive">
+                      Branch <span className="font-medium">{pullBranch}</span> has no tracking remote branch on <span className="font-medium">{pullSelectedRemote}</span>. Please select a remote branch to pull from.
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Options */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="pull-rebase" 
+                    checked={pullRebase}
+                    onCheckedChange={(checked) => setPullRebase(checked === true)}
+                    disabled={isPulling}
+                  />
+                  <Label htmlFor="pull-rebase" className="text-sm font-normal cursor-pointer">
+                    Rebase onto remote branch
+                  </Label>
+                </div>
+                {!pullRebase && (
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Remote branch will be merged into local branch instead.
+                  </p>
+                )}
+              </div>
+              
+              {/* Error message during pull */}
+              {pullError && (
+                <div className="flex items-start gap-3 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                  <p className="text-sm text-destructive">{pullError}</p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPullOpen(false)} disabled={isPulling}>
+              Cancel
+            </Button>
+            {pullRemotes.length > 0 && (
+              <Button 
+                onClick={handlePullFromRemote} 
+                disabled={isPulling || !pullSelectedRemote || !pullSelectedRemoteBranch}
+              >
+                {isPulling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowDown className="h-4 w-4 mr-2" />}
+                Pull
               </Button>
             )}
           </DialogFooter>
