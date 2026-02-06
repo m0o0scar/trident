@@ -66,7 +66,7 @@ export function StatusView({ repoPath }: { repoPath: string }) {
     };
 
     return (
-        <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+        <div className="flex h-full overflow-hidden">
             {/* Left Panel: File List */}
             <div className="w-80 border-r flex flex-col bg-muted/10">
                 <div className="p-4 border-b flex items-center justify-between bg-background">
