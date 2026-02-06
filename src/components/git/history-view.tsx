@@ -1,8 +1,8 @@
 'use client';
 
-import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile } from '@/hooks/use-git';
+import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, BranchTrackingInfo } from '@/hooks/use-git';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal, X, Globe } from 'lucide-react';
+import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal, X, Globe, ArrowUp, ArrowDown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn, sanitizeBranchName } from '@/lib/utils';
 import { GitGraph, GitGraphHandle } from './git-graph';
@@ -402,6 +402,7 @@ function BranchTreeItem({
   depth = 0,
   groupPath,
   isRemote = false,
+  trackingInfo,
 }: {
   node: BranchTreeNode;
   currentBranch?: string;
@@ -420,6 +421,7 @@ function BranchTreeItem({
   depth?: number;
   groupPath?: string;
   isRemote?: boolean;
+  trackingInfo?: Record<string, BranchTrackingInfo>;
 }) {
   const children = Array.from(node.children.values());
   const sortedChildren = children.sort((a, b) => {
@@ -500,6 +502,7 @@ function BranchTreeItem({
                   depth={depth + 1}
                   groupPath={groupPath}
                   isRemote={isRemote}
+                  trackingInfo={trackingInfo}
                 />
               )}
             </div>
@@ -507,6 +510,8 @@ function BranchTreeItem({
         }
 
         // Render leaf (actual branch)
+        const branchTracking = !isRemote && child.fullPath ? trackingInfo?.[child.fullPath] : undefined;
+        const hasDivergence = branchTracking && (branchTracking.ahead > 0 || branchTracking.behind > 0);
         return (
           <ContextMenu key={child.fullPath}>
             <ContextMenuTrigger>
@@ -531,7 +536,26 @@ function BranchTreeItem({
                   ) : (
                     <GitBranch className="h-3 w-3 shrink-0 text-muted-foreground" />
                   )}
-                  <span className="truncate flex-1" title={child.fullPath}>{child.name}</span>
+                  <span className="truncate" title={child.fullPath}>{child.name}</span>
+                  {hasDivergence && (
+                    <span 
+                      className="flex items-center gap-1 text-xs text-muted-foreground shrink-0"
+                      title={`${branchTracking.ahead} ahead, ${branchTracking.behind} behind ${branchTracking.upstream}`}
+                    >
+                      {branchTracking.ahead > 0 && (
+                        <span className="flex items-center">
+                          <ArrowUp className="h-3 w-3" />
+                          <span>{branchTracking.ahead}</span>
+                        </span>
+                      )}
+                      {branchTracking.behind > 0 && (
+                        <span className="flex items-center">
+                          <ArrowDown className="h-3 w-3" />
+                          <span>{branchTracking.behind}</span>
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-0.5 ml-auto">
                   <VisibilityToggle
@@ -1254,6 +1278,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                     onToggleVisibility={handleToggleVisibility}
                     depth={1}
                     groupPath="__local__"
+                    trackingInfo={branchData?.trackingInfo}
                   />
                 )}
               </>
@@ -1311,6 +1336,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                           depth={2}
                           groupPath={remoteGroupPath}
                           isRemote={true}
+                          trackingInfo={branchData?.trackingInfo}
                         />
                       )}
                     </div>

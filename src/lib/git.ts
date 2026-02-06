@@ -175,11 +175,38 @@ export class GitService {
       }
     }
     
+    // Get tracking info (upstream) and ahead/behind counts for local branches
+    const trackingInfo: Record<string, { upstream: string; ahead: number; behind: number }> = {};
+    
+    for (const branch of localBranchSummary.all) {
+      try {
+        // Get the upstream branch for this local branch
+        const upstream = await this.git.raw(['for-each-ref', '--format=%(upstream:short)', `refs/heads/${branch}`]);
+        const upstreamBranch = upstream.trim();
+        
+        if (upstreamBranch) {
+          // Get ahead/behind counts using rev-list --left-right --count
+          const counts = await this.git.raw(['rev-list', '--left-right', '--count', `${branch}...${upstreamBranch}`]);
+          const [ahead, behind] = counts.trim().split(/\s+/).map(n => parseInt(n, 10) || 0);
+          
+          trackingInfo[branch] = {
+            upstream: upstreamBranch,
+            ahead,
+            behind
+          };
+        }
+      } catch (e) {
+        // Branch might not have an upstream, that's ok
+        console.debug(`No tracking info for branch ${branch}:`, e);
+      }
+    }
+    
     return {
       branches: localBranchSummary.all,
       current: localBranchSummary.current,
       branchCommits,
       remotes, // { "origin": ["main", "feature"], "upstream": ["main"] }
+      trackingInfo, // { "main": { upstream: "origin/main", ahead: 5, behind: 1 } }
     };
   }
 
