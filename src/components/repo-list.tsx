@@ -3,7 +3,7 @@
 import { useRepositories, useAddRepository } from '@/hooks/use-git';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { FolderOpen, Plus, ArrowRight } from 'lucide-react';
+import { FolderOpen, Plus, ArrowRight, Key } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -35,6 +35,12 @@ export function RepoList() {
                 </div>
                 <div className="flex items-center gap-2">
                     <ThemeToggle />
+                    <Button variant="outline" asChild>
+                        <Link href="/credentials" className="gap-2">
+                            <Key className="w-4 h-4" />
+                            Credentials
+                        </Link>
+                    </Button>
                     <Button onClick={() => setBrowserOpen(true)} className="gap-2">
                         <Plus className="w-4 h-4" />
                         Add Repository
