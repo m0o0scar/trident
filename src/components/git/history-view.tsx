@@ -27,6 +27,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
@@ -94,7 +95,7 @@ function FileStatusIcon({ status }: { status: string }) {
 }
 
 // Component to show commit file diff
-function CommitFileDiffView({ repoPath, commitHash, filePath }: { repoPath: string; commitHash: string; filePath: string }) {
+function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { repoPath: string; commitHash: string; filePath: string; splitView: boolean }) {
   const { data, isLoading } = useCommitFileDiff(repoPath, commitHash, filePath);
   const { resolvedTheme } = useTheme();
 
@@ -118,7 +119,7 @@ function CommitFileDiffView({ repoPath, commitHash, filePath }: { repoPath: stri
       <ReactDiffViewer
         oldValue={data.left || ''}
         newValue={data.right || ''}
-        splitView={false}
+        splitView={splitView}
         useDarkTheme={resolvedTheme === 'dark'}
 
       />
@@ -130,6 +131,7 @@ function CommitFileDiffView({ repoPath, commitHash, filePath }: { repoPath: stri
 function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitHash: string }) {
   const { data, isLoading } = useCommitDiff(repoPath, commitHash);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [splitView, setSplitView] = useState(true);
 
   // Reset selected file when commit changes
   useEffect(() => {
@@ -182,11 +184,20 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
       <div className="flex-1 overflow-hidden">
         {selectedFile ? (
           <div className="h-full flex flex-col">
-            <div className="px-4 py-2 text-xs font-mono text-muted-foreground border-b bg-background shrink-0 truncate">
-              {selectedFile}
+            <div className="px-4 py-2 text-xs font-mono text-muted-foreground border-b bg-background shrink-0 truncate flex items-center justify-between">
+              <span className="truncate">{selectedFile}</span>
+              <div className="flex items-center gap-2 shrink-0 ml-4">
+                <Label htmlFor="commit-diff-split-view" className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer">Split View</Label>
+                <Switch
+                  id="commit-diff-split-view"
+                  checked={splitView}
+                  onCheckedChange={setSplitView}
+                  className="scale-75 origin-right"
+                />
+              </div>
             </div>
             <div className="flex-1 overflow-auto">
-              <CommitFileDiffView repoPath={repoPath} commitHash={commitHash} filePath={selectedFile} />
+              <CommitFileDiffView repoPath={repoPath} commitHash={commitHash} filePath={selectedFile} splitView={splitView} />
             </div>
           </div>
         ) : (
