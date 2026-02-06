@@ -1413,6 +1413,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         }
       });
       
+      // Fetch from the remote we just pushed to
+      await runGitAction({
+        repoPath,
+        action: 'fetch',
+        data: { remote: pushSelectedRemote }
+      });
+      
       setIsPushOpen(false);
       setPushBranch(null);
     } catch (e) {
