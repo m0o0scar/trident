@@ -154,7 +154,7 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
         <div className="px-3 py-2 text-xs font-semibold text-muted-foreground border-b bg-background">
           {data.files.length} file{data.files.length !== 1 ? 's' : ''} changed
         </div>
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="p-1">
             {data.files.map((file) => (
               <div
