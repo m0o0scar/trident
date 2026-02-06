@@ -18,13 +18,15 @@ export function GitGraph({
     onSelectCommit,
     selectedHash,
     onEndReached,
-    isLoadingMore
+    isLoadingMore,
+    currentBranch
 }: {
     commits: Commit[],
     onSelectCommit?: (hash: string) => void,
     selectedHash?: string,
     onEndReached?: () => void,
-    isLoadingMore?: boolean
+    isLoadingMore?: boolean,
+    currentBranch?: string
 }) {
     const nodes = useMemo(() => generateGraphData(commits), [commits]);
 
@@ -132,19 +134,30 @@ export function GitGraph({
                                         {/* Refs Pills */}
                                         {node.refs && node.refs.split(', ').map((ref, idx) => {
                                             // remove potential leading and trailing brackets
-                                            const displayName = ref.replace(/^\s*\(|\)\s*$/g, '');
-                                            console.log('displayName', displayName, ref);
+                                            let displayName = ref.replace(/^\s*\(|\)\s*$/g, '');
+                                            // Check if this is the current branch by checking if it contains "HEAD -> branchName"
+                                            const isCurrentBranch = currentBranch && (
+                                                displayName === currentBranch || 
+                                                displayName === `HEAD -> ${currentBranch}` ||
+                                                displayName.includes(`HEAD -> ${currentBranch}`)
+                                            );
+                                            // Clean up "HEAD -> " prefix for display but keep for checking
+                                            const cleanDisplayName = displayName.replace(/^HEAD\s*->\s*/, '');
+                                            console.log('displayName', displayName, 'cleanDisplayName', cleanDisplayName, 'currentBranch', currentBranch, 'isCurrentBranch', isCurrentBranch);
                                             return (
                                                 <span key={idx}
-                                                    className="text-[10px] px-1.5 rounded-full border truncate max-w-[150px]"
+                                                    className={cn(
+                                                        "text-[10px] px-1.5 rounded-full border truncate max-w-[150px]",
+                                                        isCurrentBranch && "font-bold text-black dark:text-white"
+                                                    )}
                                                     style={{
                                                         borderColor: node.color,
-                                                        color: node.color,
+                                                        color: isCurrentBranch ? undefined : node.color,
                                                         backgroundColor: `${node.color}15` // 10% opacity
                                                     }}
-                                                    title={displayName}
+                                                    title={cleanDisplayName}
                                                 >
-                                                    {displayName}
+                                                    {cleanDisplayName}
                                                 </span>
                                             );
                                         })}

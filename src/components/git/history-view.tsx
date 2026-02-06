@@ -245,6 +245,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               }
             }}
             isLoadingMore={isFetching && limit > 100}
+            currentBranch={branchData?.current}
           />
         </div>
 
