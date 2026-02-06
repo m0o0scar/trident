@@ -124,12 +124,12 @@ export function GitGraph({
                                 <div style={{ width: width, flexShrink: 0 }} />
 
                                 {/* Content */}
-                                <div className="flex flex-1 gap-4 overflow-hidden pr-4 items-center">
-                                    <div className="flex-1 truncate flex items-center gap-2">
+                                <div className="flex flex-1 gap-4 overflow-hidden pr-4 items-center min-w-0">
+                                    <div className="flex-1 flex items-center gap-2 min-w-0">
                                         {/* Refs Pills */}
                                         {node.refs && node.refs.split(', ').map((ref, idx) => (
                                             <span key={idx}
-                                                className="text-[10px] px-1.5 rounded-full border truncate max-w-[150px]"
+                                                className="text-[10px] px-1.5 rounded-full border truncate max-w-[150px] shrink-0"
                                                 style={{
                                                     borderColor: node.color,
                                                     color: node.color,
@@ -139,17 +139,17 @@ export function GitGraph({
                                                 {ref}
                                             </span>
                                         ))}
-                                        <span className={cn("truncate min-w-0 max-w-[600px]", selectedHash === node.hash ? "font-semibold" : "")} title={node.message}>
+                                        <span className={cn("truncate min-w-0 flex-1", selectedHash === node.hash ? "font-semibold" : "")} title={node.message}>
                                             {node.message}
                                         </span>
                                     </div>
-                                    <div className="w-32 truncate text-muted-foreground text-xs text-right">
+                                    <div className="w-32 shrink-0 truncate text-muted-foreground text-xs text-right">
                                         {node.author_name}
                                     </div>
-                                    <div className="w-20 truncate text-muted-foreground text-xs text-right opacity-70 font-mono">
+                                    <div className="w-20 shrink-0 truncate text-muted-foreground text-xs text-right opacity-70 font-mono">
                                         {node.hash}
                                     </div>
-                                    <div className="w-32 truncate text-muted-foreground text-xs text-right">
+                                    <div className="w-32 shrink-0 truncate text-muted-foreground text-xs text-right">
                                         {new Date(node.date).toLocaleString(undefined, {
                                             month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
                                         })}
