@@ -188,7 +188,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                                 </span>
                                             );
                                         })}
-                                        <span className={cn("truncate min-w-0 max-w-[600px]", selectedHash === node.hash ? "font-semibold" : "")} title={node.message}>
+                                        <span className={cn("truncate min-w-0 max-w-[600px] text-xs", selectedHash === node.hash ? "font-semibold" : "")} title={node.message}>
                                             {node.message}
                                         </span>
                                     </div>
