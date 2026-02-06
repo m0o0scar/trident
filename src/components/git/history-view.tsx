@@ -49,6 +49,25 @@ interface BranchTreeNode {
   children: Map<string, BranchTreeNode>;
 }
 
+// Check if content appears to be binary (contains null bytes or high ratio of non-printable chars)
+function isBinaryContent(content: string): boolean {
+  if (!content) return false;
+  // Check for null bytes - strong indicator of binary content
+  if (content.includes('\0')) return true;
+  // Check first 8KB for non-printable characters
+  const sample = content.slice(0, 8192);
+  let nonPrintable = 0;
+  for (let i = 0; i < sample.length; i++) {
+    const code = sample.charCodeAt(i);
+    // Allow common whitespace (tab, newline, carriage return) and printable ASCII
+    if (code < 32 && code !== 9 && code !== 10 && code !== 13) {
+      nonPrintable++;
+    }
+  }
+  // If more than 10% non-printable, likely binary
+  return sample.length > 0 && (nonPrintable / sample.length) > 0.1;
+}
+
 // File status icon component
 function FileStatusIcon({ status }: { status: string }) {
   switch (status) {
@@ -76,6 +95,13 @@ function CommitFileDiffView({ repoPath, commitHash, filePath }: { repoPath: stri
     return <div className="flex items-center justify-center p-8 text-muted-foreground">No diff available</div>;
   }
 
+  // Check if either side is binary content
+  const isBinary = isBinaryContent(data.left || '') || isBinaryContent(data.right || '');
+
+  if (isBinary) {
+    return <div className="flex items-center justify-center p-8 text-muted-foreground">Binary file - diff not available</div>;
+  }
+
   return (
     <div className="overflow-auto h-full">
       <ReactDiffViewer
@@ -85,9 +111,18 @@ function CommitFileDiffView({ repoPath, commitHash, filePath }: { repoPath: stri
         useDarkTheme={resolvedTheme === 'dark'}
         styles={{
           diffContainer: {
-            fontSize: '12px',
+            fontSize: '11px',
             fontFamily: 'monospace',
-          }
+          },
+          line: {
+            lineHeight: '1.3',
+          },
+          gutter: {
+            lineHeight: '1.3',
+          },
+          contentText: {
+            lineHeight: '1.3',
+          },
         }}
       />
     </div>
