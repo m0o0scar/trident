@@ -1,12 +1,14 @@
 'use client';
 
-import { useGitLog, useGitBranches, useGitAction } from '@/hooks/use-git';
+import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile } from '@/hooks/use-git';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX } from 'lucide-react';
+import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import ReactDiffViewer from 'react-diff-viewer';
+import { useTheme } from 'next-themes';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -45,6 +47,117 @@ interface BranchTreeNode {
   name: string;
   fullPath?: string; // Only set for leaf nodes (actual branches)
   children: Map<string, BranchTreeNode>;
+}
+
+// File status icon component
+function FileStatusIcon({ status }: { status: string }) {
+  switch (status) {
+    case 'A':
+      return <FilePlus className="h-3.5 w-3.5 text-green-500" />;
+    case 'D':
+      return <FileMinus className="h-3.5 w-3.5 text-red-500" />;
+    case 'M':
+      return <FileEdit className="h-3.5 w-3.5 text-yellow-500" />;
+    default:
+      return <FileText className="h-3.5 w-3.5 text-muted-foreground" />;
+  }
+}
+
+// Component to show commit file diff
+function CommitFileDiffView({ repoPath, commitHash, filePath }: { repoPath: string; commitHash: string; filePath: string }) {
+  const { data, isLoading } = useCommitFileDiff(repoPath, commitHash, filePath);
+  const { resolvedTheme } = useTheme();
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center p-8"><Loader2 className="animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (!data) {
+    return <div className="flex items-center justify-center p-8 text-muted-foreground">No diff available</div>;
+  }
+
+  return (
+    <div className="overflow-auto h-full">
+      <ReactDiffViewer
+        oldValue={data.left || ''}
+        newValue={data.right || ''}
+        splitView={false}
+        useDarkTheme={resolvedTheme === 'dark'}
+        styles={{
+          diffContainer: {
+            fontSize: '12px',
+            fontFamily: 'monospace',
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+// Component to show commit changes
+function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitHash: string }) {
+  const { data, isLoading } = useCommitDiff(repoPath, commitHash);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+
+  // Reset selected file when commit changes
+  useEffect(() => {
+    setSelectedFile(null);
+  }, [commitHash]);
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center p-8 h-full"><Loader2 className="animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (!data || data.files.length === 0) {
+    return <div className="flex items-center justify-center p-8 h-full text-muted-foreground">No changes in this commit</div>;
+  }
+
+  return (
+    <div className="flex h-full">
+      {/* File list */}
+      <div className="w-64 border-r flex flex-col bg-muted/5 shrink-0">
+        <div className="px-3 py-2 text-xs font-semibold text-muted-foreground border-b bg-background">
+          {data.files.length} file{data.files.length !== 1 ? 's' : ''} changed
+        </div>
+        <ScrollArea className="flex-1">
+          <div className="p-1">
+            {data.files.map((file) => (
+              <div
+                key={file.path}
+                className={cn(
+                  "flex items-center gap-2 px-2 py-1.5 text-xs rounded cursor-pointer hover:bg-muted/50 transition-colors",
+                  selectedFile === file.path && "bg-muted"
+                )}
+                onClick={() => setSelectedFile(file.path)}
+                title={file.path}
+              >
+                <FileStatusIcon status={file.status} />
+                <span className="truncate flex-1 font-mono">{file.path.split('/').pop()}</span>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
+      </div>
+
+      {/* Diff view */}
+      <div className="flex-1 overflow-hidden">
+        {selectedFile ? (
+          <div className="h-full flex flex-col">
+            <div className="px-4 py-2 text-xs font-mono text-muted-foreground border-b bg-background shrink-0 truncate">
+              {selectedFile}
+            </div>
+            <div className="flex-1 overflow-auto">
+              <CommitFileDiffView repoPath={repoPath} commitHash={commitHash} filePath={selectedFile} />
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+            Select a file to view changes
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // Build tree structure from flat branch list
@@ -325,6 +438,69 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   
   // State for pending scroll to branch commit
   const [pendingScrollCommit, setPendingScrollCommit] = useState<string | null>(null);
+
+  // Bottom panel tab state
+  const [activeTab, setActiveTab] = useState<'message' | 'changes'>('message');
+  
+  // Resizable bottom panel state - load from localStorage
+  const panelHeightStorageKey = 'git-web:history-panel-height';
+  const [panelHeight, setPanelHeight] = useState(() => {
+    if (typeof window === 'undefined') return 200;
+    try {
+      const stored = localStorage.getItem(panelHeightStorageKey);
+      if (stored) {
+        const parsed = parseInt(stored, 10);
+        if (!isNaN(parsed) && parsed >= 100 && parsed <= 600) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load panel height from localStorage:', e);
+    }
+    return 200;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
+
+  // Save panel height to localStorage when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(panelHeightStorageKey, String(panelHeight));
+    } catch (e) {
+      console.error('Failed to save panel height to localStorage:', e);
+    }
+  }, [panelHeight]);
+
+  // Handle resize drag
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    resizeRef.current = { startY: e.clientY, startHeight: panelHeight };
+  }, [panelHeight]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const delta = resizeRef.current.startY - e.clientY;
+      const newHeight = Math.min(Math.max(resizeRef.current.startHeight + delta, 100), 600);
+      setPanelHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      resizeRef.current = null;
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
 
   // Build branch tree and manage expanded state
   const branchTree = useMemo(() => {
@@ -791,19 +967,70 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         </div>
 
         {selectedHash && (
-          <div className="h-48 flex flex-col overflow-hidden border-t bg-muted/10">
-            <div className="flex flex-row items-center py-2 px-4 border-b bg-background shrink-0 justify-between">
-              <span className="text-sm font-semibold truncate flex-1 mr-4">
-                {log.all.find(c => c.hash === selectedHash)?.message}
-              </span>
-              <span className="text-xs font-mono text-muted-foreground">
-                  {selectedHash.substring(0, 7)}
-              </span>
+          <div 
+            className="flex flex-col overflow-hidden border-t bg-muted/10"
+            style={{ height: panelHeight }}
+          >
+            {/* Resize handle */}
+            <div 
+              className={cn(
+                "h-1.5 cursor-ns-resize flex items-center justify-center hover:bg-muted/50 transition-colors group shrink-0",
+                isResizing && "bg-muted/50"
+              )}
+              onMouseDown={handleResizeStart}
+            >
+              <GripHorizontal className="h-3 w-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
             </div>
-            <div className="flex-1 overflow-auto p-4 bg-background">
-              <div className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
-                {log.all.find(c => c.hash === selectedHash)?.body}
+
+            {/* Header with commit info and tabs */}
+            <div className="flex flex-row items-center py-2 px-4 border-b bg-background shrink-0 justify-between gap-4">
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <span className="text-sm font-semibold truncate">
+                  {log.all.find(c => c.hash === selectedHash)?.message}
+                </span>
+                <span className="text-xs font-mono text-muted-foreground shrink-0">
+                  {selectedHash.substring(0, 7)}
+                </span>
               </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  className={cn(
+                    "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                    activeTab === 'message' 
+                      ? "bg-muted text-foreground" 
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                  onClick={() => setActiveTab('message')}
+                >
+                  Message
+                </button>
+                <button
+                  className={cn(
+                    "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                    activeTab === 'changes' 
+                      ? "bg-muted text-foreground" 
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                  onClick={() => setActiveTab('changes')}
+                >
+                  Changes
+                </button>
+              </div>
+            </div>
+
+            {/* Tab content */}
+            <div className="flex-1 overflow-hidden bg-background">
+              {activeTab === 'message' ? (
+                <ScrollArea className="h-full">
+                  <div className="p-4">
+                    <div className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                      {log.all.find(c => c.hash === selectedHash)?.body || 'No additional message'}
+                    </div>
+                  </div>
+                </ScrollArea>
+              ) : (
+                <CommitChangesView repoPath={repoPath} commitHash={selectedHash} />
+              )}
             </div>
           </div>
         )}

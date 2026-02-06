@@ -9,11 +9,12 @@ import pathLib from 'path';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const repoPath = searchParams.get('path'); // Renamed for clarity, was 'path'
+  const repoPath = searchParams.get('path');
   const filePath = searchParams.get('file');
+  const commitHash = searchParams.get('commit');
 
-  if (!repoPath || !filePath) {
-    return NextResponse.json({ error: 'Repo path and file path are required' }, { status: 400 });
+  if (!repoPath) {
+    return NextResponse.json({ error: 'Repo path is required' }, { status: 400 });
   }
 
   // Check if path exists
@@ -23,8 +24,25 @@ export async function GET(request: Request) {
 
   try {
     const git = new GitService(repoPath);
-    // TODO: Support getting diff for staged vs unstaged, or specific commits
-    // For now, simple diff against HEAD (changes in working dir)
+
+    // If commit hash is provided, get commit diff
+    if (commitHash) {
+      // If file path is also provided, get diff for that specific file in the commit
+      if (filePath) {
+        const { before, after } = await git.getCommitFileDiff(commitHash, filePath);
+        return NextResponse.json({ left: before, right: after });
+      }
+      
+      // Otherwise, get the list of files changed in the commit
+      const { files, diff } = await git.getCommitDiff(commitHash);
+      return NextResponse.json({ files, diff });
+    }
+
+    // Original behavior: diff against working directory
+    if (!filePath) {
+      return NextResponse.json({ error: 'File path is required' }, { status: 400 });
+    }
+
     const diff = await git.getDiff(filePath);
 
     // Get content for Diff Viewer
@@ -32,7 +50,6 @@ export async function GET(request: Request) {
     let right = '';
     const fullPath = pathLib.join(repoPath, filePath);
     if (fs.existsSync(fullPath)) {
-      // Check if directory? assume file for now
       right = await fs.promises.readFile(fullPath, 'utf-8');
     }
 

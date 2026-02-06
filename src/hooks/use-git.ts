@@ -123,6 +123,57 @@ export function useGitDiff(repoPath: string | null, filePath: string | null) {
   });
 }
 
+export interface CommitFile {
+  path: string;
+  status: string;
+  additions: number;
+  deletions: number;
+}
+
+export function useCommitDiff(repoPath: string | null, commitHash: string | null) {
+  return useQuery<{ files: CommitFile[]; diff: string }>({
+    queryKey: ['git', repoPath, 'commit-diff', commitHash],
+    queryFn: async () => {
+      if (!repoPath || !commitHash) return null;
+      const res = await fetch(`${API_BASE}/git/diff?path=${encodeURIComponent(repoPath)}&commit=${encodeURIComponent(commitHash)}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const err = new Error(errorData.error || 'Failed to fetch commit diff');
+        (err as any).status = res.status;
+        throw err;
+      }
+      return res.json();
+    },
+    enabled: !!repoPath && !!commitHash,
+    retry: (failureCount, error: any) => {
+      if (error.status === 404 || error.status === 400) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
+export function useCommitFileDiff(repoPath: string | null, commitHash: string | null, filePath: string | null) {
+  return useQuery<{ left: string; right: string }>({
+    queryKey: ['git', repoPath, 'commit-file-diff', commitHash, filePath],
+    queryFn: async () => {
+      if (!repoPath || !commitHash || !filePath) return null;
+      const res = await fetch(`${API_BASE}/git/diff?path=${encodeURIComponent(repoPath)}&commit=${encodeURIComponent(commitHash)}&file=${encodeURIComponent(filePath)}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const err = new Error(errorData.error || 'Failed to fetch file diff');
+        (err as any).status = res.status;
+        throw err;
+      }
+      return res.json();
+    },
+    enabled: !!repoPath && !!commitHash && !!filePath,
+    retry: (failureCount, error: any) => {
+      if (error.status === 404 || error.status === 400) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
 // Actions
 export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'branch' | 'delete-branch';
 
