@@ -98,7 +98,6 @@ export default function CredentialsPage() {
     }
   };
 
-  const hasGitHubCredential = credentials?.some((c) => c.type === 'github');
   const isSubmitting = createCredential.isPending || updateCredential.isPending;
 
   return (
@@ -125,8 +124,8 @@ export default function CredentialsPage() {
         {/* Add Credential Buttons */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <Card
-            className={`cursor-pointer transition-colors hover:border-primary/50 ${hasGitHubCredential ? 'opacity-50' : ''}`}
-            onClick={() => !hasGitHubCredential && handleOpenCreate('github')}
+            className="cursor-pointer transition-colors hover:border-primary/50"
+            onClick={() => handleOpenCreate('github')}
           >
             <CardHeader className="pb-3">
               <div className="flex items-center gap-3">
@@ -136,19 +135,17 @@ export default function CredentialsPage() {
                 <div>
                   <CardTitle className="text-base">GitHub</CardTitle>
                   <CardDescription className="text-xs">
-                    {hasGitHubCredential ? 'Already configured' : 'Personal Access Token'}
+                    Personal Access Token
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
-            {!hasGitHubCredential && (
-              <CardContent className="pt-0">
-                <Button variant="outline" size="sm" className="w-full gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add GitHub
-                </Button>
-              </CardContent>
-            )}
+            <CardContent className="pt-0">
+              <Button variant="outline" size="sm" className="w-full gap-2">
+                <Plus className="h-4 w-4" />
+                Add GitHub
+              </Button>
+            </CardContent>
           </Card>
 
           <Card

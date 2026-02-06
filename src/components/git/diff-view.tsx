@@ -4,7 +4,7 @@ import { useGitDiff } from '@/hooks/use-git';
 import { Loader2 } from 'lucide-react';
 import ReactDiffViewer from '@alexbruf/react-diff-viewer';
 import '@alexbruf/react-diff-viewer/index.css';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { useTheme } from 'next-themes';

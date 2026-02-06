@@ -166,9 +166,9 @@ export async function createGitHubCredential(token: string): Promise<{ success: 
 
   // Check if GitHub credential already exists
   const existing = getCredentialsMetadata();
-  const existingGitHub = existing.find((c) => c.type === 'github');
+  const existingGitHub = existing.find((c) => c.type === 'github' && c.username === verification.username);
   if (existingGitHub) {
-    return { success: false, error: 'A GitHub credential already exists. Please update or delete it first.' };
+    return { success: false, error: `A GitHub credential for ${verification.username} already exists. Please update or delete it first.` };
   }
 
   const id = generateId();
@@ -213,9 +213,9 @@ export async function createGitLabCredential(serverUrl: string, token: string): 
 
   // Check if GitLab credential for this server already exists
   const existing = getCredentialsMetadata();
-  const existingGitLab = existing.find((c) => c.type === 'gitlab' && c.serverUrl === normalizedUrl);
+  const existingGitLab = existing.find((c) => c.type === 'gitlab' && c.serverUrl === normalizedUrl && c.username === verification.username);
   if (existingGitLab) {
-    return { success: false, error: `A GitLab credential for ${normalizedUrl} already exists. Please update or delete it first.` };
+    return { success: false, error: `A GitLab credential for ${verification.username} on ${normalizedUrl} already exists. Please update or delete it first.` };
   }
 
   const id = generateId();
