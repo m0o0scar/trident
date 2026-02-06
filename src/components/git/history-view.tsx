@@ -949,7 +949,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         repoPath,
         action: 'merge',
         data: {
-          sourceBranch: mergeTargetBranch,
+          targetBranch: mergeTargetBranch,
           rebaseBeforeMerge: mergeRebaseBeforeMerge,
           squash: mergeSquash,
           fastForward: mergeFastForward,

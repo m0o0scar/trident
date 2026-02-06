@@ -229,7 +229,7 @@ export class GitService {
   }
 
   async merge(
-    sourceBranch: string,
+    targetBranch: string,
     options: {
       rebaseBeforeMerge?: boolean;
       squash?: boolean;
@@ -239,10 +239,17 @@ export class GitService {
   ): Promise<void> {
     const { rebaseBeforeMerge, squash, fastForward, squashMessage } = options;
 
-    // Rebase current branch onto source branch before merging if requested
+    // Get the current branch name (the branch we want to merge FROM)
+    const branchSummary = await this.git.branchLocal();
+    const sourceBranch = branchSummary.current;
+
+    // Rebase current branch onto target branch before merging if requested
     if (rebaseBeforeMerge) {
-      await this.git.rebase([sourceBranch]);
+      await this.git.rebase([targetBranch]);
     }
+
+    // Checkout the target branch (the branch we want to merge INTO)
+    await this.git.checkout(targetBranch);
 
     // Build merge arguments
     const mergeArgs: string[] = [];
@@ -258,6 +265,7 @@ export class GitService {
       mergeArgs.push('--no-ff');
     }
 
+    // Merge the source branch (original current branch) into target branch
     mergeArgs.push(sourceBranch);
 
     await this.git.merge(mergeArgs);

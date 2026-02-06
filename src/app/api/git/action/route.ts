@@ -66,8 +66,8 @@ export async function POST(request: Request) {
         await git.rebase(data.ontoBranch, data.stashChanges ?? true);
         break;
       case 'merge':
-        if (!data?.sourceBranch) throw new Error('Source branch is required for merge');
-        await git.merge(data.sourceBranch, {
+        if (!data?.targetBranch) throw new Error('Target branch is required for merge');
+        await git.merge(data.targetBranch, {
           rebaseBeforeMerge: data.rebaseBeforeMerge ?? false,
           squash: data.squash ?? false,
           fastForward: data.fastForward ?? false,
