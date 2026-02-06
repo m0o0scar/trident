@@ -280,7 +280,10 @@ export class GitService {
 
   async getCommitDiff(commitHash: string): Promise<{ files: { path: string; additions: number; deletions: number; status: string }[]; diff: string }> {
     // Get the list of files changed in this commit with stats
-    const diffStat = await this.git.raw(['diff-tree', '--no-commit-id', '--name-status', '-r', commitHash]);
+    // Use -m --first-parent to handle merge commits properly:
+    // - For regular commits: compares against the single parent (same behavior as before)
+    // - For merge commits: compares against the first parent (the branch being merged INTO)
+    const diffStat = await this.git.raw(['diff-tree', '-m', '--first-parent', '--no-commit-id', '--name-status', '-r', commitHash]);
     const files = diffStat.trim().split('\n').filter(Boolean).map(line => {
       const [status, ...pathParts] = line.split('\t');
       const path = pathParts.join('\t'); // Handle paths with tabs (rare)
@@ -288,7 +291,8 @@ export class GitService {
     });
 
     // Get the full diff for this commit
-    const diff = await this.git.raw(['show', '--format=', commitHash]);
+    // Use -m --first-parent for merge commits to show the diff against first parent
+    const diff = await this.git.raw(['show', '-m', '--first-parent', '--format=', commitHash]);
 
     return { files, diff };
   }
