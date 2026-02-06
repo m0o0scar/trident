@@ -645,15 +645,13 @@ function BranchTreeItem({
               >
                 Merge {child.name} into {currentBranch}
               </ContextMenuItem>
-              {!isRemote && (
-                <ContextMenuItem
-                  disabled={isCurrent}
-                  className="text-destructive focus:text-destructive"
-                  onSelect={() => onDeleteBranch(child.fullPath!)}
-                >
-                  Delete Branch...
-                </ContextMenuItem>
-              )}
+              <ContextMenuItem
+                disabled={isCurrent}
+                className="text-destructive focus:text-destructive"
+                onSelect={() => onDeleteBranch(child.fullPath!)}
+              >
+                {isRemote ? 'Delete Remote Branch...' : 'Delete Branch...'}
+              </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
         );
@@ -1141,11 +1139,26 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     if (!branchToDelete) return;
     setIsDeleting(true);
     try {
-      await runGitAction({
-        repoPath,
-        action: 'delete-branch',
-        data: { branch: branchToDelete }
-      });
+      // Check if it is a remote branch
+      if (branchToDelete.startsWith('remotes/')) {
+        const parts = branchToDelete.split('/');
+        // remotes/origin/main -> remote=origin, branch=main
+        if (parts.length >= 3) {
+          const remote = parts[1];
+          const branch = parts.slice(2).join('/');
+          await runGitAction({
+            repoPath,
+            action: 'delete-remote-branch',
+            data: { remote, branch }
+          });
+        }
+      } else {
+        await runGitAction({
+          repoPath,
+          action: 'delete-branch',
+          data: { branch: branchToDelete }
+        });
+      }
       setIsDeleteOpen(false);
       setBranchToDelete(null);
     } catch (e) {

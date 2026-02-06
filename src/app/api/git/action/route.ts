@@ -8,7 +8,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch', 'delete-branch', 'rename-branch', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -114,6 +114,13 @@ export async function POST(request: Request) {
       case 'delete-branch':
         if (!data?.branch) throw new Error('Branch name is required to delete branch');
         await git.deleteBranch(data.branch);
+        break;
+      case 'delete-remote-branch':
+        if (!data?.remote) throw new Error('Remote name is required to delete remote branch');
+        if (!data?.branch) throw new Error('Branch name is required to delete remote branch');
+        
+        const deleteCreds = await resolveCredentials(repoPath, git, data.remote);
+        await git.deleteRemoteBranch(data.remote, data.branch, deleteCreds);
         break;
       case 'rename-branch':
         if (!data?.oldName) throw new Error('Old branch name is required to rename branch');

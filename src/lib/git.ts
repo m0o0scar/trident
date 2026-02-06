@@ -263,6 +263,37 @@ export class GitService {
     await this.git.deleteLocalBranch(branch, true);
   }
 
+  async deleteRemoteBranch(remote: string, branch: string, credentials?: { username: string; token: string }): Promise<void> {
+    let targetRemote = remote;
+
+    if (credentials) {
+      const remoteUrl = await this.getRemoteUrl(remote);
+      if (remoteUrl) {
+        try {
+          const urlObj = new URL(remoteUrl);
+          urlObj.username = credentials.username;
+          urlObj.password = credentials.token;
+          targetRemote = urlObj.toString();
+        } catch (e) {
+          console.warn('[deleteRemoteBranch] Failed to construct authenticated URL, falling back to remote name', e);
+        }
+      } else {
+        console.warn(`[deleteRemoteBranch] Could not resolve URL for remote '${remote}', falling back to remote name`);
+      }
+    }
+
+    await this.git.push([targetRemote, '--delete', branch]);
+
+    // Also delete the remote-tracking branch locally to update the view immediately
+    // This is necessary because if we used a URL for targetRemote, git won't automatically prune the named remote's ref
+    try {
+      await this.git.branch(['-r', '-D', `${remote}/${branch}`]);
+    } catch (e) {
+      // Ignore error if branch doesn't exist locally or if deletion fails for some reason
+      console.debug(`[deleteRemoteBranch] Could not delete local remote-tracking branch ${remote}/${branch}:`, e);
+    }
+  }
+
   async renameBranch(oldName: string, newName: string): Promise<void> {
     await this.git.branch(['-m', oldName, newName]);
   }
