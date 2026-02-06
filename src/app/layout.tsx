@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Forkly",
-  description: "Git repository management tool",
+  description: "Git repository management tool"
 };
 
 export default function RootLayout({
