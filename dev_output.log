@@ -1,0 +1,14 @@
+
+> git-web@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.2:3000
+
+✓ Starting...
+✓ Ready in 1092ms
+○ Compiling / ...
+ GET / 200 in 4.8s (compile: 4.3s, render: 462ms)
+ GET /api/repos 200 in 1201ms (compile: 1171ms, render: 29ms)
+ GET /api/fs 200 in 194ms (compile: 181ms, render: 12ms)

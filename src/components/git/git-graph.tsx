@@ -54,9 +54,9 @@ export function GitGraph({
     }, [nodes.length, prevCount]);
 
     return (
-        <div className="flex border rounded-md h-full bg-background overflow-hidden font-mono text-sm select-none">
+        <div className="flex h-full bg-background overflow-hidden font-mono text-sm select-none px-2">
             {/* Graph Column (SVG) + Message Column (combined to ensure alignment) */}
-            <ScrollArea className="flex-1 h-full" onScroll={handleScroll} ref={scrollRef}>
+            <ScrollArea className="flex-1 h-full max-w-full" onScroll={handleScroll} ref={scrollRef}>
                 <div className="relative min-w-full" style={{ height }}>
                     {/* SVG Graph Layout */}
                     <svg width={width} height={height} className="absolute top-0 left-0 pointer-events-none z-10">
@@ -127,18 +127,24 @@ export function GitGraph({
                                 <div className="flex flex-1 gap-4 overflow-hidden pr-4 items-center">
                                     <div className="flex-1 truncate flex items-center gap-2">
                                         {/* Refs Pills */}
-                                        {node.refs && node.refs.split(', ').map((ref, idx) => (
-                                            <span key={idx}
-                                                className="text-[10px] px-1.5 rounded-full border truncate max-w-[150px]"
-                                                style={{
-                                                    borderColor: node.color,
-                                                    color: node.color,
-                                                    backgroundColor: `${node.color}15` // 10% opacity
-                                                }}
-                                            >
-                                                {ref}
-                                            </span>
-                                        ))}
+                                        {node.refs && node.refs.split(', ').map((ref, idx) => {
+                                            // remove potential leading and trailing brackets
+                                            const displayName = ref.replace(/^\s*\(|\)\s*$/g, '');
+                                            console.log('displayName', displayName, ref);
+                                            return (
+                                                <span key={idx}
+                                                    className="text-[10px] px-1.5 rounded-full border truncate max-w-[150px]"
+                                                    style={{
+                                                        borderColor: node.color,
+                                                        color: node.color,
+                                                        backgroundColor: `${node.color}15` // 10% opacity
+                                                    }}
+                                                    title={displayName}
+                                                >
+                                                    {displayName}
+                                                </span>
+                                            );
+                                        })}
                                         <span className={cn("truncate min-w-0 max-w-[600px]", selectedHash === node.hash ? "font-semibold" : "")} title={node.message}>
                                             {node.message}
                                         </span>

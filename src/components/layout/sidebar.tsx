@@ -29,30 +29,30 @@ export function Sidebar({ className }: SidebarProps) {
   };
 
   return (
-    <div className={cn("pb-12 w-64 border-r min-h-screen bg-gray-50/40 dark:bg-gray-900/40", className)}>
+    <div className={cn("pb-12 w-64 border-r min-h-screen bg-background relative", className)}>
       <div className="space-y-4 py-4">
         <div className="px-3 py-2">
-          <div className="mb-2 px-4 flex items-center justify-between">
+          <div className="mb-6 px-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold tracking-tight">
               Workspace
             </h2>
-            <div className="flex items-center gap-1">
-              <ThemeToggle />
-              <Button variant="ghost" size="icon" asChild title="Back to Dashboard">
+             <Button variant="ghost" size="icon" asChild title="Back to Dashboard" className="h-8 w-8">
                 <Link href="/">
                   <ArrowLeft className="h-4 w-4" />
                 </Link>
               </Button>
-            </div>
           </div>
-          <p className="px-4 text-xs text-muted-foreground break-all mb-4" title={repoPath}>
-            {repoPath.split('/').pop()}
-          </p>
+
+          <div className="px-4 mb-6">
+               <p className="text-xs font-mono text-muted-foreground break-all border rounded p-2 bg-muted/30" title={repoPath}>
+                {repoPath.split('/').pop()}
+              </p>
+          </div>
 
           <div className="space-y-1">
             <Button
               variant={isActive('status') ? 'secondary' : 'ghost'}
-              className="w-full justify-start"
+              className={cn("w-full justify-start", isActive('status') && "font-medium")}
               asChild
             >
               <Link href={getHref()}>
@@ -62,7 +62,7 @@ export function Sidebar({ className }: SidebarProps) {
             </Button>
             <Button
               variant={isActive('history') ? 'secondary' : 'ghost'}
-              className="w-full justify-start"
+              className={cn("w-full justify-start", isActive('history') && "font-medium")}
               asChild
             >
               <Link href={getHref('/history')}>
@@ -72,7 +72,7 @@ export function Sidebar({ className }: SidebarProps) {
             </Button>
             <Button
               variant={isActive('settings') ? 'secondary' : 'ghost'}
-              className="w-full justify-start"
+              className={cn("w-full justify-start", isActive('settings') && "font-medium")}
               asChild
             >
               <Link href={getHref('/settings')}>
@@ -82,6 +82,13 @@ export function Sidebar({ className }: SidebarProps) {
             </Button>
           </div>
         </div>
+      </div>
+
+      <div className="absolute bottom-4 left-0 w-full px-6">
+          <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <span className="text-xs text-muted-foreground">Theme</span>
+          </div>
       </div>
     </div>
   );

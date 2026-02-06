@@ -53,6 +53,7 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect }: FileSystemBr
     if (open && !currentPath) {
       loadPath();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const handleNavigate = (path: string) => {
@@ -61,30 +62,30 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect }: FileSystemBr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0 gap-0 overflow-hidden">
+        <DialogHeader className="p-4 border-b">
           <DialogTitle>Select Repository</DialogTitle>
-           <div className="text-sm text-muted-foreground font-mono truncate bg-muted p-1 rounded">
+           <div className="text-xs text-muted-foreground font-mono truncate pt-2">
             {currentPath || 'Loading...'}
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden border rounded-md relative">
+        <div className="flex-1 overflow-hidden relative bg-background">
             {isLoading && (
                 <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
-                    <Loader2 className="animate-spin w-8 h-8" />
+                    <Loader2 className="animate-spin w-8 h-8 text-muted-foreground" />
                 </div>
             )}
             
             <ScrollArea className="h-full">
-                <div className="p-2 space-y-1">
+                <div className="divide-y">
                     {data?.parent && (
                         <div 
-                            className="flex items-center gap-2 p-2 hover:bg-muted rounded cursor-pointer text-muted-foreground"
+                            className="flex items-center gap-3 px-4 py-3 hover:bg-muted/50 cursor-pointer text-muted-foreground transition-colors"
                             onClick={() => handleNavigate(data.parent)}
                         >
                             <ArrowUp className="w-4 h-4" />
-                            <span>..</span>
+                            <span className="text-sm">..</span>
                         </div>
                     )}
                     
@@ -92,21 +93,21 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect }: FileSystemBr
                         <div 
                             key={item.path}
                             className={cn(
-                                "flex items-center justify-between p-2 hover:bg-muted rounded cursor-pointer group",
-                                item.isRepo && "bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-100/50 dark:hover:bg-blue-900/20",
+                                "flex items-center justify-between px-4 py-3 hover:bg-muted/50 cursor-pointer group transition-colors",
                                 item.name.startsWith('.') && "opacity-60"
                             )}
                             onClick={() => handleNavigate(item.path)}
                         >
-                            <div className="flex items-center gap-2 truncate">
-                                {item.isRepo ? <GitBranch className="w-4 h-4 text-blue-500" /> : <Folder className="w-4 h-4 text-yellow-500" />}
-                                <span className="font-mono text-sm">{item.name}</span>
+                            <div className="flex items-center gap-3 truncate">
+                                {item.isRepo ? <GitBranch className="w-4 h-4 text-primary" /> : <Folder className="w-4 h-4 text-muted-foreground" />}
+                                <span className={cn("text-sm font-mono", item.isRepo && "font-medium")}>{item.name}</span>
                             </div>
                             
                             {item.isRepo && (
                                 <Button 
                                     size="xs" 
-                                    variant="secondary" 
+                                    variant="outline"
+                                    className="h-7 text-xs"
                                     onClick={(e) => { e.stopPropagation(); onSelect(item.path); onOpenChange(false); }}
                                 >
                                     Select
@@ -116,7 +117,7 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect }: FileSystemBr
                     ))}
                     
                     {data?.folders.length === 0 && (
-                        <div className="p-4 text-center text-muted-foreground text-sm">
+                        <div className="p-8 text-center text-muted-foreground text-sm">
                             No folders found
                         </div>
                     )}
@@ -124,9 +125,9 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect }: FileSystemBr
             </ScrollArea>
         </div>
 
-        <DialogFooter className="flex justify-between items-center sm:justify-between">
+        <DialogFooter className="p-4 border-t flex items-center justify-between sm:justify-between bg-muted/5">
            <div className="text-xs text-muted-foreground">
-               Click folder to navigate. Click Select on valid repos.
+               Click folder to navigate.
            </div>
            <Button variant="default" onClick={() => { onSelect(currentPath); onOpenChange(false); }}>
                Select Current Folder
