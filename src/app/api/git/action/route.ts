@@ -6,7 +6,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch', 'delete-branch', 'rename-branch', 'rebase', 'merge']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch', 'delete-branch', 'rename-branch', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -79,6 +79,30 @@ export async function POST(request: Request) {
           fastForward: data.fastForward ?? false,
           squashMessage: data.squashMessage,
         });
+        break;
+      case 'get-remotes':
+        const remotes = await git.getRemotes();
+        return NextResponse.json({ success: true, remotes });
+      case 'get-remote-branches':
+        if (!data?.remote) throw new Error('Remote name is required');
+        const remoteBranches = await git.getRemoteBranches(data.remote);
+        return NextResponse.json({ success: true, branches: remoteBranches });
+      case 'get-tracking-branch':
+        if (!data?.branch) throw new Error('Branch name is required');
+        const tracking = await git.getTrackingBranch(data.branch);
+        return NextResponse.json({ success: true, tracking });
+      case 'push-to-remote':
+        console.log('[API] push-to-remote action received:', data);
+        if (!data?.localBranch) throw new Error('Local branch is required');
+        if (!data?.remote) throw new Error('Remote is required');
+        if (!data?.remoteBranch) throw new Error('Remote branch is required');
+        console.log('[API] Calling git.pushToRemote...');
+        await git.pushToRemote(data.localBranch, data.remote, data.remoteBranch, {
+          rebaseFirst: data.rebaseFirst ?? true,
+          forcePush: data.forcePush ?? false,
+          setUpstream: data.setUpstream ?? false,
+        });
+        console.log('[API] git.pushToRemote completed');
         break;
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

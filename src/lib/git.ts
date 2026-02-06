@@ -13,7 +13,16 @@ export function getGit(repoPath: string): SimpleGit {
       maxConcurrentProcesses: 6,
       trimmed: false,
     };
-    gitInstances[repoPath] = simpleGit(options);
+    const git = simpleGit(options);
+    
+    // Configure git to not prompt for credentials - fail instead of hang
+    git.env({
+      ...process.env,
+      GIT_TERMINAL_PROMPT: '0',
+      GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o StrictHostKeyChecking=no',
+    });
+    
+    gitInstances[repoPath] = git;
   }
   return gitInstances[repoPath];
 }
@@ -352,6 +361,160 @@ export class GitService {
     if (squash) {
       const message = squashMessage || `Squash merge branch '${sourceBranch}'`;
       await this.git.commit(message);
+    }
+  }
+
+  async getRemotes(): Promise<string[]> {
+    const remotes = await this.git.getRemotes();
+    return remotes.map(r => r.name);
+  }
+
+  async getRemoteBranches(remote: string): Promise<string[]> {
+    // Fetch from remote first to get latest branches
+    await this.git.fetch(remote);
+    
+    const allBranches = await this.git.branch(['-r']);
+    const remoteBranches: string[] = [];
+    
+    for (const branch of allBranches.all) {
+      // Remote branches look like: origin/main, origin/feature
+      if (branch.startsWith(`${remote}/`)) {
+        const branchName = branch.slice(`${remote}/`.length);
+        // Skip HEAD symbolic ref
+        if (branchName === 'HEAD' || branchName.startsWith('HEAD ')) continue;
+        remoteBranches.push(branchName);
+      }
+    }
+    
+    return remoteBranches;
+  }
+
+  async getTrackingBranch(localBranch: string): Promise<{ remote: string; branch: string } | null> {
+    try {
+      const upstream = await this.git.raw(['for-each-ref', '--format=%(upstream:short)', `refs/heads/${localBranch}`]);
+      const upstreamBranch = upstream.trim();
+      
+      if (upstreamBranch) {
+        // Parse "origin/main" format
+        const slashIndex = upstreamBranch.indexOf('/');
+        if (slashIndex > 0) {
+          return {
+            remote: upstreamBranch.slice(0, slashIndex),
+            branch: upstreamBranch.slice(slashIndex + 1)
+          };
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  async pushToRemote(
+    localBranch: string,
+    remote: string,
+    remoteBranch: string,
+    options: {
+      rebaseFirst?: boolean;
+      forcePush?: boolean;
+      setUpstream?: boolean;
+    } = {}
+  ): Promise<void> {
+    const { rebaseFirst, forcePush, setUpstream } = options;
+    
+    console.log('[pushToRemote] Starting push:', { localBranch, remote, remoteBranch, options });
+    
+    // Check if we have uncommitted changes
+    const status = await this.git.status();
+    const hasChanges = status.files.length > 0;
+    console.log('[pushToRemote] Has uncommitted changes:', hasChanges);
+    
+    if (hasChanges && rebaseFirst) {
+      // Stash changes before rebase
+      console.log('[pushToRemote] Stashing changes...');
+      await this.git.stash(['push', '-m', 'auto-stash before push rebase']);
+    }
+    
+    try {
+      // First, fetch from remote to update our local refs (general fetch, not specific branch)
+      // This updates our knowledge of what branches exist on the remote
+      console.log('[pushToRemote] Fetching from remote:', remote);
+      await this.git.fetch(remote);
+      console.log('[pushToRemote] Fetch completed');
+      
+      const remoteFull = `${remote}/${remoteBranch}`;
+      
+      // Check if remote branch exists by trying to resolve it
+      let remoteBranchExists = false;
+      try {
+        await this.git.revparse(['--verify', `refs/remotes/${remoteFull}`]);
+        remoteBranchExists = true;
+        console.log('[pushToRemote] Remote branch exists:', remoteFull);
+      } catch {
+        // Remote branch doesn't exist
+        remoteBranchExists = false;
+        console.log('[pushToRemote] Remote branch does not exist:', remoteFull);
+      }
+      
+      // Only rebase/merge if the remote branch exists
+      if (remoteBranchExists) {
+        if (rebaseFirst) {
+          // Remote branch exists, rebase onto it
+          console.log('[pushToRemote] Rebasing onto:', remoteFull);
+          await this.git.rebase([remoteFull]);
+          console.log('[pushToRemote] Rebase completed');
+        } else {
+          // Remote branch exists, merge it
+          console.log('[pushToRemote] Merging:', remoteFull);
+          await this.git.merge([remoteFull]);
+          console.log('[pushToRemote] Merge completed');
+        }
+      }
+      
+      // Build push options
+      const pushOptions: string[] = [];
+      
+      if (forcePush) {
+        pushOptions.push('--force');
+      }
+      
+      if (setUpstream) {
+        pushOptions.push('-u');
+      }
+      
+      // Add --progress to see what's happening
+      pushOptions.push('--progress');
+      
+      console.log('[pushToRemote] Pushing to', remote, 'with refspec', `${localBranch}:${remoteBranch}`, 'options:', pushOptions);
+      
+      // Use simple-git's push method with explicit remote and branch
+      // This handles credentials better than raw commands
+      const pushResult = await this.git.push(remote, `${localBranch}:${remoteBranch}`, pushOptions);
+      console.log('[pushToRemote] Push completed successfully, result:', pushResult);
+      
+      // Pop stashed changes if we stashed them
+      if (hasChanges && rebaseFirst) {
+        try {
+          console.log('[pushToRemote] Popping stashed changes...');
+          await this.git.stash(['pop']);
+        } catch {
+          // Stash pop might fail if there are conflicts
+          throw new Error('Push succeeded but failed to restore local changes. Run "git stash pop" manually.');
+        }
+      }
+      
+      console.log('[pushToRemote] Operation completed successfully');
+    } catch (e) {
+      console.error('[pushToRemote] Error:', e);
+      // Try to restore stashed changes on error
+      if (hasChanges && rebaseFirst) {
+        try {
+          await this.git.stash(['pop']);
+        } catch {
+          // Ignore stash pop errors during error handling
+        }
+      }
+      throw e;
     }
   }
 }

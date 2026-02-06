@@ -2,7 +2,7 @@
 
 import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, BranchTrackingInfo } from '@/hooks/use-git';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal, X, Globe, ArrowUp, ArrowDown } from 'lucide-react';
+import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal, X, Globe, ArrowUp, ArrowDown, Upload, AlertCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn, sanitizeBranchName } from '@/lib/utils';
 import { GitGraph, GitGraphHandle } from './git-graph';
@@ -27,6 +27,13 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 import {
   AlertDialog,
@@ -395,6 +402,7 @@ function BranchTreeItem({
   onRenameBranch,
   onRebase,
   onMerge,
+  onPushToRemote,
   onBranchClick,
   visibilityMap,
   onToggleVisibility,
@@ -414,6 +422,7 @@ function BranchTreeItem({
   onRenameBranch: (branch: string) => void;
   onRebase: (targetBranch: string) => void;
   onMerge: (targetBranch: string) => void;
+  onPushToRemote: (branch: string) => void;
   onBranchClick?: (branch: string) => void;
   visibilityMap: VisibilityMap;
   onToggleVisibility: (path: string, type: 'visible' | 'hidden') => void;
@@ -495,6 +504,7 @@ function BranchTreeItem({
                   onRenameBranch={onRenameBranch}
                   onRebase={onRebase}
                   onMerge={onMerge}
+                  onPushToRemote={onPushToRemote}
                   onBranchClick={onBranchClick}
                   visibilityMap={visibilityMap}
                   onToggleVisibility={onToggleVisibility}
@@ -590,6 +600,11 @@ function BranchTreeItem({
                   Rename Branch...
                 </ContextMenuItem>
               )}
+              {!isRemote && (
+                <ContextMenuItem onSelect={() => onPushToRemote(child.fullPath!)}>
+                  Push to Remote...
+                </ContextMenuItem>
+              )}
               <ContextMenuItem
                 disabled={isCurrent}
                 onSelect={() => onRebase(child.fullPath!)}
@@ -651,6 +666,21 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [mergeFastForward, setMergeFastForward] = useState(false);
   const [mergeSquashMessage, setMergeSquashMessage] = useState('');
   const [isMerging, setIsMerging] = useState(false);
+
+  // Push to remote dialog state
+  const [isPushOpen, setIsPushOpen] = useState(false);
+  const [pushBranch, setPushBranch] = useState<string | null>(null);
+  const [pushRemotes, setPushRemotes] = useState<string[]>([]);
+  const [pushSelectedRemote, setPushSelectedRemote] = useState<string>('');
+  const [pushRemoteBranches, setPushRemoteBranches] = useState<string[]>([]);
+  const [pushSelectedRemoteBranch, setPushSelectedRemoteBranch] = useState<string>('');
+  const [pushTrackingBranch, setPushTrackingBranch] = useState<{ remote: string; branch: string } | null>(null);
+  const [pushRebaseFirst, setPushRebaseFirst] = useState(true);
+  const [pushForcePush, setPushForcePush] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
+  const [pushLoadingRemotes, setPushLoadingRemotes] = useState(false);
+  const [pushLoadingBranches, setPushLoadingBranches] = useState(false);
 
   // Ref for GitGraph to scroll to commits
   const gitGraphRef = useRef<GitGraphHandle>(null);
@@ -1170,6 +1200,147 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }
 
+  const confirmPushToRemote = async (branch: string) => {
+    setPushBranch(branch);
+    setPushError(null);
+    setPushRemotes([]);
+    setPushRemoteBranches([]);
+    setPushSelectedRemote('');
+    setPushSelectedRemoteBranch('');
+    setPushTrackingBranch(null);
+    setPushRebaseFirst(true);
+    setPushForcePush(false);
+    setIsPushOpen(true);
+    
+    // Load remotes
+    setPushLoadingRemotes(true);
+    try {
+      const result = await runGitAction({
+        repoPath,
+        action: 'get-remotes',
+        data: {}
+      });
+      
+      if (!result.remotes || result.remotes.length === 0) {
+        setPushError('No remote repository configured. Please add a remote first.');
+        setPushLoadingRemotes(false);
+        return;
+      }
+      
+      setPushRemotes(result.remotes);
+      
+      // Get tracking branch info
+      const trackingResult = await runGitAction({
+        repoPath,
+        action: 'get-tracking-branch',
+        data: { branch }
+      });
+      
+      setPushTrackingBranch(trackingResult.tracking);
+      
+      // Set default remote - use tracking remote if available and exists in remotes list, otherwise first remote
+      const trackingRemote = trackingResult.tracking?.remote;
+      const defaultRemote = (trackingRemote && result.remotes.includes(trackingRemote)) 
+        ? trackingRemote 
+        : result.remotes[0];
+      setPushSelectedRemote(defaultRemote);
+      
+      // Load branches for the default remote
+      setPushLoadingBranches(true);
+      const branchesResult = await runGitAction({
+        repoPath,
+        action: 'get-remote-branches',
+        data: { remote: defaultRemote }
+      });
+      
+      setPushRemoteBranches(branchesResult.branches || []);
+      
+      // Set default remote branch - use tracking branch if on same remote, otherwise use branch name
+      if (trackingResult.tracking?.remote === defaultRemote && trackingResult.tracking?.branch) {
+        setPushSelectedRemoteBranch(trackingResult.tracking.branch);
+      } else {
+        // Default to same name as local branch, or first branch if local branch name doesn't exist
+        const localBranchName = branch;
+        if (branchesResult.branches?.includes(localBranchName)) {
+          setPushSelectedRemoteBranch(localBranchName);
+        } else {
+          // Will create new branch with local branch name
+          setPushSelectedRemoteBranch(localBranchName);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      setPushError((e as Error).message || 'Failed to load remote information');
+    } finally {
+      setPushLoadingRemotes(false);
+      setPushLoadingBranches(false);
+    }
+  }
+
+  const handlePushRemoteChange = async (remote: string) => {
+    setPushSelectedRemote(remote);
+    setPushLoadingBranches(true);
+    setPushRemoteBranches([]);
+    
+    try {
+      const branchesResult = await runGitAction({
+        repoPath,
+        action: 'get-remote-branches',
+        data: { remote }
+      });
+      
+      setPushRemoteBranches(branchesResult.branches || []);
+      
+      // Set default branch - tracking branch if on this remote, otherwise local branch name
+      if (pushTrackingBranch?.remote === remote && pushTrackingBranch?.branch) {
+        setPushSelectedRemoteBranch(pushTrackingBranch.branch);
+      } else {
+        setPushSelectedRemoteBranch(pushBranch || '');
+      }
+    } catch (e) {
+      console.error(e);
+      setPushError((e as Error).message || 'Failed to load remote branches');
+    } finally {
+      setPushLoadingBranches(false);
+    }
+  }
+
+  const handlePushToRemote = async () => {
+    if (!pushBranch || !pushSelectedRemote || !pushSelectedRemoteBranch) return;
+    
+    setIsPushing(true);
+    setPushError(null);
+    
+    try {
+      // Determine if we need to set upstream
+      const isNewBranch = !pushRemoteBranches.includes(pushSelectedRemoteBranch);
+      const needsSetUpstream = isNewBranch || 
+        pushTrackingBranch?.remote !== pushSelectedRemote || 
+        pushTrackingBranch?.branch !== pushSelectedRemoteBranch;
+      
+      await runGitAction({
+        repoPath,
+        action: 'push-to-remote',
+        data: {
+          localBranch: pushBranch,
+          remote: pushSelectedRemote,
+          remoteBranch: pushSelectedRemoteBranch,
+          rebaseFirst: pushRebaseFirst,
+          forcePush: pushForcePush,
+          setUpstream: needsSetUpstream,
+        }
+      });
+      
+      setIsPushOpen(false);
+      setPushBranch(null);
+    } catch (e) {
+      console.error(e);
+      setPushError((e as Error).message || 'Failed to push to remote');
+    } finally {
+      setIsPushing(false);
+    }
+  }
+
   const handleFetchFromAllRemotes = async () => {
     try {
       await runGitAction({
@@ -1297,6 +1468,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                     onRenameBranch={confirmRenameBranch}
                     onRebase={confirmRebase}
                     onMerge={confirmMerge}
+                    onPushToRemote={confirmPushToRemote}
                     onBranchClick={handleBranchClick}
                     visibilityMap={visibilityMap}
                     onToggleVisibility={handleToggleVisibility}
@@ -1372,6 +1544,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                           onRenameBranch={confirmRenameBranch}
                           onRebase={confirmRebase}
                           onMerge={confirmMerge}
+                          onPushToRemote={confirmPushToRemote}
                           onBranchClick={handleBranchClick}
                           visibilityMap={visibilityMap}
                           onToggleVisibility={handleToggleVisibility}
@@ -1545,6 +1718,164 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <Button onClick={handleMerge} disabled={isMerging}>
               {isMerging ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPushOpen} onOpenChange={setIsPushOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Push to Remote</DialogTitle>
+            <DialogDescription>
+              Push <span className="font-semibold text-foreground">{pushBranch}</span> to a remote repository.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {pushError && pushRemotes.length === 0 ? (
+            // Error state when no remotes
+            <div className="py-4">
+              <div className="flex items-start gap-3 p-4 rounded-md bg-destructive/10 border border-destructive/20">
+                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-destructive">Error</p>
+                  <p className="text-sm text-muted-foreground">{pushError}</p>
+                </div>
+              </div>
+            </div>
+          ) : pushLoadingRemotes ? (
+            // Loading state
+            <div className="py-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            // Normal state with remotes
+            <div className="py-2 space-y-4">
+              {/* Remote selection */}
+              <div className="space-y-2">
+                <Label htmlFor="push-remote" className="text-sm font-medium">Remote Repository</Label>
+                <Select
+                  value={pushSelectedRemote}
+                  onValueChange={handlePushRemoteChange}
+                  disabled={isPushing}
+                >
+                  <SelectTrigger id="push-remote">
+                    <SelectValue placeholder="Select remote" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {pushRemotes.map((remote) => (
+                      <SelectItem key={remote} value={remote}>
+                        {remote}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Remote branch selection */}
+              <div className="space-y-2">
+                <Label htmlFor="push-remote-branch" className="text-sm font-medium">Remote Branch</Label>
+                {pushLoadingBranches ? (
+                  <div className="flex items-center gap-2 h-9 px-3 border rounded-md bg-muted/50">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm text-muted-foreground">Loading branches...</span>
+                  </div>
+                ) : (
+                  <Select
+                    value={pushSelectedRemoteBranch}
+                    onValueChange={setPushSelectedRemoteBranch}
+                    disabled={isPushing}
+                  >
+                    <SelectTrigger id="push-remote-branch">
+                      <SelectValue placeholder="Select or create branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {/* Show the local branch name as an option if it doesn't exist on remote */}
+                      {pushBranch && !pushRemoteBranches.includes(pushBranch) && (
+                        <SelectItem value={pushBranch}>
+                          {pushBranch} (new)
+                        </SelectItem>
+                      )}
+                      {pushRemoteBranches.map((branch) => (
+                        <SelectItem key={branch} value={branch}>
+                          {branch}
+                          {pushTrackingBranch?.remote === pushSelectedRemote && 
+                           pushTrackingBranch?.branch === branch && 
+                           ' (tracking)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                
+                {/* Info message about new branch creation */}
+                {pushSelectedRemoteBranch && !pushRemoteBranches.includes(pushSelectedRemoteBranch) && (
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <AlertCircle className="h-3 w-3" />
+                    A new remote branch <span className="font-medium">{pushSelectedRemoteBranch}</span> will be created and tracked by <span className="font-medium">{pushBranch}</span>.
+                  </p>
+                )}
+              </div>
+              
+              {/* Options */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="push-rebase-first" 
+                    checked={pushRebaseFirst}
+                    onCheckedChange={(checked) => setPushRebaseFirst(checked === true)}
+                    disabled={isPushing}
+                  />
+                  <Label htmlFor="push-rebase-first" className="text-sm font-normal cursor-pointer">
+                    Rebase onto remote branch before pushing
+                  </Label>
+                </div>
+                {!pushRebaseFirst && (
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Remote branch will be merged into local branch first, then pushed.
+                  </p>
+                )}
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="push-force" 
+                    checked={pushForcePush}
+                    onCheckedChange={(checked) => setPushForcePush(checked === true)}
+                    disabled={isPushing}
+                  />
+                  <Label htmlFor="push-force" className="text-sm font-normal cursor-pointer">
+                    Force push
+                  </Label>
+                </div>
+                {pushForcePush && (
+                  <p className="text-xs text-destructive ml-6">
+                    Warning: Force push will overwrite remote history. Use with caution.
+                  </p>
+                )}
+              </div>
+              
+              {/* Error message during push */}
+              {pushError && (
+                <div className="flex items-start gap-3 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                  <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
+                  <p className="text-sm text-destructive">{pushError}</p>
+                </div>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPushOpen(false)} disabled={isPushing}>
+              Cancel
+            </Button>
+            {pushRemotes.length > 0 && (
+              <Button 
+                onClick={handlePushToRemote} 
+                disabled={isPushing || !pushSelectedRemote || !pushSelectedRemoteBranch}
+              >
+                {isPushing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                Push
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

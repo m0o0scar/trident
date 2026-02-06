@@ -187,7 +187,7 @@ export function useCommitFileDiff(repoPath: string | null, commitHash: string | 
 }
 
 // Actions
-export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'branch' | 'delete-branch' | 'rename-branch' | 'rebase' | 'merge';
+export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'branch' | 'delete-branch' | 'rename-branch' | 'rebase' | 'merge' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'push-to-remote';
 
 interface GitActionPayload {
   repoPath: string;
@@ -211,8 +211,12 @@ export function useGitAction() {
       return res.json();
     },
     onSuccess: (_, variables) => {
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ['git', variables.repoPath] });
+      // Don't invalidate for read-only actions
+      const readOnlyActions = ['get-remotes', 'get-remote-branches', 'get-tracking-branch'];
+      if (!readOnlyActions.includes(variables.action)) {
+        // Invalidate relevant queries
+        queryClient.invalidateQueries({ queryKey: ['git', variables.repoPath] });
+      }
     },
   });
 }
