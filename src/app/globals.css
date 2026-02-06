@@ -130,8 +130,38 @@
   font-family: monospace !important;
 }
 
-.diff-container .line, 
-.diff-container .gutter, 
+.diff-container .line,
+.diff-container .gutter,
 .diff-container pre {
   line-height: 1.3 !important;
+}
+
+/* Force Equal Split View using Wrapper Class and Nth-Child */
+/* This is necessary because the library's fixed layout algorithm behaves unpredictably with width:auto */
+
+/* 1. Force fixed table layout */
+.diff-viewer-wrapper table.split-view {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+/* 2. Constrain Gutters (Columns 1 & 4) */
+.diff-viewer-wrapper table.split-view tbody tr td:nth-child(1),
+.diff-viewer-wrapper table.split-view tbody tr td:nth-child(4) {
+  width: 40px !important;
+  min-width: 40px !important;
+  white-space: nowrap !important;
+}
+
+/* 3. Constrain Markers (Columns 2 & 5) */
+.diff-viewer-wrapper table.split-view tbody tr td:nth-child(2),
+.diff-viewer-wrapper table.split-view tbody tr td:nth-child(5) {
+  width: 20px !important;
+  min-width: 20px !important;
+}
+
+/* 4. Force Content Columns (Columns 3 & 6) to be equal */
+.diff-viewer-wrapper table.split-view tbody tr td:nth-child(3),
+.diff-viewer-wrapper table.split-view tbody tr td:nth-child(6) {
+  width: auto !important;
 }

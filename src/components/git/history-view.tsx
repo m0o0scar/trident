@@ -121,7 +121,7 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
         newValue={data.right || ''}
         splitView={splitView}
         useDarkTheme={resolvedTheme === 'dark'}
-
+        disableWordDiff={true}
       />
     </div>
   );
@@ -131,7 +131,29 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
 function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitHash: string }) {
   const { data, isLoading } = useCommitDiff(repoPath, commitHash);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [splitView, setSplitView] = useState(true);
+  
+  // Storage key for split view preference - same as in DiffView
+  const storageKey = 'git-web:diff-view-split';
+  
+  const [splitView, setSplitView] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      return stored !== null ? JSON.parse(stored) : true;
+    } catch (e) {
+      console.error('Failed to load split view preference:', e);
+      return true;
+    }
+  });
+
+  // Save split view preference when it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(splitView));
+    } catch (e) {
+      console.error('Failed to save split view preference:', e);
+    }
+  }, [splitView]);
 
   // Reset selected file when commit changes
   useEffect(() => {
@@ -196,7 +218,7 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
                 />
               </div>
             </div>
-            <div className="flex-1 overflow-auto">
+            <div className="flex-1 overflow-auto diff-viewer-wrapper">
               <CommitFileDiffView repoPath={repoPath} commitHash={commitHash} filePath={selectedFile} splitView={splitView} />
             </div>
           </div>

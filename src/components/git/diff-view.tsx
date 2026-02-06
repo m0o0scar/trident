@@ -30,8 +30,33 @@ function isBinaryContent(content: string): boolean {
 
 export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: string }) {
   const { data, isLoading } = useGitDiff(repoPath, filePath);
-  const [splitView, setSplitView] = useState(true);
+  
+  // Storage key for split view preference
+  const storageKey = 'git-web:diff-view-split';
+  
+  const [splitView, setSplitView] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const stored = localStorage.getItem(storageKey);
+      return stored !== null ? JSON.parse(stored) : true;
+    } catch (e) {
+      console.error('Failed to load split view preference:', e);
+      return true;
+    }
+  });
+  
   const { resolvedTheme } = useTheme();
+
+  // Save split view preference when it changes
+  // We use a separate effect for saving to avoid hydration mismatches if we used the initializer alone
+  // (though the initializer above is the standard pattern in this codebase)
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(splitView));
+    } catch (e) {
+      console.error('Failed to save split view preference:', e);
+    }
+  }, [splitView]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8 h-full"><Loader2 className="animate-spin text-muted-foreground" /></div>;
@@ -75,13 +100,13 @@ export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: s
           />
         </div>
       </div>
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto diff-viewer-wrapper">
         <ReactDiffViewer
           oldValue={data.left || ''}
           newValue={data.right || ''}
           splitView={splitView}
           useDarkTheme={resolvedTheme === 'dark'}
-
+          disableWordDiff={true}
         />
       </div>
     </div>
