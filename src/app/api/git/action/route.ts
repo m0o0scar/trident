@@ -1,6 +1,8 @@
 
 import { NextResponse } from 'next/server';
 import { GitService } from '@/lib/git';
+import { getRepositories } from '@/lib/store';
+import { getCredentialById, getCredentialToken, findCredentialForRemote } from '@/lib/credentials';
 import { z } from 'zod';
 import fs from 'node:fs';
 
@@ -9,6 +11,35 @@ const actionSchema = z.object({
   action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch', 'delete-branch', 'rename-branch', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote']),
   data: z.any().optional(), // Payload depends on action
 });
+
+async function resolveCredentials(repoPath: string, git: GitService, remoteName?: string) {
+  const repos = getRepositories();
+  const repoConfig = repos.find(r => r.path === repoPath);
+  
+  // 1. Check for explicitly associated credential
+  if (repoConfig?.credentialId) {
+    const cred = await getCredentialById(repoConfig.credentialId);
+    if (cred) {
+      const token = await getCredentialToken(cred.id);
+      if (token) {
+        return { username: cred.username, token };
+      }
+    }
+  }
+
+  // 2. Fallback: try to find matching credential by URL
+  if (remoteName) {
+    const remoteUrl = await git.getRemoteUrl(remoteName);
+    if (remoteUrl) {
+       const result = await findCredentialForRemote(remoteUrl);
+       if (result) {
+         return { username: result.credential.username, token: result.token };
+       }
+    }
+  }
+
+  return undefined;
+}
 
 export async function POST(request: Request) {
   try {
@@ -28,7 +59,29 @@ export async function POST(request: Request) {
         await git.commit(data.message, data.files);
         break;
       case 'push':
-        await git.push();
+        // Try to resolve credentials
+        let pushCredentials = await resolveCredentials(repoPath, git, undefined);
+        
+        if (!pushCredentials) {
+            // If no associated credential, try to infer from upstream
+            try {
+                const status = await git.getBranches();
+                const current = status.current;
+                const tracking = status.trackingInfo[current];
+                if (tracking && tracking.upstream) {
+                    const slashIndex = tracking.upstream.indexOf('/');
+                    if (slashIndex > 0) {
+                        const remoteName = tracking.upstream.slice(0, slashIndex);
+                        pushCredentials = await resolveCredentials(repoPath, git, remoteName);
+                    }
+                }
+            } catch (e) {
+                // Ignore errors finding upstream, just proceed without creds
+                console.warn('[API] Failed to resolve upstream for push credentials:', e);
+            }
+        }
+        
+        await git.push({ credentials: pushCredentials });
         break;
       case 'pull':
         await git.pull();
@@ -96,11 +149,15 @@ export async function POST(request: Request) {
         if (!data?.localBranch) throw new Error('Local branch is required');
         if (!data?.remote) throw new Error('Remote is required');
         if (!data?.remoteBranch) throw new Error('Remote branch is required');
+        
+        const creds = await resolveCredentials(repoPath, git, data.remote);
+        
         console.log('[API] Calling git.pushToRemote...');
         await git.pushToRemote(data.localBranch, data.remote, data.remoteBranch, {
           rebaseFirst: data.rebaseFirst ?? true,
           forcePush: data.forcePush ?? false,
           setUpstream: data.setUpstream ?? false,
+          credentials: creds,
         });
         console.log('[API] git.pushToRemote completed');
         break;

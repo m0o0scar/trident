@@ -33,6 +33,24 @@ export function useAddRepository() {
   });
 }
 
+export function useUpdateRepository() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ path, updates }: { path: string; updates: Partial<Repository> }) => {
+      const res = await fetch(`${API_BASE}/repos`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path, updates }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repos'] });
+    },
+  });
+}
+
 export function useGitStatus(repoPath: string | null) {
   return useQuery<GitStatus>({
     queryKey: ['git', repoPath, 'status'],
@@ -98,6 +116,7 @@ export function useGitBranches(repoPath: string | null) {
     current: string, 
     branchCommits: Record<string, string>, 
     remotes: Record<string, string[]>,
+    remoteUrls: Record<string, string>,
     trackingInfo: Record<string, BranchTrackingInfo>
   }>({
     queryKey: ['git', repoPath, 'branches'],

@@ -2,6 +2,7 @@
 export interface Repository {
   path: string;
   name: string;
+  credentialId?: string | null;
 }
 
 export interface GitStatus {

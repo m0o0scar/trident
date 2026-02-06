@@ -93,8 +93,24 @@ export class GitService {
     await this.git.pull();
   }
 
-  async push(): Promise<void> {
-    await this.git.push();
+  async push(options: { credentials?: { username: string; token: string } } = {}): Promise<void> {
+    const { credentials } = options;
+
+    if (credentials) {
+      // If credentials are provided, we must use pushToRemote with the authenticated URL
+      // We need to resolve the current branch and its upstream
+      const branchSummary = await this.git.branchLocal();
+      const currentBranch = branchSummary.current;
+      
+      const tracking = await this.getTrackingBranch(currentBranch);
+      if (!tracking) {
+        throw new Error(`No upstream configured for branch '${currentBranch}'. Cannot push with credentials.`);
+      }
+
+      await this.pushToRemote(currentBranch, tracking.remote, tracking.branch, { credentials });
+    } else {
+      await this.git.push();
+    }
   }
 
   async commit(message: string, files?: string[]): Promise<void> {
@@ -218,11 +234,19 @@ export class GitService {
       }
     }
     
+    // Get remote URLs
+    const remoteList = await this.git.getRemotes(true);
+    const remoteUrls: Record<string, string> = {};
+    for (const r of remoteList) {
+        remoteUrls[r.name] = r.refs.fetch || r.refs.push;
+    }
+
     return {
       branches: localBranchSummary.all,
       current: localBranchSummary.current,
       branchCommits,
       remotes, // { "origin": ["main", "feature"], "upstream": ["main"] }
+      remoteUrls,
       trackingInfo, // { "main": { upstream: "origin/main", ahead: 5, behind: 1 } }
     };
   }
@@ -502,6 +526,16 @@ export class GitService {
     }
   }
 
+  async getRemoteUrl(remoteName: string): Promise<string | null> {
+    try {
+      const remotes = await this.git.getRemotes(true);
+      const remote = remotes.find(r => r.name === remoteName);
+      return remote ? (remote.refs.push || remote.refs.fetch) : null;
+    } catch {
+      return null;
+    }
+  }
+
   async pushToRemote(
     localBranch: string,
     remote: string,
@@ -510,11 +544,18 @@ export class GitService {
       rebaseFirst?: boolean;
       forcePush?: boolean;
       setUpstream?: boolean;
+      credentials?: { username: string; token: string };
     } = {}
   ): Promise<void> {
-    const { rebaseFirst, forcePush, setUpstream } = options;
+    const { rebaseFirst, forcePush, setUpstream, credentials } = options;
     
-    console.log('[pushToRemote] Starting push:', { localBranch, remote, remoteBranch, options });
+    // Mask token for logging
+    const logOptions = { ...options };
+    if (logOptions.credentials) {
+      logOptions.credentials = { ...logOptions.credentials, token: '***' };
+    }
+    
+    console.log('[pushToRemote] Starting push:', { localBranch, remote, remoteBranch, options: logOptions });
     
     // Check if we have uncommitted changes
     const status = await this.git.status();
@@ -528,10 +569,34 @@ export class GitService {
     }
     
     try {
+      // Determine the remote URL or name to use
+      let targetRemote = remote;
+      
+      if (credentials) {
+        const remoteUrl = await this.getRemoteUrl(remote);
+        if (remoteUrl) {
+          try {
+            // Inject credentials into the URL
+            const urlObj = new URL(remoteUrl);
+            urlObj.username = credentials.username;
+            urlObj.password = credentials.token;
+            targetRemote = urlObj.toString();
+            console.log('[pushToRemote] Using authenticated URL for push');
+          } catch (e) {
+            console.warn('[pushToRemote] Failed to construct authenticated URL, falling back to remote name', e);
+          }
+        } else {
+            console.warn(`[pushToRemote] Could not resolve URL for remote '${remote}', falling back to remote name`);
+        }
+      }
+
       // First, fetch from remote to update our local refs (general fetch, not specific branch)
       // This updates our knowledge of what branches exist on the remote
       console.log('[pushToRemote] Fetching from remote:', remote);
-      await this.git.fetch(remote);
+      // Note: We use the original remote name for fetch, assuming fetch auth is handled or same as push
+      // If fetch requires auth, we might need to use targetRemote here too, but simple-git might handle it if configured
+      // For now, let's try using targetRemote for fetch as well if we have credentials
+      await this.git.fetch(targetRemote);
       console.log('[pushToRemote] Fetch completed');
       
       const remoteFull = `${remote}/${remoteBranch}`;
@@ -581,7 +646,8 @@ export class GitService {
       
       // Use simple-git's push method with explicit remote and branch
       // This handles credentials better than raw commands
-      const pushResult = await this.git.push(remote, `${localBranch}:${remoteBranch}`, pushOptions);
+      // Use targetRemote (which might contain credentials)
+      const pushResult = await this.git.push(targetRemote, `${localBranch}:${remoteBranch}`, pushOptions);
       console.log('[pushToRemote] Push completed successfully, result:', pushResult);
       
       // Pop stashed changes if we stashed them
