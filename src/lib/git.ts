@@ -517,10 +517,10 @@ export class GitService {
     const hasChanges = status.files.length > 0;
     console.log('[pushToRemote] Has uncommitted changes:', hasChanges);
     
-    if (hasChanges && rebaseFirst) {
-      // Stash changes before rebase
+    if (hasChanges) {
+      // Stash changes before push (including any rebase/merge operations)
       console.log('[pushToRemote] Stashing changes...');
-      await this.git.stash(['push', '-m', 'auto-stash before push rebase']);
+      await this.git.stash(['push', '-m', 'auto-stash before push']);
     }
     
     try {
@@ -581,7 +581,7 @@ export class GitService {
       console.log('[pushToRemote] Push completed successfully, result:', pushResult);
       
       // Pop stashed changes if we stashed them
-      if (hasChanges && rebaseFirst) {
+      if (hasChanges) {
         try {
           console.log('[pushToRemote] Popping stashed changes...');
           await this.git.stash(['pop']);
@@ -595,7 +595,7 @@ export class GitService {
     } catch (e) {
       console.error('[pushToRemote] Error:', e);
       // Try to restore stashed changes on error
-      if (hasChanges && rebaseFirst) {
+      if (hasChanges) {
         try {
           await this.git.stash(['pop']);
         } catch {
