@@ -6,7 +6,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch', 'delete-branch', 'rename-branch', 'rebase']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch', 'delete-branch', 'rename-branch', 'rebase', 'merge']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -64,6 +64,15 @@ export async function POST(request: Request) {
       case 'rebase':
         if (!data?.ontoBranch) throw new Error('Target branch is required for rebase');
         await git.rebase(data.ontoBranch, data.stashChanges ?? true);
+        break;
+      case 'merge':
+        if (!data?.sourceBranch) throw new Error('Source branch is required for merge');
+        await git.merge(data.sourceBranch, {
+          rebaseBeforeMerge: data.rebaseBeforeMerge ?? false,
+          squash: data.squash ?? false,
+          fastForward: data.fastForward ?? false,
+          squashMessage: data.squashMessage,
+        });
         break;
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

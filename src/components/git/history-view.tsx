@@ -26,6 +26,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 
 import {
   AlertDialog,
@@ -294,6 +295,7 @@ function BranchTreeItem({
   onDeleteBranch,
   onRenameBranch,
   onRebase,
+  onMerge,
   onBranchClick,
   visibilityMap,
   onToggleVisibility,
@@ -309,6 +311,7 @@ function BranchTreeItem({
   onDeleteBranch: (branch: string) => void;
   onRenameBranch: (branch: string) => void;
   onRebase: (targetBranch: string) => void;
+  onMerge: (targetBranch: string) => void;
   onBranchClick?: (branch: string) => void;
   visibilityMap: VisibilityMap;
   onToggleVisibility: (path: string, type: 'visible' | 'hidden') => void;
@@ -386,6 +389,7 @@ function BranchTreeItem({
                   onDeleteBranch={onDeleteBranch}
                   onRenameBranch={onRenameBranch}
                   onRebase={onRebase}
+                  onMerge={onMerge}
                   onBranchClick={onBranchClick}
                   visibilityMap={visibilityMap}
                   onToggleVisibility={onToggleVisibility}
@@ -461,6 +465,12 @@ function BranchTreeItem({
               </ContextMenuItem>
               <ContextMenuItem
                 disabled={isCurrent}
+                onSelect={() => onMerge(child.fullPath!)}
+              >
+                Merge {currentBranch} onto {child.fullPath}
+              </ContextMenuItem>
+              <ContextMenuItem
+                disabled={isCurrent}
                 className="text-destructive focus:text-destructive"
                 onSelect={() => onDeleteBranch(child.fullPath!)}
               >
@@ -498,6 +508,14 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [rebaseTargetBranch, setRebaseTargetBranch] = useState<string | null>(null);
   const [rebaseStashChanges, setRebaseStashChanges] = useState(true);
   const [isRebasing, setIsRebasing] = useState(false);
+
+  const [isMergeOpen, setIsMergeOpen] = useState(false);
+  const [mergeTargetBranch, setMergeTargetBranch] = useState<string | null>(null);
+  const [mergeRebaseBeforeMerge, setMergeRebaseBeforeMerge] = useState(false);
+  const [mergeSquash, setMergeSquash] = useState(false);
+  const [mergeFastForward, setMergeFastForward] = useState(false);
+  const [mergeSquashMessage, setMergeSquashMessage] = useState('');
+  const [isMerging, setIsMerging] = useState(false);
 
   // Ref for GitGraph to scroll to commits
   const gitGraphRef = useRef<GitGraphHandle>(null);
@@ -914,6 +932,39 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }
 
+  const confirmMerge = (targetBranch: string) => {
+    setMergeTargetBranch(targetBranch);
+    setMergeRebaseBeforeMerge(false);
+    setMergeSquash(false);
+    setMergeFastForward(false);
+    setMergeSquashMessage('');
+    setIsMergeOpen(true);
+  }
+
+  const handleMerge = async () => {
+    if (!mergeTargetBranch) return;
+    setIsMerging(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'merge',
+        data: {
+          sourceBranch: mergeTargetBranch,
+          rebaseBeforeMerge: mergeRebaseBeforeMerge,
+          squash: mergeSquash,
+          fastForward: mergeFastForward,
+          squashMessage: mergeSquash ? mergeSquashMessage : undefined,
+        }
+      });
+      setIsMergeOpen(false);
+      setMergeTargetBranch(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsMerging(false);
+    }
+  }
+
   const handleCheckout = async (branchName: string) => {
 
     try {
@@ -1004,6 +1055,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 onDeleteBranch={confirmDeleteBranch}
                 onRenameBranch={confirmRenameBranch}
                 onRebase={confirmRebase}
+                onMerge={confirmMerge}
                 onBranchClick={handleBranchClick}
                 visibilityMap={visibilityMap}
                 onToggleVisibility={handleToggleVisibility}
@@ -1101,6 +1153,72 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <Button variant="outline" onClick={() => setIsRebaseOpen(false)} disabled={isRebasing}>Cancel</Button>
             <Button onClick={handleRebase} disabled={isRebasing}>
               {isRebasing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isMergeOpen} onOpenChange={setIsMergeOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Merge</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2">
+                <p>Merge branch into another one.</p>
+                <p>Are you sure to merge <span className="font-semibold text-foreground">{branchData?.current}</span> into <span className="font-semibold text-foreground">{mergeTargetBranch}</span>?</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2 space-y-3">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="rebase-before-merge" 
+                checked={mergeRebaseBeforeMerge}
+                onCheckedChange={(checked) => setMergeRebaseBeforeMerge(checked === true)}
+                disabled={isMerging}
+              />
+              <Label htmlFor="rebase-before-merge" className="text-sm font-normal cursor-pointer">
+                Rebase before merge
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="squash-before-merge" 
+                checked={mergeSquash}
+                onCheckedChange={(checked) => setMergeSquash(checked === true)}
+                disabled={isMerging}
+              />
+              <Label htmlFor="squash-before-merge" className="text-sm font-normal cursor-pointer">
+                Squash before merge
+              </Label>
+            </div>
+            {mergeSquash && (
+              <div className="ml-6">
+                <Textarea
+                  placeholder="Commit message for squash merge"
+                  value={mergeSquashMessage}
+                  onChange={(e) => setMergeSquashMessage(e.target.value)}
+                  disabled={isMerging}
+                  className="min-h-20"
+                />
+              </div>
+            )}
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="fast-forward-merge" 
+                checked={mergeFastForward}
+                onCheckedChange={(checked) => setMergeFastForward(checked === true)}
+                disabled={isMerging}
+              />
+              <Label htmlFor="fast-forward-merge" className="text-sm font-normal cursor-pointer">
+                Fast forward merge
+              </Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsMergeOpen(false)} disabled={isMerging}>Cancel</Button>
+            <Button onClick={handleMerge} disabled={isMerging}>
+              {isMerging ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm'}
             </Button>
           </DialogFooter>
         </DialogContent>

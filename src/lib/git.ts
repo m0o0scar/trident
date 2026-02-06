@@ -227,4 +227,45 @@ export class GitService {
     
     return { before, after };
   }
+
+  async merge(
+    sourceBranch: string,
+    options: {
+      rebaseBeforeMerge?: boolean;
+      squash?: boolean;
+      fastForward?: boolean;
+      squashMessage?: string;
+    } = {}
+  ): Promise<void> {
+    const { rebaseBeforeMerge, squash, fastForward, squashMessage } = options;
+
+    // Rebase current branch onto source branch before merging if requested
+    if (rebaseBeforeMerge) {
+      await this.git.rebase([sourceBranch]);
+    }
+
+    // Build merge arguments
+    const mergeArgs: string[] = [];
+
+    if (squash) {
+      mergeArgs.push('--squash');
+    }
+
+    if (fastForward) {
+      mergeArgs.push('--ff-only');
+    } else if (!squash) {
+      // Use no-ff by default unless squashing (squash doesn't create a merge commit anyway)
+      mergeArgs.push('--no-ff');
+    }
+
+    mergeArgs.push(sourceBranch);
+
+    await this.git.merge(mergeArgs);
+
+    // If squash merge, we need to commit with the provided message
+    if (squash) {
+      const message = squashMessage || `Squash merge branch '${sourceBranch}'`;
+      await this.git.commit(message);
+    }
+  }
 }
