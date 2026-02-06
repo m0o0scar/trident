@@ -24,6 +24,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 
 import {
   AlertDialog,
@@ -291,6 +293,7 @@ function BranchTreeItem({
   onCreateBranch,
   onDeleteBranch,
   onRenameBranch,
+  onRebase,
   onBranchClick,
   visibilityMap,
   onToggleVisibility,
@@ -305,6 +308,7 @@ function BranchTreeItem({
   onCreateBranch: () => void;
   onDeleteBranch: (branch: string) => void;
   onRenameBranch: (branch: string) => void;
+  onRebase: (targetBranch: string) => void;
   onBranchClick?: (branch: string) => void;
   visibilityMap: VisibilityMap;
   onToggleVisibility: (path: string, type: 'visible' | 'hidden') => void;
@@ -381,6 +385,7 @@ function BranchTreeItem({
                   onCreateBranch={onCreateBranch}
                   onDeleteBranch={onDeleteBranch}
                   onRenameBranch={onRenameBranch}
+                  onRebase={onRebase}
                   onBranchClick={onBranchClick}
                   visibilityMap={visibilityMap}
                   onToggleVisibility={onToggleVisibility}
@@ -450,6 +455,12 @@ function BranchTreeItem({
               </ContextMenuItem>
               <ContextMenuItem
                 disabled={isCurrent}
+                onSelect={() => onRebase(child.fullPath!)}
+              >
+                Rebase {currentBranch} onto {child.fullPath}
+              </ContextMenuItem>
+              <ContextMenuItem
+                disabled={isCurrent}
                 className="text-destructive focus:text-destructive"
                 onSelect={() => onDeleteBranch(child.fullPath!)}
               >
@@ -482,6 +493,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [branchToRename, setBranchToRename] = useState<string | null>(null);
   const [newBranchNameForRename, setNewBranchNameForRename] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
+
+  const [isRebaseOpen, setIsRebaseOpen] = useState(false);
+  const [rebaseTargetBranch, setRebaseTargetBranch] = useState<string | null>(null);
+  const [rebaseStashChanges, setRebaseStashChanges] = useState(true);
+  const [isRebasing, setIsRebasing] = useState(false);
 
   // Ref for GitGraph to scroll to commits
   const gitGraphRef = useRef<GitGraphHandle>(null);
@@ -874,6 +890,30 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }
 
+  const confirmRebase = (targetBranch: string) => {
+    setRebaseTargetBranch(targetBranch);
+    setRebaseStashChanges(true);
+    setIsRebaseOpen(true);
+  }
+
+  const handleRebase = async () => {
+    if (!rebaseTargetBranch) return;
+    setIsRebasing(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'rebase',
+        data: { ontoBranch: rebaseTargetBranch, stashChanges: rebaseStashChanges }
+      });
+      setIsRebaseOpen(false);
+      setRebaseTargetBranch(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRebasing(false);
+    }
+  }
+
   const handleCheckout = async (branchName: string) => {
 
     try {
@@ -963,6 +1003,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 onCreateBranch={() => setIsCreateBranchOpen(true)}
                 onDeleteBranch={confirmDeleteBranch}
                 onRenameBranch={confirmRenameBranch}
+                onRebase={confirmRebase}
                 onBranchClick={handleBranchClick}
                 visibilityMap={visibilityMap}
                 onToggleVisibility={handleToggleVisibility}
@@ -1022,6 +1063,44 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               disabled={!newBranchNameForRename || newBranchNameForRename === branchToRename || isRenaming}
             >
               {isRenaming ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Rename'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isRebaseOpen} onOpenChange={setIsRebaseOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rebase</DialogTitle>
+            <DialogDescription asChild>
+              <div className="space-y-2">
+                <p>Copy commits from one branch to another.</p>
+                <p>Are you sure to rebase <span className="font-semibold text-foreground">{branchData?.current}</span> onto <span className="font-semibold text-foreground">{rebaseTargetBranch}</span>?</p>
+              </div>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <div className="flex items-center space-x-2">
+              <Checkbox 
+                id="stash-changes" 
+                checked={rebaseStashChanges}
+                onCheckedChange={(checked) => setRebaseStashChanges(checked === true)}
+                disabled={isRebasing}
+              />
+              <Label htmlFor="stash-changes" className="text-sm font-normal cursor-pointer">
+                Stash and reapply local changes
+              </Label>
+            </div>
+            {!rebaseStashChanges && (
+              <p className="text-xs text-muted-foreground mt-2 ml-6">
+                Warning: All local changes will be discarded.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsRebaseOpen(false)} disabled={isRebasing}>Cancel</Button>
+            <Button onClick={handleRebase} disabled={isRebasing}>
+              {isRebasing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm'}
             </Button>
           </DialogFooter>
         </DialogContent>

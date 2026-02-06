@@ -156,6 +156,41 @@ export class GitService {
     await this.git.branch(['-m', oldName, newName]);
   }
 
+  async rebase(ontoBranch: string, stashChanges: boolean = true): Promise<void> {
+    if (stashChanges) {
+      // Stash any local changes before rebasing
+      const status = await this.git.status();
+      const hasChanges = status.files.length > 0;
+      
+      if (hasChanges) {
+        await this.git.stash(['push', '-m', 'auto-stash before rebase']);
+      }
+      
+      try {
+        await this.git.rebase([ontoBranch]);
+        
+        // Reapply stashed changes if we stashed anything
+        if (hasChanges) {
+          await this.git.stash(['pop']);
+        }
+      } catch (e) {
+        // If rebase fails, try to pop stash anyway so user doesn't lose changes
+        if (hasChanges) {
+          try {
+            await this.git.stash(['pop']);
+          } catch {
+            // Stash pop might fail if there are conflicts, that's ok
+          }
+        }
+        throw e;
+      }
+    } else {
+      // Discard local changes by resetting before rebase
+      await this.git.reset(['--hard', 'HEAD']);
+      await this.git.rebase([ontoBranch]);
+    }
+  }
+
   async getCommitDiff(commitHash: string): Promise<{ files: { path: string; additions: number; deletions: number; status: string }[]; diff: string }> {
     // Get the list of files changed in this commit with stats
     const diffStat = await this.git.raw(['diff-tree', '--no-commit-id', '--name-status', '-r', commitHash]);
