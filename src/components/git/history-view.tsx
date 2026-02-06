@@ -403,7 +403,11 @@ function BranchTreeItem({
                 )}
                 style={{ paddingLeft: `${depth * 12 + 8}px` }}
               >
-                <div className="flex items-center gap-2 flex-1 min-w-0" onClick={() => onBranchClick?.(child.fullPath!)}>
+                <div 
+                  className="flex items-center gap-2 flex-1 min-w-0" 
+                  onClick={() => onBranchClick?.(child.fullPath!)}
+                  onDoubleClick={() => !isCurrent && onCheckout(child.fullPath!)}
+                >
                   {isCurrent ? (
                     <span className="w-3 h-3 flex items-center justify-center shrink-0">
                       <span className="w-2 h-2 rounded-full bg-primary" />
