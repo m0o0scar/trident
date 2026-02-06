@@ -1,17 +1,60 @@
 'use client';
 
-import { useMemo, useRef, useState, useLayoutEffect, useImperativeHandle, forwardRef } from 'react';
+import { useMemo, useRef, useState, useLayoutEffect, useImperativeHandle, forwardRef, useEffect, useCallback } from 'react';
 import { Commit } from '@/lib/types';
 import { generateGraphData, GraphNode } from '@/lib/graph-utils';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 
 const ROW_HEIGHT = 24; // Compact rows like Fork
 const LANE_WIDTH = 12;
 const DOT_SIZE = 3;
 const STROKE_WIDTH = 2;
+
+// Helper function to highlight matching text
+function HighlightedText({ text, searchQuery }: { text: string; searchQuery: string }) {
+    if (!searchQuery || !text) return <>{text}</>;
+    
+    const query = searchQuery.toLowerCase();
+    const lowerText = text.toLowerCase();
+    const parts: { text: string; highlighted: boolean }[] = [];
+    
+    let lastIndex = 0;
+    let index = lowerText.indexOf(query);
+    
+    while (index !== -1) {
+        // Add non-matching part
+        if (index > lastIndex) {
+            parts.push({ text: text.slice(lastIndex, index), highlighted: false });
+        }
+        // Add matching part (preserve original case)
+        parts.push({ text: text.slice(index, index + query.length), highlighted: true });
+        lastIndex = index + query.length;
+        index = lowerText.indexOf(query, lastIndex);
+    }
+    
+    // Add remaining non-matching part
+    if (lastIndex < text.length) {
+        parts.push({ text: text.slice(lastIndex), highlighted: false });
+    }
+    
+    if (parts.length === 0) return <>{text}</>;
+    
+    return (
+        <>
+            {parts.map((part, i) => 
+                part.highlighted ? (
+                    <mark key={i} className="bg-yellow-300 dark:bg-yellow-500/50 text-inherit rounded-sm px-0.5">{part.text}</mark>
+                ) : (
+                    <span key={i}>{part.text}</span>
+                )
+            )}
+        </>
+    );
+}
 
 export interface GitGraphHandle {
     scrollToCommit: (hash: string) => boolean;
@@ -36,7 +79,38 @@ export const GitGraph = forwardRef<GitGraphHandle, {
 }, ref) {
     const nodes = useMemo(() => generateGraphData(commits), [commits]);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
     const [prevCount, setPrevCount] = useState(0);
+    
+    // Search state
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    
+    // Handle Cmd+F to open search
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Cmd+F (Mac) or Ctrl+F (Windows/Linux)
+            if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+                e.preventDefault();
+                setIsSearchOpen(true);
+                // Focus input after render
+                setTimeout(() => searchInputRef.current?.focus(), 0);
+            }
+            // Escape to close search
+            if (e.key === 'Escape' && isSearchOpen) {
+                setIsSearchOpen(false);
+                setSearchQuery('');
+            }
+        };
+        
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isSearchOpen]);
+    
+    const handleCloseSearch = useCallback(() => {
+        setIsSearchOpen(false);
+        setSearchQuery('');
+    }, []);
 
     // Expose scrollToCommit function via ref
     useImperativeHandle(ref, () => ({
@@ -81,9 +155,32 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     };
 
     return (
-        <div className="flex h-full bg-background overflow-hidden font-mono text-sm select-none px-2">
+        <div className="flex flex-col h-full bg-background overflow-hidden font-mono text-sm select-none">
+            {/* Search Input - Sticky on top */}
+            {isSearchOpen && (
+                <div className="sticky top-0 z-20 bg-background border-b px-2 py-2 flex items-center gap-2">
+                    <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <Input
+                        ref={searchInputRef}
+                        type="text"
+                        placeholder="Search in commits..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="flex-1 h-8 text-sm"
+                        autoFocus
+                    />
+                    <button
+                        onClick={handleCloseSearch}
+                        className="p-1 hover:bg-muted rounded-md transition-colors"
+                        title="Close search (Esc)"
+                    >
+                        <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                </div>
+            )}
+            
             {/* Graph Column (SVG) + Message Column (combined to ensure alignment) */}
-            <ScrollArea className="flex-1 h-full max-w-full" onScroll={handleScroll} ref={scrollRef}>
+            <ScrollArea className="flex-1 h-full max-w-full px-2" onScroll={handleScroll} ref={scrollRef}>
                 <div className="relative min-w-full" style={{ height }}>
                     {/* SVG Graph Layout */}
                     <svg width={width} height={height} className="absolute top-0 left-0 pointer-events-none z-10">
@@ -154,9 +251,9 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                 <div className="flex flex-1 gap-4 overflow-hidden pr-4 items-center">
                                     <div className="flex-1 truncate flex items-center gap-2">
                                         {/* Refs Pills */}
-                                        {node.refs && node.refs.split(', ').map((ref, idx) => {
+                                        {node.refs && node.refs.split(', ').map((refName, idx) => {
                                             // remove potential leading and trailing brackets
-                                            let displayName = ref.replace(/^\s*\(|\)\s*$/g, '');
+                                            let displayName = refName.replace(/^\s*\(|\)\s*$/g, '');
                                             // Clean up "HEAD -> " prefix for display but keep for checking
                                             const cleanDisplayName = displayName.replace(/^HEAD\s*->\s*/, '');
                                             
@@ -171,7 +268,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                             }
                                             
                                             // Check if this is the current branch by checking if it contains "HEAD -> branchName"
-                                            const isCurrentBranch = currentBranch && (
+                                            const isCurrent = currentBranch && (
                                                 displayName === currentBranch || 
                                                 displayName === `HEAD -> ${currentBranch}` ||
                                                 displayName.includes(`HEAD -> ${currentBranch}`)
@@ -180,28 +277,28 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                                 <span key={idx}
                                                     className={cn(
                                                         "text-[10px] px-1.5 rounded-full border whitespace-nowrap shrink-0",
-                                                        isCurrentBranch && "font-bold text-black dark:text-white"
+                                                        isCurrent && "font-bold text-black dark:text-white"
                                                     )}
                                                     style={{
                                                         borderColor: node.color,
-                                                        color: isCurrentBranch ? undefined : node.color,
+                                                        color: isCurrent ? undefined : node.color,
                                                         backgroundColor: `${node.color}15` // 10% opacity
                                                     }}
                                                     title={cleanDisplayName}
                                                 >
-                                                    {cleanDisplayName}
+                                                    <HighlightedText text={cleanDisplayName} searchQuery={searchQuery} />
                                                 </span>
                                             );
                                         })}
                                         <span className={cn("truncate min-w-0 max-w-[600px] text-xs", selectedHash === node.hash ? "font-semibold" : "")} title={node.message}>
-                                            {node.message}
+                                            <HighlightedText text={node.message} searchQuery={searchQuery} />
                                         </span>
                                     </div>
                                     <div className="w-32 truncate text-muted-foreground text-xs text-right">
-                                        {node.author_name}
+                                        <HighlightedText text={node.author_name} searchQuery={searchQuery} />
                                     </div>
                                     <div className="w-20 truncate text-muted-foreground text-xs text-right opacity-70 font-mono">
-                                        {node.hash}
+                                        <HighlightedText text={node.hash} searchQuery={searchQuery} />
                                     </div>
                                     <div className="w-32 truncate text-muted-foreground text-xs text-right">
                                         {new Date(node.date).toLocaleString(undefined, {
