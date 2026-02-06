@@ -14,6 +14,61 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - **Commit History** - Browse commit history with infinite scroll and branch filtering
 - **Dark/Light Mode** - Theme toggle for comfortable viewing
 
+## Feature Roadmap
+
+### Repository Management
+- [x] Open local repository
+- [x] List recent repositories
+- [ ] Clone repository
+- [ ] Initialize new repository
+
+### Working Directory & Staging
+- [x] View modified files status
+- [x] Stage/Unstage individual files
+- [x] Stage All files
+- [ ] Discard changes (Clean)
+- [ ] Stash changes
+- [ ] Pop/Apply stash
+
+### Committing
+- [x] Write commit message
+- [x] Create commit
+- [ ] Amend last commit
+- [ ] Sign commits (GPG/SSH)
+- [ ] Co-author support
+
+### Branching & Merging
+- [x] List local and remote branches
+- [x] Create branch
+- [x] Checkout branch
+- [x] Delete branch
+- [x] Rename branch
+- [x] Merge (Squash, Fast-forward options)
+- [x] Rebase (with auto-stash support)
+
+### Remote Operations
+- [x] List remotes
+- [x] Fetch (All or specific remote)
+- [x] Pull (Rebase support)
+- [x] Push (Force push, Set Upstream)
+- [ ] Manage Remotes (Add/Edit/Remove)
+
+### History & Graph
+- [x] Visual commit graph (Lanes, Merges)
+- [x] Filter history by branch visibility
+- [x] View commit details (Message, Author, Date)
+- [x] View commit diffs (Side-by-side / Inline)
+
+### Advanced / Other
+- [ ] Cherry-pick commits
+- [ ] Revert commits
+- [ ] Tags management
+- [ ] Submodules support
+- [ ] Interactive Rebase
+- [ ] Blame/Annotate view
+- [ ] Git LFS support
+- [ ] Diff syntax highlighting
+
 ## Tech Stack
 
 - **Framework:** [Next.js](https://nextjs.org/) 16 (App Router)
