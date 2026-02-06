@@ -87,7 +87,7 @@ export function useGitLog(repoPath: string | null, limit: number = 50) {
 // ... UseGitLog ...
 
 export function useGitBranches(repoPath: string | null) {
-  return useQuery<{ branches: string[], current: string }>({
+  return useQuery<{ branches: string[], current: string, branchCommits: Record<string, string> }>({
     queryKey: ['git', repoPath, 'branches'],
     queryFn: async () => {
       if (!repoPath) return null;

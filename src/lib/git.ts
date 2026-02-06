@@ -120,9 +120,23 @@ export class GitService {
 
   async getBranches() {
     const branchSummary = await this.git.branchLocal();
+    
+    // Get commit hash for each branch
+    const branchCommits: Record<string, string> = {};
+    for (const branch of branchSummary.all) {
+      try {
+        // Get the short hash of the latest commit on this branch
+        const result = await this.git.revparse(['--short', branch]);
+        branchCommits[branch] = result.trim();
+      } catch (e) {
+        console.error(`Failed to get commit for branch ${branch}:`, e);
+      }
+    }
+    
     return {
       branches: branchSummary.all,
       current: branchSummary.current,
+      branchCommits,
     };
   }
 

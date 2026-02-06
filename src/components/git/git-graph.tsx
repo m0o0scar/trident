@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState, useLayoutEffect } from 'react';
+import { useMemo, useRef, useState, useLayoutEffect, useImperativeHandle, forwardRef } from 'react';
 import { Commit } from '@/lib/types';
 import { generateGraphData, GraphNode } from '@/lib/graph-utils';
 import { cn } from '@/lib/utils';
@@ -13,22 +13,56 @@ const LANE_WIDTH = 16;
 const DOT_SIZE = 4;
 const STROKE_WIDTH = 2;
 
-export function GitGraph({
-    commits,
-    onSelectCommit,
-    selectedHash,
-    onEndReached,
-    isLoadingMore,
-    currentBranch
-}: {
+export interface GitGraphHandle {
+    scrollToCommit: (hash: string) => boolean;
+}
+
+export const GitGraph = forwardRef<GitGraphHandle, {
     commits: Commit[],
     onSelectCommit?: (hash: string) => void,
     selectedHash?: string,
     onEndReached?: () => void,
     isLoadingMore?: boolean,
     currentBranch?: string
-}) {
+}>(function GitGraph({
+    commits,
+    onSelectCommit,
+    selectedHash,
+    onEndReached,
+    isLoadingMore,
+    currentBranch
+}, ref) {
     const nodes = useMemo(() => generateGraphData(commits), [commits]);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const [prevCount, setPrevCount] = useState(0);
+
+    // Expose scrollToCommit function via ref
+    useImperativeHandle(ref, () => ({
+        scrollToCommit: (hash: string) => {
+            if (!nodes || nodes.length === 0) return false;
+            
+            const index = nodes.findIndex(n => n.hash === hash);
+            if (index === -1) return false;
+            
+            // Scroll to the commit row
+            if (scrollRef.current) {
+                const scrollTop = index * ROW_HEIGHT - (scrollRef.current.clientHeight / 2) + ROW_HEIGHT / 2;
+                scrollRef.current.scrollTop = Math.max(0, scrollTop);
+            }
+            return true;
+        }
+    }), [nodes]);
+
+    // Save scroll position
+    useLayoutEffect(() => {
+        if (nodes && nodes.length > prevCount && scrollRef.current) {
+            // We added items, the scroll position might stay automatically if we are appending to bottom.
+            // If we were prepending, we'd need to adjust.
+            // But for infinite scroll down, the browser usually handles it unless we replace the whole DOM.
+            // The issue might be the ScrollArea forcing a reset or key change.
+        }
+        setPrevCount(nodes?.length ?? 0);
+    }, [nodes?.length, prevCount]);
 
     if (!nodes || nodes.length === 0) return null;
 
@@ -43,20 +77,6 @@ export function GitGraph({
             onEndReached?.();
         }
     };
-
-    const scrollRef = useRef<HTMLDivElement>(null);
-    const [prevCount, setPrevCount] = useState(0);
-
-    // Save scroll position
-    useLayoutEffect(() => {
-        if (nodes.length > prevCount && scrollRef.current) {
-            // We added items, the scroll position might stay automatically if we are appending to bottom.
-            // If we were prepending, we'd need to adjust.
-            // But for infinite scroll down, the browser usually handles it unless we replace the whole DOM.
-            // The issue might be the ScrollArea forcing a reset or key change.
-        }
-        setPrevCount(nodes.length);
-    }, [nodes.length, prevCount]);
 
     return (
         <div className="flex h-full bg-background overflow-hidden font-mono text-sm select-none px-2">
@@ -192,4 +212,4 @@ export function GitGraph({
             </ScrollArea>
         </div>
     );
-}
+});

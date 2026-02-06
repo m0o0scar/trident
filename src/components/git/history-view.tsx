@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { GitGraph } from './git-graph';
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { GitGraph, GitGraphHandle } from './git-graph';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -78,6 +78,7 @@ function BranchTreeItem({
   onCheckout,
   onCreateBranch,
   onDeleteBranch,
+  onBranchClick,
   depth = 0,
 }: {
   node: BranchTreeNode;
@@ -87,6 +88,7 @@ function BranchTreeItem({
   onCheckout: (branch: string) => void;
   onCreateBranch: () => void;
   onDeleteBranch: (branch: string) => void;
+  onBranchClick?: (branch: string) => void;
   depth?: number;
 }) {
   const children = Array.from(node.children.values());
@@ -136,6 +138,7 @@ function BranchTreeItem({
                   onCheckout={onCheckout}
                   onCreateBranch={onCreateBranch}
                   onDeleteBranch={onDeleteBranch}
+                  onBranchClick={onBranchClick}
                   depth={depth + 1}
                 />
               )}
@@ -153,6 +156,7 @@ function BranchTreeItem({
                   isCurrent && "bg-muted font-medium text-primary"
                 )}
                 style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                onClick={() => onBranchClick?.(child.fullPath!)}
               >
                 <GitBranch className={cn("h-3 w-3 shrink-0 text-muted-foreground", isCurrent && "text-primary")} />
                 <span className="truncate flex-1" title={child.fullPath}>{child.name}</span>
@@ -199,6 +203,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [branchToDelete, setBranchToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Ref for GitGraph to scroll to commits
+  const gitGraphRef = useRef<GitGraphHandle>(null);
+  
+  // State for pending scroll to branch commit
+  const [pendingScrollCommit, setPendingScrollCommit] = useState<string | null>(null);
+
   // Build branch tree and manage expanded state
   const branchTree = useMemo(() => {
     if (!branchData?.branches) return null;
@@ -231,6 +241,58 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       console.error('Failed to save expanded folders to localStorage:', e);
     }
   }, [expandedFolders, storageKey]);
+
+  // Handle scrolling to branch commit when it's loaded
+  useEffect(() => {
+    if (!pendingScrollCommit || !log?.all || isFetching) return;
+    
+    // Check if commit exists in current loaded commits
+    const commitExists = log.all.some(c => c.hash === pendingScrollCommit);
+    
+    if (commitExists) {
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(() => {
+        const scrolled = gitGraphRef.current?.scrollToCommit(pendingScrollCommit);
+        if (scrolled) {
+          setSelectedHash(pendingScrollCommit);
+          setPendingScrollCommit(null);
+        }
+      });
+    } else {
+      // Need to load more commits - increase limit
+      // Set a reasonable max limit to avoid infinite loading
+      if (limit < 5000) {
+        setLimit(l => l + 100);
+      } else {
+        // Give up after 5000 commits
+        console.warn('Could not find commit after loading 5000 commits');
+        setPendingScrollCommit(null);
+      }
+    }
+  }, [pendingScrollCommit, log?.all, isFetching, limit]);
+
+  // Handle branch click - find the branch's latest commit and scroll to it
+  const handleBranchClick = useCallback((branch: string) => {
+    if (!branchData?.branchCommits) return;
+    
+    const commitHash = branchData.branchCommits[branch];
+    if (!commitHash) return;
+    
+    // Check if commit is already in view
+    const commitExists = log?.all?.some(c => c.hash === commitHash);
+    
+    if (commitExists && gitGraphRef.current) {
+      const scrolled = gitGraphRef.current.scrollToCommit(commitHash);
+      if (scrolled) {
+        setSelectedHash(commitHash);
+        return;
+      }
+    }
+    
+    // Need to load more commits or scroll failed, set pending
+    setPendingScrollCommit(commitHash);
+    setSelectedHash(commitHash);
+  }, [branchData?.branchCommits, log?.all]);
 
   const toggleFolder = useCallback((path: string) => {
     setExpandedFolders(prev => {
@@ -342,6 +404,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 onCheckout={handleCheckout}
                 onCreateBranch={() => setIsCreateBranchOpen(true)}
                 onDeleteBranch={confirmDeleteBranch}
+                onBranchClick={handleBranchClick}
               />
             )}
           </div>
@@ -408,6 +471,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
         <div className="flex-1 overflow-hidden relative">
           <GitGraph
+            ref={gitGraphRef}
             commits={log.all}
             selectedHash={selectedHash || undefined}
             onSelectCommit={setSelectedHash}
