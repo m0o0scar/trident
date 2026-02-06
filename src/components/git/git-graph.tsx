@@ -179,7 +179,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                             return (
                                                 <span key={idx}
                                                     className={cn(
-                                                        "text-[10px] px-1.5 rounded-full border truncate max-w-[150px]",
+                                                        "text-[10px] px-1.5 rounded-full border whitespace-nowrap shrink-0",
                                                         isCurrentBranch && "font-bold text-black dark:text-white"
                                                     )}
                                                     style={{
