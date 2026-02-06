@@ -2,7 +2,7 @@
 
 import { useGitLog, useGitBranches, useGitAction } from '@/hooks/use-git';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder } from 'lucide-react';
+import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { GitGraph, GitGraphHandle } from './git-graph';
@@ -33,6 +33,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+
+// Visibility state for branches/folders
+type VisibilityState = 'visible' | 'hidden' | null;
+
+// Map of path -> visibility state
+type VisibilityMap = Record<string, VisibilityState>;
 
 // Tree node type for branch hierarchy
 interface BranchTreeNode {
@@ -69,6 +75,64 @@ function buildBranchTree(branches: string[]): BranchTreeNode {
   return root;
 }
 
+// Get the effective visibility for a path (considering parent inheritance)
+function getEffectiveVisibility(
+  path: string,
+  visibilityMap: VisibilityMap
+): VisibilityState {
+  // Check if this path has explicit visibility
+  if (visibilityMap[path]) {
+    return visibilityMap[path];
+  }
+
+  // Check parent paths for inherited visibility
+  const parts = path.split('/');
+  for (let i = parts.length - 1; i > 0; i--) {
+    const parentPath = parts.slice(0, i).join('/');
+    if (visibilityMap[parentPath]) {
+      return visibilityMap[parentPath];
+    }
+  }
+
+  return null;
+}
+
+
+// Visibility toggle button component
+function VisibilityToggle({
+  type,
+  isActive,
+  isInherited,
+  onClick,
+  showOnHover,
+}: {
+  type: 'visible' | 'hidden';
+  isActive: boolean;
+  isInherited: boolean;
+  onClick: (e: React.MouseEvent) => void;
+  showOnHover: boolean;
+}) {
+  const Icon = type === 'visible' ? Eye : EyeOff;
+  const title = type === 'visible' 
+    ? (isActive ? 'Remove visible filter' : 'Show only this branch')
+    : (isActive ? 'Remove hide filter' : 'Hide this branch');
+
+  return (
+    <button
+      className={cn(
+        "p-0.5 rounded hover:bg-muted transition-colors shrink-0 cursor-pointer",
+        isActive && "text-primary",
+        isInherited && "opacity-50",
+        !isActive && !showOnHover && "opacity-0 group-hover:opacity-100"
+      )}
+      onClick={onClick}
+      title={title}
+    >
+      <Icon className="h-3 w-3" />
+    </button>
+  );
+}
+
 // Recursive component to render branch tree
 function BranchTreeItem({
   node,
@@ -79,6 +143,9 @@ function BranchTreeItem({
   onCreateBranch,
   onDeleteBranch,
   onBranchClick,
+  visibilityMap,
+  onToggleVisibility,
+  parentPath = '',
   depth = 0,
 }: {
   node: BranchTreeNode;
@@ -89,6 +156,9 @@ function BranchTreeItem({
   onCreateBranch: () => void;
   onDeleteBranch: (branch: string) => void;
   onBranchClick?: (branch: string) => void;
+  visibilityMap: VisibilityMap;
+  onToggleVisibility: (path: string, type: 'visible' | 'hidden') => void;
+  parentPath?: string;
   depth?: number;
 }) {
   const children = Array.from(node.children.values());
@@ -106,28 +176,50 @@ function BranchTreeItem({
       {sortedChildren.map((child) => {
         const isLeaf = child.fullPath !== undefined;
         const isFolder = child.children.size > 0 && !isLeaf;
-        const folderPath = child.fullPath || (node.name ? `${node.name}/${child.name}` : child.name);
-        const isExpanded = expandedFolders.has(folderPath);
+        const itemPath = child.fullPath || (parentPath ? `${parentPath}/${child.name}` : child.name);
+        const isExpanded = expandedFolders.has(itemPath);
         const isCurrent = isLeaf && child.fullPath === currentBranch;
+
+        // Get visibility state for this item
+        const directVisibility = visibilityMap[itemPath];
+        const effectiveVisibility = getEffectiveVisibility(itemPath, visibilityMap);
+        const isInherited = !directVisibility && effectiveVisibility !== null;
 
         if (isFolder) {
           // Render folder
           return (
-            <div key={folderPath}>
+            <div key={itemPath}>
               <div
                 className={cn(
-                  "flex items-center gap-1 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-muted/50 transition-colors text-muted-foreground",
+                  "group flex items-center gap-1 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-muted/50 transition-colors text-muted-foreground",
                 )}
                 style={{ paddingLeft: `${depth * 12 + 8}px` }}
-                onClick={() => onToggleFolder(folderPath)}
               >
-                {isExpanded ? (
-                  <ChevronDown className="h-3 w-3 shrink-0" />
-                ) : (
-                  <ChevronRight className="h-3 w-3 shrink-0" />
-                )}
-                <Folder className="h-3 w-3 shrink-0" />
-                <span className="truncate">{child.name}</span>
+                <div className="flex items-center gap-1 flex-1 min-w-0" onClick={() => onToggleFolder(itemPath)}>
+                  {isExpanded ? (
+                    <ChevronDown className="h-3 w-3 shrink-0" />
+                  ) : (
+                    <ChevronRight className="h-3 w-3 shrink-0" />
+                  )}
+                  <Folder className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{child.name}</span>
+                </div>
+                <div className="flex items-center gap-0.5 ml-auto">
+                  <VisibilityToggle
+                    type="visible"
+                    isActive={directVisibility === 'visible' || (isInherited && effectiveVisibility === 'visible')}
+                    isInherited={isInherited && effectiveVisibility === 'visible'}
+                    onClick={(e) => { e.stopPropagation(); onToggleVisibility(itemPath, 'visible'); }}
+                    showOnHover={directVisibility === 'visible' || (isInherited && effectiveVisibility === 'visible')}
+                  />
+                  <VisibilityToggle
+                    type="hidden"
+                    isActive={directVisibility === 'hidden' || (isInherited && effectiveVisibility === 'hidden')}
+                    isInherited={isInherited && effectiveVisibility === 'hidden'}
+                    onClick={(e) => { e.stopPropagation(); onToggleVisibility(itemPath, 'hidden'); }}
+                    showOnHover={directVisibility === 'hidden' || (isInherited && effectiveVisibility === 'hidden')}
+                  />
+                </div>
               </div>
               {isExpanded && (
                 <BranchTreeItem
@@ -139,6 +231,9 @@ function BranchTreeItem({
                   onCreateBranch={onCreateBranch}
                   onDeleteBranch={onDeleteBranch}
                   onBranchClick={onBranchClick}
+                  visibilityMap={visibilityMap}
+                  onToggleVisibility={onToggleVisibility}
+                  parentPath={itemPath}
                   depth={depth + 1}
                 />
               )}
@@ -152,15 +247,37 @@ function BranchTreeItem({
             <ContextMenuTrigger>
               <div
                 className={cn(
-                  "flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-muted/50 transition-colors",
+                  "group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-muted/50 transition-colors",
                   isCurrent && "bg-muted font-medium text-primary"
                 )}
                 style={{ paddingLeft: `${depth * 12 + 8}px` }}
-                onClick={() => onBranchClick?.(child.fullPath!)}
               >
-                <GitBranch className={cn("h-3 w-3 shrink-0 text-muted-foreground", isCurrent && "text-primary")} />
-                <span className="truncate flex-1" title={child.fullPath}>{child.name}</span>
-                {isCurrent && <span className="w-2 h-2 rounded-full bg-primary shrink-0" />}
+                <div className="flex items-center gap-2 flex-1 min-w-0" onClick={() => onBranchClick?.(child.fullPath!)}>
+                  {isCurrent ? (
+                    <span className="w-3 h-3 flex items-center justify-center shrink-0">
+                      <span className="w-2 h-2 rounded-full bg-primary" />
+                    </span>
+                  ) : (
+                    <GitBranch className="h-3 w-3 shrink-0 text-muted-foreground" />
+                  )}
+                  <span className="truncate flex-1" title={child.fullPath}>{child.name}</span>
+                </div>
+                <div className="flex items-center gap-0.5 ml-auto">
+                  <VisibilityToggle
+                    type="visible"
+                    isActive={directVisibility === 'visible' || (isInherited && effectiveVisibility === 'visible')}
+                    isInherited={isInherited && effectiveVisibility === 'visible'}
+                    onClick={(e) => { e.stopPropagation(); onToggleVisibility(itemPath, 'visible'); }}
+                    showOnHover={directVisibility === 'visible' || (isInherited && effectiveVisibility === 'visible')}
+                  />
+                  <VisibilityToggle
+                    type="hidden"
+                    isActive={directVisibility === 'hidden' || (isInherited && effectiveVisibility === 'hidden')}
+                    isInherited={isInherited && effectiveVisibility === 'hidden'}
+                    onClick={(e) => { e.stopPropagation(); onToggleVisibility(itemPath, 'hidden'); }}
+                    showOnHover={directVisibility === 'hidden' || (isInherited && effectiveVisibility === 'hidden')}
+                  />
+                </div>
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent>
@@ -241,6 +358,176 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       console.error('Failed to save expanded folders to localStorage:', e);
     }
   }, [expandedFolders, storageKey]);
+
+  // Storage key for this repo's branch visibility
+  const visibilityStorageKey = `git-web:branch-visibility:${repoPath}`;
+
+  // Visibility state for branches/folders
+  const [visibilityMap, setVisibilityMap] = useState<VisibilityMap>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const stored = localStorage.getItem(visibilityStorageKey);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+    } catch (e) {
+      console.error('Failed to load visibility from localStorage:', e);
+    }
+    return {};
+  });
+
+  // Save visibility to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(visibilityStorageKey, JSON.stringify(visibilityMap));
+    } catch (e) {
+      console.error('Failed to save visibility to localStorage:', e);
+    }
+  }, [visibilityMap, visibilityStorageKey]);
+
+  // Toggle visibility for a path
+  const handleToggleVisibility = useCallback((path: string, type: 'visible' | 'hidden') => {
+    setVisibilityMap(prev => {
+      const next = { ...prev };
+      // If currently set to this type, remove it (toggle off)
+      if (next[path] === type) {
+        delete next[path];
+      } else {
+        // Set to this type (auto-removes the other one since we're replacing)
+        next[path] = type;
+      }
+      return next;
+    });
+  }, []);
+
+  // Clear all visibility filters
+  const handleClearAllFilters = useCallback(() => {
+    setVisibilityMap({});
+  }, []);
+
+  // Compute which branches should be visible based on visibility map
+  const filteredCommits = useMemo(() => {
+    if (!log?.all || !branchData?.branches || !branchData?.branchCommits) return log?.all || [];
+
+    const hasVisibleMarkers = Object.values(visibilityMap).some(v => v === 'visible');
+    const hasHiddenMarkers = Object.values(visibilityMap).some(v => v === 'hidden');
+
+    // If no visibility markers are set, show all commits
+    if (!hasVisibleMarkers && !hasHiddenMarkers) {
+      return log.all;
+    }
+
+    // Calculate effective visibility for each branch
+    const visibleBranches = new Set<string>();
+    const hiddenBranches = new Set<string>();
+    
+    for (const branch of branchData.branches) {
+      const effectiveVis = getEffectiveVisibility(branch, visibilityMap);
+      if (effectiveVis === 'visible') {
+        visibleBranches.add(branch);
+      } else if (effectiveVis === 'hidden') {
+        hiddenBranches.add(branch);
+      }
+    }
+
+    // Build a map from commit hash to commit for quick lookup
+    const commitMap = new Map(log.all.map(c => [c.hash, c]));
+    
+    // Find commits reachable from visible branches (using BFS/DFS through parent chain)
+    const reachableFromVisible = new Set<string>();
+    const reachableFromHidden = new Set<string>();
+    
+    // Helper to mark all ancestors as reachable
+    const markReachable = (startHash: string, reachableSet: Set<string>) => {
+      const stack = [startHash];
+      while (stack.length > 0) {
+        const hash = stack.pop()!;
+        if (reachableSet.has(hash)) continue;
+        
+        const commit = commitMap.get(hash);
+        if (!commit) continue;
+        
+        reachableSet.add(hash);
+        
+        // Add parents to process
+        for (const parentHash of commit.parents || []) {
+          if (!reachableSet.has(parentHash)) {
+            stack.push(parentHash);
+          }
+        }
+      }
+    };
+    
+    // Mark commits reachable from visible branches
+    for (const branch of visibleBranches) {
+      const headHash = branchData.branchCommits[branch];
+      if (headHash) {
+        markReachable(headHash, reachableFromVisible);
+      }
+    }
+    
+    // Mark commits reachable from hidden branches
+    for (const branch of hiddenBranches) {
+      const headHash = branchData.branchCommits[branch];
+      if (headHash) {
+        markReachable(headHash, reachableFromHidden);
+      }
+    }
+    
+    // Filter commits based on reachability
+    return log.all.filter(commit => {
+      const isInVisible = reachableFromVisible.has(commit.hash);
+      const isInHidden = reachableFromHidden.has(commit.hash);
+      
+      // If there are visible markers, only show commits reachable from visible branches
+      if (hasVisibleMarkers) {
+        return isInVisible;
+      }
+      
+      // If only hidden markers exist, hide commits that are ONLY reachable from hidden branches
+      // (commits shared with non-hidden branches should still show)
+      if (hasHiddenMarkers) {
+        // If commit is in hidden set and not in any visible branch's history
+        // Since we don't have visible markers, we need to check if it's exclusively in hidden
+        // For simplicity: hide if it's reachable from hidden branch
+        // But we should not hide commits that are ancestors of non-hidden branches too
+        // This requires checking all non-hidden branches...
+        
+        // Simpler approach: if no visible markers, just hide commits directly reachable from hidden
+        return !isInHidden;
+      }
+      
+      return true;
+    });
+  }, [log?.all, branchData?.branches, branchData?.branchCommits, visibilityMap]);
+
+  // Check if visibility filters are active
+  const hasVisibilityFilters = useMemo(() => {
+    return Object.values(visibilityMap).some(v => v === 'visible' || v === 'hidden');
+  }, [visibilityMap]);
+
+  // Auto-fetch more commits when filtered results are too few
+  const MIN_FILTERED_COMMITS = 50;
+  const MAX_AUTO_FETCH_LIMIT = 5000;
+  
+  useEffect(() => {
+    // Only auto-fetch if:
+    // 1. Visibility filters are active
+    // 2. We have fewer filtered commits than the minimum threshold
+    // 3. We're not already fetching
+    // 4. We haven't hit the max limit
+    // 5. There might be more commits to fetch (raw count >= current limit)
+    if (
+      hasVisibilityFilters &&
+      filteredCommits.length < MIN_FILTERED_COMMITS &&
+      !isFetching &&
+      limit < MAX_AUTO_FETCH_LIMIT &&
+      log?.all && log.all.length >= limit
+    ) {
+      // Fetch more commits - increase limit by 100
+      setLimit(l => Math.min(l + 100, MAX_AUTO_FETCH_LIMIT));
+    }
+  }, [hasVisibilityFilters, filteredCommits.length, isFetching, limit, log?.all]);
 
   // Handle scrolling to branch commit when it's loaded
   useEffect(() => {
@@ -389,9 +676,22 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
              <GitBranch className="h-4 w-4" />
              Branches
           </div>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsCreateBranchOpen(true)} title="Create Branch">
-            <Plus className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            {hasVisibilityFilters && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-6 w-6 cursor-pointer" 
+                onClick={handleClearAllFilters} 
+                title="Clear all filters"
+              >
+                <FilterX className="h-4 w-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" className="h-6 w-6 cursor-pointer" onClick={() => setIsCreateBranchOpen(true)} title="Create Branch">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <ScrollArea className="flex-1 overflow-auto">
           <div className="p-2 space-y-0.5">
@@ -405,6 +705,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 onCreateBranch={() => setIsCreateBranchOpen(true)}
                 onDeleteBranch={confirmDeleteBranch}
                 onBranchClick={handleBranchClick}
+                visibilityMap={visibilityMap}
+                onToggleVisibility={handleToggleVisibility}
               />
             )}
           </div>
@@ -465,14 +767,17 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <div className="h-[57px] flex items-center justify-between px-6 border-b shrink-0">
           <h1 className="font-semibold text-lg">History</h1>
           <div className="text-xs text-muted-foreground font-mono">
-            {log.all.length} commits {isFetching && <Loader2 className="inline ml-2 h-3 w-3 animate-spin" />}
+            {filteredCommits.length !== log.all.length 
+              ? `${filteredCommits.length} / ${log.all.length} commits` 
+              : `${log.all.length} commits`
+            } {isFetching && <Loader2 className="inline ml-2 h-3 w-3 animate-spin" />}
           </div>
         </div>
 
         <div className="flex-1 overflow-hidden relative">
           <GitGraph
             ref={gitGraphRef}
-            commits={log.all}
+            commits={filteredCommits}
             selectedHash={selectedHash || undefined}
             onSelectCommit={setSelectedHash}
             onEndReached={() => {
