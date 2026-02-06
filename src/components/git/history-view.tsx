@@ -4,7 +4,7 @@ import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDi
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeBranchName } from '@/lib/utils';
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import ReactDiffViewer from 'react-diff-viewer';
@@ -1098,7 +1098,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           <div className="py-2">
             <Input
               value={newBranchNameForRename}
-              onChange={e => setNewBranchNameForRename(e.target.value)}
+              onChange={e => setNewBranchNameForRename(sanitizeBranchName(e.target.value))}
               placeholder="New branch name"
               disabled={isRenaming}
               onKeyDown={e => {
@@ -1236,7 +1236,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           <div className="py-2">
             <Input
               value={newBranchName}
-              onChange={e => setNewBranchName(e.target.value)}
+              onChange={e => setNewBranchName(sanitizeBranchName(e.target.value))}
               placeholder="Branch name"
               disabled={isCreating}
               onKeyDown={e => {
