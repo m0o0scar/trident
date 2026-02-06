@@ -34,7 +34,13 @@ export async function POST(request: Request) {
         await git.pull();
         break;
       case 'fetch':
-        await git.fetch();
+        if (data?.allRemotes) {
+          await git.fetchAllRemotes();
+        } else if (data?.remote) {
+          await git.fetchRemote(data.remote);
+        } else {
+          await git.fetch();
+        }
         break;
       case 'stage':
         if (!data?.files) throw new Error('Files are required for staging');

@@ -1170,6 +1170,30 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }
 
+  const handleFetchFromAllRemotes = async () => {
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'fetch',
+        data: { allRemotes: true }
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  const handleFetchFromRemote = async (remote: string) => {
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'fetch',
+        data: { remote }
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   const handleCheckout = async (branchName: string) => {
 
     try {
@@ -1287,15 +1311,24 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             {/* Remote Branches Group */}
             {(hasRemotes || isBranchesLoading) && (
               <>
-                <GroupHeader
-                  name="Remotes"
-                  groupPath="__remotes__"
-                  icon={<Globe className="h-3.5 w-3.5 shrink-0" />}
-                  isExpanded={remotesGroupExpanded}
-                  onToggle={() => setRemotesGroupExpanded(!remotesGroupExpanded)}
-                  visibilityMap={visibilityMap}
-                  onToggleVisibility={handleToggleVisibility}
-                />
+                <ContextMenu>
+                  <ContextMenuTrigger>
+                    <GroupHeader
+                      name="Remotes"
+                      groupPath="__remotes__"
+                      icon={<Globe className="h-3.5 w-3.5 shrink-0" />}
+                      isExpanded={remotesGroupExpanded}
+                      onToggle={() => setRemotesGroupExpanded(!remotesGroupExpanded)}
+                      visibilityMap={visibilityMap}
+                      onToggleVisibility={handleToggleVisibility}
+                    />
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onSelect={handleFetchFromAllRemotes}>
+                      Fetch from all remotes
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
                 {remotesGroupExpanded && isBranchesLoading && !remoteBranchTrees && (
                   <div className="flex items-center gap-2 px-2 py-2 text-sm text-muted-foreground" style={{ paddingLeft: '20px' }}>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1308,16 +1341,25 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   
                   return (
                     <div key={remoteName}>
-                      <GroupHeader
-                        name={remoteName}
-                        groupPath={remoteGroupPath}
-                        icon={<Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                        isExpanded={isRemoteExpanded}
-                        onToggle={() => toggleFolder(remoteGroupPath)}
-                        visibilityMap={visibilityMap}
-                        onToggleVisibility={handleToggleVisibility}
-                        depth={1}
-                      />
+                      <ContextMenu>
+                        <ContextMenuTrigger>
+                          <GroupHeader
+                            name={remoteName}
+                            groupPath={remoteGroupPath}
+                            icon={<Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                            isExpanded={isRemoteExpanded}
+                            onToggle={() => toggleFolder(remoteGroupPath)}
+                            visibilityMap={visibilityMap}
+                            onToggleVisibility={handleToggleVisibility}
+                            depth={1}
+                          />
+                        </ContextMenuTrigger>
+                        <ContextMenuContent>
+                          <ContextMenuItem onSelect={() => handleFetchFromRemote(remoteName)}>
+                            Fetch from {remoteName}
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
                       {isRemoteExpanded && (
                         <BranchTreeItem
                           node={tree}

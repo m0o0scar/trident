@@ -72,6 +72,14 @@ export class GitService {
     await this.git.fetch();
   }
 
+  async fetchRemote(remote: string): Promise<void> {
+    await this.git.fetch(remote);
+  }
+
+  async fetchAllRemotes(): Promise<void> {
+    await this.git.fetch(['--all']);
+  }
+
   async pull(): Promise<void> {
     await this.git.pull();
   }
