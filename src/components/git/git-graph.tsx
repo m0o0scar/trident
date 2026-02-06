@@ -54,7 +54,7 @@ export function GitGraph({
     }, [nodes.length, prevCount]);
 
     return (
-        <div className="flex border rounded-md h-full bg-background overflow-hidden font-mono text-sm select-none">
+        <div className="flex h-full bg-background overflow-hidden font-mono text-sm select-none px-2">
             {/* Graph Column (SVG) + Message Column (combined to ensure alignment) */}
             <ScrollArea className="flex-1 h-full" onScroll={handleScroll} ref={scrollRef}>
                 <div className="relative min-w-full" style={{ height }}>

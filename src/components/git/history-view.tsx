@@ -124,7 +124,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   if (!log) return <div className="flex items-center justify-center p-8 h-full text-muted-foreground">No history data available</div>;
 
   return (
-    <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+    <div className="flex h-full overflow-hidden">
       {/* Branch Sidebar */}
       <div className="w-64 flex flex-col border-r bg-muted/10">
         <div className="p-4 border-b flex items-center justify-between bg-background h-[57px]">
@@ -136,7 +136,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <Plus className="h-4 w-4" />
           </Button>
         </div>
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 overflow-auto">
           <div className="p-2 space-y-0.5">
             {branchData?.branches.map((branch) => (
               <ContextMenu key={branch}>
@@ -147,7 +147,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   )}
                   >
                     <GitBranch className={cn("h-3 w-3 text-muted-foreground", branch === branchData.current && "text-primary")} />
-                    <span className="truncate flex-1">{branch}</span>
+                    <span className="truncate flex-1" title={branch}>{branch}</span>
                     {branch === branchData.current && <span className="w-2 h-2 rounded-full bg-primary" />}
                   </div>
                 </ContextMenuTrigger>
