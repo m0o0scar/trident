@@ -26,7 +26,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] View modified files status
 - [x] Stage/Unstage individual files
 - [x] Stage All files
-- [ ] Discard changes (Clean)
+- [x] Discard changes (Clean)
 - [ ] Stash changes
 - [ ] Pop/Apply stash
 
