@@ -4,7 +4,7 @@ import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDi
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal, X, Globe, ArrowUp, ArrowDown, Upload, AlertCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn, sanitizeBranchName } from '@/lib/utils';
+import { cn, sanitizeBranchName, isFileBinary } from '@/lib/utils';
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import ReactDiffViewer from '@alexbruf/react-diff-viewer';
@@ -61,24 +61,6 @@ interface BranchTreeNode {
   children: Map<string, BranchTreeNode>;
 }
 
-// Check if content appears to be binary (contains null bytes or high ratio of non-printable chars)
-function isBinaryContent(content: string): boolean {
-  if (!content) return false;
-  // Check for null bytes - strong indicator of binary content
-  if (content.includes('\0')) return true;
-  // Check first 8KB for non-printable characters
-  const sample = content.slice(0, 8192);
-  let nonPrintable = 0;
-  for (let i = 0; i < sample.length; i++) {
-    const code = sample.charCodeAt(i);
-    // Allow common whitespace (tab, newline, carriage return) and printable ASCII
-    if (code < 32 && code !== 9 && code !== 10 && code !== 13) {
-      nonPrintable++;
-    }
-  }
-  // If more than 10% non-printable, likely binary
-  return sample.length > 0 && (nonPrintable / sample.length) > 0.1;
-}
 
 // File status icon component
 function FileStatusIcon({ status }: { status: string }) {
@@ -107,8 +89,8 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
     return <div className="flex items-center justify-center p-8 text-muted-foreground">No diff available</div>;
   }
 
-  // Check if either side is binary content
-  const isBinary = isBinaryContent(data.left || '') || isBinaryContent(data.right || '');
+  // Check if file is binary (first by extension, then by content if unknown)
+  const isBinary = isFileBinary(filePath, data.left, data.right);
 
   if (isBinary) {
     return <div className="flex items-center justify-center p-8 text-muted-foreground">Binary file - diff not available</div>;
