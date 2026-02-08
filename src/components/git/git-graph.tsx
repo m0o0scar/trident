@@ -171,7 +171,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                     />
                     <button
                         onClick={handleCloseSearch}
-                        className="p-1 hover:bg-muted rounded-md transition-colors"
+                        className="p-1 hover:bg-muted rounded-md transition-colors cursor-pointer"
                         title="Close search (Esc)"
                     >
                         <X className="h-4 w-4 text-muted-foreground" />

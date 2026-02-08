@@ -2348,7 +2348,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   className={cn(
-                    "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                    "px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer",
                     activeTab === 'message' 
                       ? "bg-muted text-foreground" 
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -2359,7 +2359,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 </button>
                 <button
                   className={cn(
-                    "px-3 py-1 text-xs font-medium rounded-md transition-colors",
+                    "px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer",
                     activeTab === 'changes' 
                       ? "bg-muted text-foreground" 
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -2369,7 +2369,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   Changes
                 </button>
                 <button
-                  className="ml-2 p-1 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+                  className="ml-2 p-1 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors cursor-pointer"
                   onClick={() => setSelectedHash(null)}
                   title="Close"
                 >
