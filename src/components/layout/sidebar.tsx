@@ -145,7 +145,7 @@ export function Sidebar({ className }: SidebarProps) {
               title={isCollapsed ? "History" : undefined}
             >
               <Link href={getHref()}>
-                <Clock className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
+                <GitBranch className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
                 {!isCollapsed && "History"}
               </Link>
             </Button>
@@ -160,7 +160,7 @@ export function Sidebar({ className }: SidebarProps) {
               title={isCollapsed ? "Changes" : undefined}
             >
               <Link href={getHref('/changes')}>
-                <GitBranch className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
+                <Clock className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
                 {!isCollapsed && "Changes"}
               </Link>
             </Button>
