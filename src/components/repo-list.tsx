@@ -1,14 +1,15 @@
 'use client';
 
 import { useRepositories, useAddRepository, useDeleteRepository } from '@/hooks/use-git';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { FolderOpen, Plus, ArrowRight, Key, Trash2 } from 'lucide-react';
+import { FolderOpen, Plus, ArrowRight, Key, Trash2, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { FileSystemBrowser } from './fs-browser';
 import { toast } from '@/hooks/use-toast';
+import { HomeSettingsModal } from './home-settings-modal';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -27,7 +28,25 @@ export function RepoList() {
     const [browserOpen, setBrowserOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [repoToDelete, setRepoToDelete] = useState<{ path: string; name: string } | null>(null);
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [defaultRootFolder, setDefaultRootFolder] = useState<string | undefined>(undefined);
     const router = useRouter();
+
+    // Load settings on mount
+    useEffect(() => {
+        const loadSettings = async () => {
+            try {
+                const res = await fetch('/api/settings');
+                if (res.ok) {
+                    const data = await res.json();
+                    setDefaultRootFolder(data.resolvedDefaultFolder);
+                }
+            } catch (e) {
+                console.error('Failed to load settings:', e);
+            }
+        };
+        loadSettings();
+    }, []);
 
     const handleAdd = async (path: string) => {
         if (!path) return;
@@ -87,6 +106,9 @@ export function RepoList() {
                 </div>
                 <div className="flex items-center gap-2">
                     <ThemeToggle />
+                    <Button variant="outline" size="icon" onClick={() => setSettingsOpen(true)} title="Settings">
+                        <Settings className="w-4 h-4" />
+                    </Button>
                     <Button variant="outline" asChild>
                         <Link href="/credentials" className="gap-2">
                             <Key className="w-4 h-4" />
@@ -157,6 +179,13 @@ export function RepoList() {
                 open={browserOpen}
                 onOpenChange={setBrowserOpen}
                 onSelect={(path) => handleAdd(path)}
+                initialPath={defaultRootFolder}
+            />
+
+            <HomeSettingsModal
+                open={settingsOpen}
+                onOpenChange={setSettingsOpen}
+                onSettingsChange={(settings) => setDefaultRootFolder(settings.resolvedDefaultFolder)}
             />
 
             <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

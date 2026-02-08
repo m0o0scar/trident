@@ -81,3 +81,54 @@ export function removeRepository(repoPath: string): void {
   repos = repos.filter(r => r.path !== repoPath);
   fs.writeFileSync(DATA_FILE, JSON.stringify(repos, null, 2));
 }
+
+// Settings management
+export interface AppSettings {
+  defaultRootFolder: string | null;
+}
+
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+
+export function getSettings(): AppSettings {
+  const defaults: AppSettings = {
+    defaultRootFolder: null, // null means use user's home directory
+  };
+
+  if (!fs.existsSync(SETTINGS_FILE)) {
+    return defaults;
+  }
+
+  try {
+    const data = fs.readFileSync(SETTINGS_FILE, 'utf-8');
+    const saved = JSON.parse(data);
+    return { ...defaults, ...saved };
+  } catch (error) {
+    console.error('Failed to parse settings.json', error);
+    return defaults;
+  }
+}
+
+export function updateSettings(updates: Partial<AppSettings>): AppSettings {
+  const current = getSettings();
+  const updated = { ...current, ...updates };
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(updated, null, 2));
+  return updated;
+}
+
+export function getDefaultRootFolder(): string {
+  const settings = getSettings();
+  
+  // If a default folder is set, check if it still exists
+  if (settings.defaultRootFolder) {
+    try {
+      if (fs.existsSync(settings.defaultRootFolder) && fs.statSync(settings.defaultRootFolder).isDirectory()) {
+        return settings.defaultRootFolder;
+      }
+    } catch {
+      // Folder doesn't exist or can't be accessed, fall back to home
+    }
+  }
+  
+  // Fall back to user's home directory
+  return os.homedir();
+}

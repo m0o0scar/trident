@@ -23,12 +23,14 @@ interface FileSystemBrowserProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSelect: (path: string) => void;
+  initialPath?: string;
 }
 
-export function FileSystemBrowser({ open, onOpenChange, onSelect }: FileSystemBrowserProps) {
+export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath }: FileSystemBrowserProps) {
   const [currentPath, setCurrentPath] = useState<string>('');
   const [data, setData] = useState<FSResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   const loadPath = async (path?: string) => {
     setIsLoading(true);
@@ -50,11 +52,16 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect }: FileSystemBr
   };
 
   useEffect(() => {
-    if (open && !currentPath) {
-      loadPath();
+    if (open && !hasInitialized) {
+      loadPath(initialPath);
+      setHasInitialized(true);
+    }
+    if (!open) {
+      // Reset when dialog closes so it starts fresh next time
+      setHasInitialized(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, initialPath]);
 
   const handleNavigate = (path: string) => {
       loadPath(path);
