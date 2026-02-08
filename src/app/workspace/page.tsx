@@ -10,7 +10,7 @@ function WorkspaceHistoryContent() {
   const searchParams = useSearchParams();
   const repoPath = searchParams.get('path');
 
-  useWorkspaceTitle(repoPath);
+  useWorkspaceTitle(repoPath, 'History');
 
   if (!repoPath) {
     return <div className="p-8">No repository path specified.</div>;

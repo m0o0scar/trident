@@ -28,7 +28,7 @@ function WorkspaceSettingsContent() {
     const searchParams = useSearchParams();
     const repoPath = searchParams.get('path');
 
-    useWorkspaceTitle(repoPath);
+    useWorkspaceTitle(repoPath, 'Settings');
 
     const { data: repos, isLoading: isLoadingRepos } = useRepositories();
     const { data: credentials, isLoading: isLoadingCreds } = useCredentials();

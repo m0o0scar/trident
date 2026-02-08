@@ -119,7 +119,7 @@ function StashesContent() {
 
     const { data: stashFiles, isLoading: filesLoading } = useStashFiles(repoPath, selectedStashIndex);
 
-    useWorkspaceTitle(repoPath);
+    useWorkspaceTitle(repoPath, 'Stashes');
 
     if (!repoPath) {
         return <div className="p-8">No repository path specified.</div>;
