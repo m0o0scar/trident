@@ -227,8 +227,80 @@ export function useCommitFileDiff(repoPath: string | null, commitHash: string | 
   });
 }
 
+// Stash types
+export interface GitStash {
+  index: number;
+  message: string;
+  date: string;
+  hash: string;
+}
+
+export function useGitStashes(repoPath: string | null) {
+  return useQuery<GitStash[]>({
+    queryKey: ['git', repoPath, 'stashes'],
+    queryFn: async () => {
+      if (!repoPath) return [];
+      const res = await fetch(`${API_BASE}/git/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repoPath, action: 'stash-list' }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to fetch stashes');
+      }
+      const data = await res.json();
+      return data.stashes || [];
+    },
+    enabled: !!repoPath,
+  });
+}
+
+export interface StashFile {
+  path: string;
+  status: string;
+}
+
+export function useStashFiles(repoPath: string | null, stashIndex: number | null) {
+  return useQuery<StashFile[]>({
+    queryKey: ['git', repoPath, 'stash-files', stashIndex],
+    queryFn: async () => {
+      if (!repoPath || stashIndex === null) return [];
+      const res = await fetch(`${API_BASE}/git/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repoPath, action: 'stash-files', data: { index: stashIndex } }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to fetch stash files');
+      }
+      const data = await res.json();
+      return data.files || [];
+    },
+    enabled: !!repoPath && stashIndex !== null,
+  });
+}
+
+export function useStashFileDiff(repoPath: string | null, stashIndex: number | null, filePath: string | null) {
+  return useQuery<{ left: string; right: string }>({
+    queryKey: ['git', repoPath, 'stash-file-diff', stashIndex, filePath],
+    queryFn: async () => {
+      if (!repoPath || stashIndex === null || !filePath) return { left: '', right: '' };
+      const res = await fetch(`${API_BASE}/git/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repoPath, action: 'stash-file-diff', data: { index: stashIndex, file: filePath } }),
+      });
+      if (!res.ok) {
+        throw new Error('Failed to fetch stash file diff');
+      }
+      return res.json();
+    },
+    enabled: !!repoPath && stashIndex !== null && !!filePath,
+  });
+}
+
 // Actions
-export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'branch' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'rebase' | 'merge' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'push-to-remote' | 'pull-from-remote';
+export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'branch' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'rebase' | 'merge' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop';
 
 interface GitActionPayload {
   repoPath: string;

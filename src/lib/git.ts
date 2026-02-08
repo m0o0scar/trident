@@ -567,6 +567,91 @@ export class GitService {
     }
   }
 
+  // Stash operations
+  async stash(message?: string): Promise<void> {
+    const args = ['push'];
+    if (message) {
+      args.push('-m', message);
+    }
+    await this.git.stash(args);
+  }
+
+  async getStashes(): Promise<{ index: number; message: string; date: string; hash: string }[]> {
+    try {
+      // Use git stash list with custom format to get useful info
+      const result = await this.git.raw(['stash', 'list', '--format=%gd|%s|%ai|%H']);
+      if (!result.trim()) {
+        return [];
+      }
+      
+      return result.trim().split('\n').map((line, idx) => {
+        const [ref, message, date, hash] = line.split('|');
+        // ref is like "stash@{0}", extract the index
+        const indexMatch = ref.match(/stash@\{(\d+)\}/);
+        const index = indexMatch ? parseInt(indexMatch[1], 10) : idx;
+        return { index, message: message || 'No message', date, hash };
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  async applyStash(index: number): Promise<void> {
+    await this.git.stash(['apply', `stash@{${index}}`]);
+  }
+
+  async dropStash(index: number): Promise<void> {
+    await this.git.stash(['drop', `stash@{${index}}`]);
+  }
+
+  async popStash(index: number): Promise<void> {
+    await this.git.stash(['pop', `stash@{${index}}`]);
+  }
+
+  async getStashFiles(index: number): Promise<{ path: string; status: string }[]> {
+    try {
+      // Get list of files changed in this stash
+      const result = await this.git.raw(['stash', 'show', '--name-status', `stash@{${index}}`]);
+      if (!result.trim()) {
+        return [];
+      }
+      
+      return result.trim().split('\n').map(line => {
+        const [status, ...pathParts] = line.split('\t');
+        const path = pathParts.join('\t');
+        return { path, status };
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  async getStashFileDiff(index: number, filePath: string): Promise<{ left: string; right: string }> {
+    // Get the content before the stash (from the parent commit of the stash)
+    // and the content in the stash itself
+    let left = '';
+    let right = '';
+    
+    try {
+      // stash@{n}^1 is the parent commit (the state before stashing)
+      // We need to get the file content from the parent
+      left = await this.git.show([`stash@{${index}}^1:${filePath}`]);
+    } catch {
+      // File might not exist before the stash (new file)
+      left = '';
+    }
+    
+    try {
+      // Get the file content from the stash itself
+      right = await this.git.show([`stash@{${index}}:${filePath}`]);
+    } catch {
+      // File might be deleted in the stash
+      right = '';
+    }
+    
+    return { left, right };
+  }
+
   async pushToRemote(
     localBranch: string,
     remote: string,

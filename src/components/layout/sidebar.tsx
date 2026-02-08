@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { GitBranch, Clock, Settings, ArrowLeft, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { GitBranch, Clock, Settings, ArrowLeft, PanelLeftClose, PanelLeft, Archive } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { usePathname, useSearchParams } from 'next/navigation';
@@ -60,10 +60,11 @@ export function Sidebar({ className }: SidebarProps) {
     return `/workspace${subPath}?${p.toString()}`;
   };
 
-  const isActive = (view: 'status' | 'history' | 'settings') => {
+  const isActive = (view: 'status' | 'history' | 'settings' | 'stashes') => {
     if (view === 'status') return pathname === '/workspace/changes';
     if (view === 'history') return pathname === '/workspace' || pathname.startsWith('/workspace/history');
     if (view === 'settings') return pathname.startsWith('/workspace/settings');
+    if (view === 'stashes') return pathname.startsWith('/workspace/stashes');
     return false;
   };
 
@@ -161,6 +162,21 @@ export function Sidebar({ className }: SidebarProps) {
               <Link href={getHref('/changes')}>
                 <GitBranch className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
                 {!isCollapsed && "Changes"}
+              </Link>
+            </Button>
+            <Button
+              variant={isActive('stashes') ? 'secondary' : 'ghost'}
+              className={cn(
+                "w-full",
+                isCollapsed ? "justify-center px-2" : "justify-start",
+                isActive('stashes') && "font-medium"
+              )}
+              asChild
+              title={isCollapsed ? "Stashes" : undefined}
+            >
+              <Link href={getHref('/stashes')}>
+                <Archive className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
+                {!isCollapsed && "Stashes"}
               </Link>
             </Button>
             <Button

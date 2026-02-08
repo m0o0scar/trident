@@ -8,7 +8,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -179,6 +179,33 @@ export async function POST(request: Request) {
         });
         console.log('[API] git.pullFromRemote completed');
         break;
+      case 'stash':
+        await git.stash(data?.message);
+        break;
+      case 'stash-list':
+        const stashes = await git.getStashes();
+        return NextResponse.json({ success: true, stashes });
+      case 'stash-apply':
+        if (data?.index === undefined) throw new Error('Stash index is required');
+        await git.applyStash(data.index);
+        break;
+      case 'stash-drop':
+        if (data?.index === undefined) throw new Error('Stash index is required');
+        await git.dropStash(data.index);
+        break;
+      case 'stash-pop':
+        if (data?.index === undefined) throw new Error('Stash index is required');
+        await git.popStash(data.index);
+        break;
+      case 'stash-files':
+        if (data?.index === undefined) throw new Error('Stash index is required');
+        const stashFiles = await git.getStashFiles(data.index);
+        return NextResponse.json({ success: true, files: stashFiles });
+      case 'stash-file-diff':
+        if (data?.index === undefined) throw new Error('Stash index is required');
+        if (!data?.file) throw new Error('File path is required');
+        const stashFileDiff = await git.getStashFileDiff(data.index, data.file);
+        return NextResponse.json({ success: true, ...stashFileDiff });
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }

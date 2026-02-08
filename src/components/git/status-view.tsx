@@ -3,16 +3,28 @@
 import { useGitStatus, useGitAction } from '@/hooks/use-git';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { useState } from 'react';
-import { Loader2, Plus, Minus, RefreshCcw, Check } from 'lucide-react';
+import { Loader2, Plus, Minus, RefreshCcw, Check, Archive, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DiffView } from './diff-view';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 export function StatusView({ repoPath }: { repoPath: string }) {
     const { data: status, isLoading, isError, error, refetch } = useGitStatus(repoPath);
     const action = useGitAction();
     const [message, setMessage] = useState('');
     const [selectedFile, setSelectedFile] = useState<string | null>(null);
+    const [stashDialogOpen, setStashDialogOpen] = useState(false);
+    const [stashMessage, setStashMessage] = useState('');
+    const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
 
     if (isLoading) {
         return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-muted-foreground" /></div>;
@@ -58,6 +70,24 @@ export function StatusView({ repoPath }: { repoPath: string }) {
         await action.mutateAsync({ repoPath, action: 'stage', data: { files: ['.'] } });
     }
 
+    const handleUnstageAll = async () => {
+        await action.mutateAsync({ repoPath, action: 'unstage', data: { files: staged } });
+    }
+
+    const handleStash = async () => {
+        await action.mutateAsync({ repoPath, action: 'stash', data: { message: stashMessage || undefined } });
+        setStashDialogOpen(false);
+        setStashMessage('');
+        setSelectedFile(null);
+    }
+
+    const handleDiscard = async () => {
+        // Reset all changes (staged and unstaged)
+        await action.mutateAsync({ repoPath, action: 'checkout', data: { branch: '.' } });
+        setDiscardDialogOpen(false);
+        setSelectedFile(null);
+    }
+
     const handleCommit = async () => {
         if (!message) return;
         await action.mutateAsync({ repoPath, action: 'commit', data: { message } });
@@ -90,7 +120,21 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                     <div className="p-2">
                         <div className="flex items-center justify-between px-2 py-2 mb-1">
                             <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Changes ({changes.length})</h3>
-                            <Button variant="ghost" size="xs" onClick={handleStageAll} className="h-5 text-[10px] px-2">Stage All</Button>
+                            <div className="flex items-center gap-1">
+                                {changes.length === 0 && staged.length > 0 ? (
+                                    <Button variant="ghost" size="xs" onClick={handleUnstageAll} className="h-5 text-[10px] px-2">Unstage All</Button>
+                                ) : (
+                                    <Button variant="ghost" size="xs" onClick={handleStageAll} className="h-5 text-[10px] px-2" disabled={changes.length === 0}>Stage All</Button>
+                                )}
+                                <Button variant="ghost" size="xs" onClick={() => setStashDialogOpen(true)} className="h-5 text-[10px] px-2" disabled={changes.length === 0 && staged.length === 0}>
+                                    <Archive className="h-3 w-3 mr-1" />
+                                    Stash
+                                </Button>
+                                <Button variant="ghost" size="xs" onClick={() => setDiscardDialogOpen(true)} className="h-5 text-[10px] px-2 hover:text-destructive" disabled={changes.length === 0}>
+                                    <Trash2 className="h-3 w-3 mr-1" />
+                                    Discard
+                                </Button>
+                            </div>
                         </div>
                         <div className="space-y-0.5">
                             {changes.length === 0 && <p className="px-2 py-2 text-xs text-muted-foreground italic">No changes</p>}
@@ -171,6 +215,61 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                     </div>
                 )}
             </div>
+
+            {/* Stash Dialog */}
+            <Dialog open={stashDialogOpen} onOpenChange={setStashDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Stash Changes</DialogTitle>
+                        <DialogDescription>
+                            Save your local modifications to a new stash entry.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <Input
+                            placeholder="Stash message (optional)"
+                            value={stashMessage}
+                            onChange={(e) => setStashMessage(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleStash();
+                                }
+                            }}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setStashDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleStash} disabled={action.isPending}>
+                            {action.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Archive className="h-4 w-4 mr-2" />}
+                            Stash
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Discard Dialog */}
+            <Dialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Discard Changes</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to discard all unstaged changes? This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDiscardDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={handleDiscard} disabled={action.isPending}>
+                            {action.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                            Discard
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
