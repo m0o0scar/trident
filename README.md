@@ -6,12 +6,14 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 
 ## Features
 
-- **Repository Management** - Add and manage multiple local Git repositories
+- **Repository Management** - Add, delete, and manage multiple local Git repositories
 - **Visual Commit Graph** - Fork-style commit visualization with branch lanes
 - **Branch Operations** - Create, checkout, delete, rename, rebase, and merge branches
 - **Change Staging** - Stage/unstage files individually or all at once
+- **Stash Support** - Stash, reapply, and delete stashed changes
 - **Diff Viewer** - Syntax-highlighted diff view for reviewing changes
 - **Commit History** - Browse commit history with infinite scroll and branch filtering
+- **Settings** - Configure default repository folder and preferences
 - **Dark/Light Mode** - Theme toggle for comfortable viewing
 
 ## Feature Roadmap
@@ -19,6 +21,8 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 ### Repository Management
 - [x] Open local repository
 - [x] List recent repositories
+- [x] Delete repository from list
+- [x] Shared repository storage across instances
 - [ ] Clone repository
 - [ ] Initialize new repository
 
@@ -27,8 +31,8 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] Stage/Unstage individual files
 - [x] Stage All files
 - [x] Discard changes (Clean)
-- [ ] Stash changes
-- [ ] Pop/Apply stash
+- [x] Stash changes
+- [x] Pop/Apply/Delete stash
 
 ### Committing
 - [x] Write commit message
@@ -58,6 +62,10 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] Filter history by branch visibility
 - [x] View commit details (Message, Author, Date)
 - [x] View commit diffs (Side-by-side / Inline)
+
+### Settings & Configuration
+- [x] Default root folder for repository browsing
+- [x] Dark/Light mode toggle
 
 ### Advanced / Other
 - [ ] Cherry-pick commits
@@ -128,7 +136,7 @@ src/
 │   │   ├── git/           # Git action endpoints
 │   │   ├── fs/            # File system endpoints
 │   │   └── repos/         # Repository management
-│   └── workspace/         # Workspace pages (status, history, settings)
+│   └── workspace/         # Workspace pages (history, changes, stashes, settings)
 ├── components/            # React components
 │   ├── git/              # Git-specific components
 │   │   ├── diff-view.tsx
