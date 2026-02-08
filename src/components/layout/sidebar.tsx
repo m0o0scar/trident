@@ -61,8 +61,8 @@ export function Sidebar({ className }: SidebarProps) {
   };
 
   const isActive = (view: 'status' | 'history' | 'settings') => {
-    if (view === 'status') return pathname === '/workspace';
-    if (view === 'history') return pathname.startsWith('/workspace/history');
+    if (view === 'status') return pathname === '/workspace/changes';
+    if (view === 'history') return pathname === '/workspace' || pathname.startsWith('/workspace/history');
     if (view === 'settings') return pathname.startsWith('/workspace/settings');
     return false;
   };
@@ -134,21 +134,6 @@ export function Sidebar({ className }: SidebarProps) {
 
           <div className="space-y-1">
             <Button
-              variant={isActive('status') ? 'secondary' : 'ghost'}
-              className={cn(
-                "w-full",
-                isCollapsed ? "justify-center px-2" : "justify-start",
-                isActive('status') && "font-medium"
-              )}
-              asChild
-              title={isCollapsed ? "Changes" : undefined}
-            >
-              <Link href={getHref()}>
-                <GitBranch className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
-                {!isCollapsed && "Changes"}
-              </Link>
-            </Button>
-            <Button
               variant={isActive('history') ? 'secondary' : 'ghost'}
               className={cn(
                 "w-full",
@@ -158,9 +143,24 @@ export function Sidebar({ className }: SidebarProps) {
               asChild
               title={isCollapsed ? "History" : undefined}
             >
-              <Link href={getHref('/history')}>
+              <Link href={getHref()}>
                 <Clock className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
                 {!isCollapsed && "History"}
+              </Link>
+            </Button>
+            <Button
+              variant={isActive('status') ? 'secondary' : 'ghost'}
+              className={cn(
+                "w-full",
+                isCollapsed ? "justify-center px-2" : "justify-start",
+                isActive('status') && "font-medium"
+              )}
+              asChild
+              title={isCollapsed ? "Changes" : undefined}
+            >
+              <Link href={getHref('/changes')}>
+                <GitBranch className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
+                {!isCollapsed && "Changes"}
               </Link>
             </Button>
             <Button
