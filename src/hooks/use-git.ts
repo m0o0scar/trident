@@ -24,7 +24,10 @@ export function useAddRepository() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path, name }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to add repository');
+      }
       return res.json();
     },
     onSuccess: () => {

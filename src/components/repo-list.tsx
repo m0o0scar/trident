@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { FileSystemBrowser } from './fs-browser';
+import { toast } from '@/hooks/use-toast';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -34,8 +35,22 @@ export function RepoList() {
             await addRepo.mutateAsync({ path });
             // Navigate to workspace page after successfully adding repository
             router.push(`/workspace?path=${encodeURIComponent(path)}`);
-        } catch {
-            alert('Failed to add repo');
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            
+            if (errorMessage.includes('already exists')) {
+                toast({
+                    variant: 'warning',
+                    title: 'Repository already added',
+                    description: 'This repository is already in your list. Select it from the list to open it.',
+                });
+            } else {
+                toast({
+                    variant: 'destructive',
+                    title: 'Failed to add repository',
+                    description: errorMessage,
+                });
+            }
         }
     };
 
@@ -51,8 +66,13 @@ export function RepoList() {
             await deleteRepo.mutateAsync({ path: repoToDelete.path });
             setDeleteDialogOpen(false);
             setRepoToDelete(null);
-        } catch {
-            alert('Failed to delete repository');
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            toast({
+                variant: 'destructive',
+                title: 'Failed to delete repository',
+                description: errorMessage,
+            });
         }
     };
 
