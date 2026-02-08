@@ -1,15 +1,34 @@
 
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { Repository } from './types';
 
-// Store the list of known repositories in a local JSON file.
-// In a real desktop app, this might be in userData directory.
-const DATA_FILE = path.join(process.cwd(), 'data', 'repos.json');
+// Get cross-platform app data directory
+function getAppDataDir(): string {
+  const platform = process.platform;
+  const homeDir = os.homedir();
+  
+  if (platform === 'win32') {
+    // Windows: %APPDATA%\trident
+    return path.join(process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming'), 'trident');
+  } else if (platform === 'darwin') {
+    // macOS: ~/Library/Application Support/trident
+    return path.join(homeDir, 'Library', 'Application Support', 'trident');
+  } else {
+    // Linux/others: ~/.config/trident
+    return path.join(process.env.XDG_CONFIG_HOME || path.join(homeDir, '.config'), 'trident');
+  }
+}
+
+// Store the list of known repositories in a shared app data directory.
+// This allows all instances of the app to share the same repository list.
+const DATA_DIR = getAppDataDir();
+const DATA_FILE = path.join(DATA_DIR, 'repos.json');
 
 // Ensure data directory exists
-if (!fs.existsSync(path.dirname(DATA_FILE))) {
-  fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
 export function getRepositories(): Repository[] {
