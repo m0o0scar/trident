@@ -32,6 +32,8 @@ export function RepoList() {
         if (!path) return;
         try {
             await addRepo.mutateAsync({ path });
+            // Navigate to workspace page after successfully adding repository
+            router.push(`/workspace?path=${encodeURIComponent(path)}`);
         } catch {
             alert('Failed to add repo');
         }
