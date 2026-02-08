@@ -1,18 +1,31 @@
 'use client';
 
-import { useRepositories, useAddRepository } from '@/hooks/use-git';
+import { useRepositories, useAddRepository, useDeleteRepository } from '@/hooks/use-git';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { FolderOpen, Plus, ArrowRight, Key } from 'lucide-react';
+import { FolderOpen, Plus, ArrowRight, Key, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { FileSystemBrowser } from './fs-browser';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export function RepoList() {
     const { data: repos, isLoading } = useRepositories();
     const addRepo = useAddRepository();
+    const deleteRepo = useDeleteRepository();
     const [browserOpen, setBrowserOpen] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [repoToDelete, setRepoToDelete] = useState<{ path: string; name: string } | null>(null);
     const router = useRouter();
 
     const handleAdd = async (path: string) => {
@@ -21,6 +34,23 @@ export function RepoList() {
             await addRepo.mutateAsync({ path });
         } catch {
             alert('Failed to add repo');
+        }
+    };
+
+    const handleDeleteClick = (e: React.MouseEvent, repo: { path: string; name: string }) => {
+        e.stopPropagation();
+        setRepoToDelete(repo);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!repoToDelete) return;
+        try {
+            await deleteRepo.mutateAsync({ path: repoToDelete.path });
+            setDeleteDialogOpen(false);
+            setRepoToDelete(null);
+        } catch {
+            alert('Failed to delete repository');
         }
     };
 
@@ -76,11 +106,24 @@ export function RepoList() {
                             <div className="text-sm text-muted-foreground font-mono truncate" title={repo.path}>
                                 {repo.path}
                             </div>
-                            <div className="text-right">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-muted-foreground" asChild>
+                            <div className="flex items-center gap-1">
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 text-muted-foreground hover:text-foreground" 
+                                    asChild
+                                >
                                     <Link href={`/workspace?path=${encodeURIComponent(repo.path)}`}>
-                                        <ArrowRight className="w-4 h-4 group-hover:text-foreground transition-colors" />
+                                        <ArrowRight className="w-4 h-4" />
                                     </Link>
+                                </Button>
+                                <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive cursor-pointer" 
+                                    onClick={(e) => handleDeleteClick(e, repo)}
+                                >
+                                    <Trash2 className="w-4 h-4" />
                                 </Button>
                             </div>
                         </div>
@@ -93,6 +136,24 @@ export function RepoList() {
                 onOpenChange={setBrowserOpen}
                 onSelect={(path) => handleAdd(path)}
             />
+
+            <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Repository</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to remove <strong>{repoToDelete?.name}</strong> from the list? 
+                            This will only remove it from your repository list, not delete the files from your file system.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction variant="destructive" onClick={handleDeleteConfirm}>
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

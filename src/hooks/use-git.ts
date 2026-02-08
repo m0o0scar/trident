@@ -51,6 +51,25 @@ export function useUpdateRepository() {
   });
 }
 
+export function useDeleteRepository() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ path }: { path: string }) => {
+      const res = await fetch(`${API_BASE}/repos`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repos'] });
+    },
+  });
+}
+
+
 export function useGitStatus(repoPath: string | null) {
   return useQuery<GitStatus>({
     queryKey: ['git', repoPath, 'status'],
