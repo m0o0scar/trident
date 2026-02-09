@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { useGitStatus } from '@/hooks/use-git';
 
 const SIDEBAR_COLLAPSED_KEY = 'workspace-sidebar-collapsed';
 const SIDEBAR_WIDTH_EXPANDED = 256; // w-64
@@ -25,6 +26,10 @@ export function Sidebar({ className }: SidebarProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   const [enableTransition, setEnableTransition] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  
+  // Fetch git status to get uncommitted changes count
+  const { data: gitStatus } = useGitStatus(repoPath || null);
+  const changesCount = gitStatus?.files?.length ?? 0;
 
   // Load collapsed state from localStorage synchronously before paint
   useIsomorphicLayoutEffect(() => {
@@ -157,11 +162,18 @@ export function Sidebar({ className }: SidebarProps) {
                 isActive('status') && "font-medium"
               )}
               asChild
-              title={isCollapsed ? "Changes" : undefined}
+              title={isCollapsed ? `Changes${changesCount > 0 ? ` (${changesCount})` : ''}` : undefined}
             >
               <Link href={getHref('/changes')}>
-                <Clock className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
-                {!isCollapsed && "Changes"}
+                <div className={cn("relative", !isCollapsed && "mr-2")}>
+                  <Clock className="h-4 w-4" />
+                  {isCollapsed && changesCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                      {changesCount > 99 ? '99+' : changesCount}
+                    </span>
+                  )}
+                </div>
+                {!isCollapsed && (changesCount > 0 ? `Changes (${changesCount})` : "Changes")}
               </Link>
             </Button>
             <Button
