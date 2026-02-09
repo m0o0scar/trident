@@ -3,7 +3,7 @@
 import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, BranchTrackingInfo, useRepository, useUpdateRepository } from '@/hooks/use-git';
 import { Repository } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal, X, Globe, ArrowUp, ArrowDown, Upload, AlertCircle } from 'lucide-react';
+import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal, X, Globe, ArrowUp, ArrowDown, Upload, AlertCircle, AlertTriangle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn, sanitizeBranchName, isFileBinary } from '@/lib/utils';
 import { GitGraph, GitGraphHandle } from './git-graph';
@@ -81,6 +81,12 @@ function FileStatusIcon({ status }: { status: string }) {
 function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { repoPath: string; commitHash: string; filePath: string; splitView: boolean }) {
   const { data, isLoading } = useCommitFileDiff(repoPath, commitHash, filePath);
   const { resolvedTheme } = useTheme();
+  const [renderAnyway, setRenderAnyway] = useState(false);
+
+  // Reset renderAnyway when file or commit changes
+  useEffect(() => {
+    setRenderAnyway(false);
+  }, [filePath, commitHash]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8"><Loader2 className="animate-spin text-muted-foreground" /></div>;
@@ -95,6 +101,35 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
 
   if (isBinary) {
     return <div className="flex items-center justify-center p-8 text-muted-foreground">Binary file - diff not available</div>;
+  }
+
+  // Large file protection
+  const MAX_DIFF_SIZE = 100 * 1024; // 100KB
+  const MAX_DIFF_LINES = 3000;
+
+  const leftContent = data.left || '';
+  const rightContent = data.right || '';
+  const contentSize = leftContent.length + rightContent.length;
+  // Estimate lines
+  const lineCount = (leftContent.match(/\n/g) || []).length + (rightContent.match(/\n/g) || []).length;
+
+  const isLargeDiff = (contentSize > MAX_DIFF_SIZE || lineCount > MAX_DIFF_LINES);
+
+  if (isLargeDiff && !renderAnyway) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
+        <AlertTriangle className="h-12 w-12 text-yellow-500" />
+        <div className="space-y-2">
+          <h3 className="font-semibold text-lg">Large Diff Detected</h3>
+          <p className="text-muted-foreground">
+            This diff is large ({Math.round(contentSize / 1024)}KB, ~{lineCount} lines) and may freeze your browser if rendered.
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => setRenderAnyway(true)}>
+          Show Diff Anyway
+        </Button>
+      </div>
+    );
   }
 
   return (
