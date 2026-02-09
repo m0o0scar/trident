@@ -2,10 +2,10 @@
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { GitBranch, Clock, Settings, ArrowLeft, PanelLeftClose, PanelLeft, Archive } from 'lucide-react';
+import { GitBranch, Clock, Settings, PanelLeftClose, PanelLeft, Archive, GitFork } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useGitStatus } from '@/hooks/use-git';
 
@@ -21,6 +21,7 @@ const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffec
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const router = useRouter();
   const repoPath = searchParams.get('path') || '';
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
@@ -94,20 +95,45 @@ export function Sidebar({ className }: SidebarProps) {
     >
       <div className="space-y-4 py-4">
         <div className={cn("px-3 py-2", isCollapsed && "px-2")}>
-          <div className={cn("mb-6 flex items-center", isCollapsed ? "justify-center px-0" : "justify-between px-4")}>
+          <div className={cn("mb-6 flex items-center", isCollapsed ? "flex-col gap-2 px-0" : "justify-between px-4")}>
             {!isCollapsed && (
-              <h2 className="text-lg font-semibold tracking-tight">
-                Workspace
-              </h2>
+              <a
+                href="/"
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey) {
+                    // Cmd/Ctrl+click: open in new tab (default behavior)
+                    return;
+                  }
+                  e.preventDefault();
+                  router.push('/');
+                }}
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+                title="Go to Home"
+              >
+                <GitFork className="h-5 w-5" />
+                <h2 className="text-lg font-semibold tracking-tight">
+                  Trident
+                </h2>
+              </a>
+            )}
+            {isCollapsed && (
+              <a
+                href="/"
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey) {
+                    // Cmd/Ctrl+click: open in new tab (default behavior)
+                    return;
+                  }
+                  e.preventDefault();
+                  router.push('/');
+                }}
+                className="flex items-center justify-center h-8 w-8 hover:opacity-80 transition-opacity cursor-pointer"
+                title="Go to Home"
+              >
+                <GitFork className="h-5 w-5" />
+              </a>
             )}
             <div className={cn("flex items-center gap-1", isCollapsed && "flex-col")}>
-              {!isCollapsed && (
-                <Button variant="ghost" size="icon" asChild title="Back to Dashboard" className="h-8 w-8">
-                  <Link href="/">
-                    <ArrowLeft className="h-4 w-4" />
-                  </Link>
-                </Button>
-              )}
               <Button 
                 variant="ghost" 
                 size="icon" 
@@ -125,16 +151,6 @@ export function Sidebar({ className }: SidebarProps) {
               <p className="text-xs font-mono text-muted-foreground break-all border rounded p-2 bg-muted/30" title={repoPath}>
                 {repoPath.split('/').pop()}
               </p>
-            </div>
-          )}
-
-          {isCollapsed && (
-            <div className="mb-6 flex justify-center">
-              <Button variant="ghost" size="icon" asChild title="Back to Dashboard" className="h-8 w-8">
-                <Link href="/">
-                  <ArrowLeft className="h-4 w-4" />
-                </Link>
-              </Button>
             </div>
           )}
 
