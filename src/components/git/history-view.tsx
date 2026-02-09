@@ -1955,7 +1955,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <DialogDescription asChild>
               <div className="space-y-2">
                 <p>Merge branch into another one.</p>
-                <p>Are you sure to merge <span className="font-semibold text-foreground">{branchData?.current}</span> into <span className="font-semibold text-foreground">{mergeTargetBranch}</span>?</p>
+                <p>Are you sure to merge <span className="font-semibold text-foreground">{mergeTargetBranch}</span> into <span className="font-semibold text-foreground">{branchData?.current}</span>?</p>
               </div>
             </DialogDescription>
           </DialogHeader>

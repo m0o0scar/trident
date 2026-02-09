@@ -421,17 +421,19 @@ export class GitService {
   ): Promise<void> {
     const { rebaseBeforeMerge, squash, fastForward, squashMessage } = options;
 
-    // Get the current branch name (the branch we want to merge FROM)
+    // Get the current branch name (the branch we want to merge INTO)
     const branchSummary = await this.git.branchLocal();
-    const sourceBranch = branchSummary.current;
+    const currentBranch = branchSummary.current;
 
-    // Rebase current branch onto target branch before merging if requested
+    // Rebase the target branch onto the current branch before merging if requested
+    // This ensures a cleaner history or fast-forward merge
     if (rebaseBeforeMerge) {
-      await this.git.rebase([targetBranch]);
+      // We must switch to the target branch to rebase it
+      await this.git.checkout(targetBranch);
+      await this.git.rebase([currentBranch]);
+      // Switch back to the branch we want to merge INTO
+      await this.git.checkout(currentBranch);
     }
-
-    // Checkout the target branch (the branch we want to merge INTO)
-    await this.git.checkout(targetBranch);
 
     // Build merge arguments
     const mergeArgs: string[] = [];
@@ -447,14 +449,14 @@ export class GitService {
       mergeArgs.push('--no-ff');
     }
 
-    // Merge the source branch (original current branch) into target branch
-    mergeArgs.push(sourceBranch);
+    // Merge the target branch into current branch
+    mergeArgs.push(targetBranch);
 
     await this.git.merge(mergeArgs);
 
     // If squash merge, we need to commit with the provided message
     if (squash) {
-      const message = squashMessage || `Squash merge branch '${sourceBranch}'`;
+      const message = squashMessage || `Squash merge branch '${targetBranch}'`;
       await this.git.commit(message);
     }
   }
