@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { GitBranch, Clock, Settings, PanelLeftClose, PanelLeft, Archive, GitFork } from 'lucide-react';
+import { GitBranch, Clock, Settings, PanelLeftClose, PanelLeft, Archive } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
@@ -110,7 +110,7 @@ export function Sidebar({ className }: SidebarProps) {
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
                 title="Go to Home"
               >
-                <GitFork className="h-5 w-5" />
+                <img src="/icon.png" alt="Trident" className="h-5 w-5" />
                 <h2 className="text-lg font-semibold tracking-tight">
                   Trident
                 </h2>
@@ -130,7 +130,7 @@ export function Sidebar({ className }: SidebarProps) {
                 className="flex items-center justify-center h-8 w-8 hover:opacity-80 transition-opacity cursor-pointer"
                 title="Go to Home"
               >
-                <GitFork className="h-5 w-5" />
+                <img src="/icon.png" alt="Trident" className="h-5 w-5" />
               </a>
             )}
             <div className={cn("flex items-center gap-1", isCollapsed && "flex-col")}>
