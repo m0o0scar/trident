@@ -244,7 +244,7 @@ export function useCommitDiff(repoPath: string | null, commitHash: string | null
 }
 
 export function useCommitFileDiff(repoPath: string | null, commitHash: string | null, filePath: string | null) {
-  return useQuery<{ left: string; right: string }>({
+  return useQuery<{ left: string; right: string; diff: string }>({
     queryKey: ['git', repoPath, 'commit-file-diff', commitHash, filePath],
     queryFn: async () => {
       if (!repoPath || !commitHash || !filePath) return null;
@@ -319,7 +319,7 @@ export function useStashFiles(repoPath: string | null, stashIndex: number | null
 }
 
 export function useStashFileDiff(repoPath: string | null, stashIndex: number | null, filePath: string | null) {
-  return useQuery<{ left: string; right: string }>({
+  return useQuery<{ left: string; right: string; diff: string }>({
     queryKey: ['git', repoPath, 'stash-file-diff', stashIndex, filePath],
     queryFn: async () => {
       if (!repoPath || stashIndex === null || !filePath) return { left: '', right: '' };

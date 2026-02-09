@@ -82,10 +82,18 @@ export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: s
 
   const leftContent = data.left || '';
   const rightContent = data.right || '';
-  const contentSize = leftContent.length + rightContent.length;
-  // Estimate lines to avoid costly split on huge strings
-  // A simple approximation is better than a full split for performance
-  const lineCount = (leftContent.match(/\n/g) || []).length + (rightContent.match(/\n/g) || []).length;
+  
+  // Use actual diff for size and line count if available
+  // This is more accurate for the "large diff" warning
+  const contentSize = data.diff ? data.diff.length : (leftContent.length + rightContent.length);
+  
+  const lineCount = data.diff 
+    ? data.diff.split('\n').filter(line => 
+        (line.startsWith('+') || line.startsWith('-')) && 
+        !line.startsWith('+++') && 
+        !line.startsWith('---')
+      ).length 
+    : (leftContent.match(/\n/g) || []).length + (rightContent.match(/\n/g) || []).length;
 
   const isLargeDiff = (contentSize > MAX_DIFF_SIZE || lineCount > MAX_DIFF_LINES);
 

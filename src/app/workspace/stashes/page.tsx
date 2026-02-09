@@ -89,9 +89,17 @@ function StashDiffView({ repoPath, stashIndex, filePath }: { repoPath: string; s
 
     const leftContent = data.left || '';
     const rightContent = data.right || '';
-    const contentSize = leftContent.length + rightContent.length;
-    // Estimate lines
-    const lineCount = (leftContent.match(/\n/g) || []).length + (rightContent.match(/\n/g) || []).length;
+    
+    // Use actual diff for size and line count if available
+    const contentSize = data.diff ? data.diff.length : (leftContent.length + rightContent.length);
+    
+    const lineCount = data.diff 
+        ? data.diff.split('\n').filter(line => 
+            (line.startsWith('+') || line.startsWith('-')) && 
+            !line.startsWith('+++') && 
+            !line.startsWith('---')
+          ).length 
+        : (leftContent.match(/\n/g) || []).length + (rightContent.match(/\n/g) || []).length;
 
     const isLargeDiff = (contentSize > MAX_DIFF_SIZE || lineCount > MAX_DIFF_LINES);
 

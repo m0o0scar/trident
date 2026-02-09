@@ -109,9 +109,17 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
 
   const leftContent = data.left || '';
   const rightContent = data.right || '';
-  const contentSize = leftContent.length + rightContent.length;
-  // Estimate lines
-  const lineCount = (leftContent.match(/\n/g) || []).length + (rightContent.match(/\n/g) || []).length;
+  
+  // Use actual diff for size and line count if available
+  const contentSize = data.diff ? data.diff.length : (leftContent.length + rightContent.length);
+  
+  const lineCount = data.diff 
+    ? data.diff.split('\n').filter(line => 
+        (line.startsWith('+') || line.startsWith('-')) && 
+        !line.startsWith('+++') && 
+        !line.startsWith('---')
+      ).length 
+    : (leftContent.match(/\n/g) || []).length + (rightContent.match(/\n/g) || []).length;
 
   const isLargeDiff = (contentSize > MAX_DIFF_SIZE || lineCount > MAX_DIFF_LINES);
 
@@ -780,6 +788,9 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [panelHeight, setPanelHeight] = useState(200);
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  
+  // Track if user has manually resized the panel to avoid sync loops
+  const userHasResized = useRef(false);
 
   // Load panel height from settings or localStorage
   useEffect(() => {
@@ -811,10 +822,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   // Sync to global settings when resizing stops
   useEffect(() => {
-    if (!isResizing && settings && panelHeight !== settings.historyPanelHeight) {
+    if (!isResizing && userHasResized.current) {
       updateSettings.mutate({ historyPanelHeight: panelHeight });
+      userHasResized.current = false;
     }
-  }, [isResizing, panelHeight, settings, updateSettings]);
+  }, [isResizing, panelHeight, updateSettings]);
 
   // Handle resize drag
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -831,6 +843,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       const delta = resizeRef.current.startY - e.clientY;
       const newHeight = Math.min(Math.max(resizeRef.current.startHeight + delta, 100), 600);
       setPanelHeight(newHeight);
+      userHasResized.current = true;
     };
 
     const handleMouseUp = () => {

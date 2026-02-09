@@ -29,8 +29,8 @@ export async function GET(request: Request) {
     if (commitHash) {
       // If file path is also provided, get diff for that specific file in the commit
       if (filePath) {
-        const { before, after } = await git.getCommitFileDiff(commitHash, filePath);
-        return NextResponse.json({ left: before, right: after });
+        const { before, after, diff } = await git.getCommitFileDiff(commitHash, filePath);
+        return NextResponse.json({ left: before, right: after, diff });
       }
       
       // Otherwise, get the list of files changed in the commit

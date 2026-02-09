@@ -388,7 +388,7 @@ export class GitService {
     return { files, diff };
   }
 
-  async getCommitFileDiff(commitHash: string, filePath: string): Promise<{ before: string; after: string }> {
+  async getCommitFileDiff(commitHash: string, filePath: string): Promise<{ before: string; after: string; diff: string }> {
     // Get file content before the commit (parent)
     let before = '';
     let after = '';
@@ -406,8 +406,17 @@ export class GitService {
       // File was deleted in this commit
       after = '';
     }
+
+    // Get the diff string
+    let diff = '';
+    try {
+        // Use show to get the diff (log message suppressed by format=)
+        diff = await this.git.raw(['show', '--format=', commitHash, '--', filePath]);
+    } catch (e) {
+        console.warn('Failed to get commit file diff:', e);
+    }
     
-    return { before, after };
+    return { before, after, diff };
   }
 
   async merge(
@@ -664,7 +673,7 @@ export class GitService {
     }
   }
 
-  async getStashFileDiff(index: number, filePath: string): Promise<{ left: string; right: string }> {
+  async getStashFileDiff(index: number, filePath: string): Promise<{ left: string; right: string; diff: string }> {
     // Get the content before the stash (from the parent commit of the stash)
     // and the content in the stash itself
     let left = '';
@@ -686,8 +695,17 @@ export class GitService {
       // File might be deleted in the stash
       right = '';
     }
+
+    // Get diff
+    let diff = '';
+    try {
+        // git stash show -p stash@{index} -- filePath
+        diff = await this.git.raw(['stash', 'show', '-p', `stash@{${index}}`, '--', filePath]);
+    } catch (e) {
+        console.warn('Failed to get stash file diff:', e);
+    }
     
-    return { left, right };
+    return { left, right, diff };
   }
 
   async pushToRemote(
