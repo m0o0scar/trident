@@ -696,10 +696,12 @@ export class GitService {
       rebaseFirst?: boolean;
       forcePush?: boolean;
       setUpstream?: boolean;
+      squash?: boolean;
+      squashMessage?: string;
       credentials?: { username: string; token: string };
     } = {}
   ): Promise<void> {
-    const { rebaseFirst, forcePush, setUpstream, credentials } = options;
+    const { rebaseFirst, forcePush, setUpstream, squash, squashMessage, credentials } = options;
     
     // Mask token for logging
     const logOptions = { ...options };
@@ -778,13 +780,68 @@ export class GitService {
           await this.git.merge([remoteFull]);
           console.log('[pushToRemote] Merge completed');
         }
+
+        // Handle squash if requested
+        if (squash) {
+            console.log('[pushToRemote] Squashing commits onto:', remoteFull);
+            // Reset soft to remote branch to stage all changes
+            await this.git.reset(['--soft', remoteFull]);
+            
+            // Commit all staged changes
+            const message = squashMessage || `Squash commits before push to ${remoteBranch}`;
+            await this.git.commit(message);
+            console.log('[pushToRemote] Squash completed');
+        }
+      } else if (squash) {
+          console.warn('[pushToRemote] Cannot squash: remote branch does not exist');
+          // We could throw here, or just continue without squashing.
+          // For now, warning is safer than failing unexpectedly if user just ticked it by habit.
       }
       
       // Build push options
       const pushOptions: string[] = [];
       
+      if (forcePush || (squash && remoteBranchExists)) {
+        // If we squashed, we rewrote history relative to what might be on remote (if we didn't rebase perfectly or if we are overwriting),
+        // but actually, if we rebased onto remoteFull, then reset --soft remoteFull, then committed...
+        // We are now 1 commit ahead of remoteFull.
+        // So it SHOULD be a fast-forward push.
+        // UNLESS remote moved since our fetch?
+        // But generally, squash implies we are replacing our history with a single commit.
+        // If we are just appending to remote, fast-forward is fine.
+        // BUT, if we had *multiple* commits that were *already* on remote?
+        // No, we rebased onto remoteFull.
+        // So we incorporated all remote changes.
+        // So our new commit is child of remoteFull.
+        // So fast-forward should work.
+        // However, if the user intended to squash commits that were *already pushed* (e.g. fixing up a PR),
+        // they would need force push.
+        // If rebaseFirst is true, we rebased on remote.
+        // If remote has A->B. Local has A->B->C->D.
+        // Rebase: Local A->B->C->D.
+        // Reset soft to B (remoteFull).
+        // Commit: A->B->E (where E contains C+D).
+        // Push E. E's parent is B. Remote is at B.
+        // Fast-forward A->B->E.
+        // This works!
+        // BUT, what if local was A->B->C (pushed) -> D (local).
+        // Remote is at C.
+        // Fetch: remote is C.
+        // Rebase onto C: Local is A->B->C->D.
+        // Reset soft to C.
+        // Commit E (contains D). Parent C.
+        // Push E. Fast-forward to C->E.
+        // Wait, where did C go? C is on remote.
+        // So we squashed D into E?
+        // Yes. C remains individual.
+        // This squashes *local* commits (ahead of remote).
+        // It does NOT squash commits that are already on remote.
+        // This matches "squash all the local commits into one".
+        // Perfect.
+        // So no implicit force push needed.
+      }
       if (forcePush) {
-        pushOptions.push('--force');
+          pushOptions.push('--force');
       }
       
       if (setUpstream) {

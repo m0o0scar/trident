@@ -701,6 +701,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [pushTrackingBranch, setPushTrackingBranch] = useState<{ remote: string; branch: string } | null>(null);
   const [pushRebaseFirst, setPushRebaseFirst] = useState(true);
   const [pushForcePush, setPushForcePush] = useState(false);
+  const [pushSquash, setPushSquash] = useState(false);
+  const [pushSquashMessage, setPushSquashMessage] = useState('');
   const [isPushing, setIsPushing] = useState(false);
   const [pushError, setPushError] = useState<string | null>(null);
   const [pushLoadingRemotes, setPushLoadingRemotes] = useState(false);
@@ -1281,6 +1283,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setPushTrackingBranch(null);
     setPushRebaseFirst(true);
     setPushForcePush(false);
+    setPushSquash(false);
+    setPushSquashMessage('');
     setIsPushOpen(true);
     
     // Load remotes
@@ -1399,6 +1403,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           rebaseFirst: pushRebaseFirst,
           forcePush: pushForcePush,
           setUpstream: needsSetUpstream,
+          squash: pushSquash,
+          squashMessage: pushSquashMessage,
         }
       });
       
@@ -2101,6 +2107,32 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   <p className="text-xs text-destructive ml-6">
                     Warning: Force push will overwrite remote history. Use with caution.
                   </p>
+                )}
+
+                <div className="flex items-center space-x-2 pt-2 border-t mt-2">
+                  <Checkbox 
+                    id="push-squash" 
+                    checked={pushSquash}
+                    onCheckedChange={(checked) => setPushSquash(checked === true)}
+                    disabled={isPushing}
+                  />
+                  <Label htmlFor="push-squash" className="text-sm font-normal cursor-pointer">
+                    Squash local commits before push
+                  </Label>
+                </div>
+                {pushSquash && (
+                  <div className="ml-6 space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      All local commits will be combined into one.
+                    </p>
+                    <Textarea
+                      placeholder="Commit message for squash"
+                      value={pushSquashMessage}
+                      onChange={(e) => setPushSquashMessage(e.target.value)}
+                      disabled={isPushing}
+                      className="min-h-[80px]"
+                    />
+                  </div>
                 )}
               </div>
               

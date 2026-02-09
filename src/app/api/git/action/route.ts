@@ -169,6 +169,8 @@ export async function POST(request: Request) {
           rebaseFirst: data.rebaseFirst ?? true,
           forcePush: data.forcePush ?? false,
           setUpstream: data.setUpstream ?? false,
+          squash: data.squash ?? false,
+          squashMessage: data.squashMessage,
           credentials: creds,
         });
         console.log('[API] git.pushToRemote completed');
