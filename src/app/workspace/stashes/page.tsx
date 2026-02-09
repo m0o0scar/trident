@@ -1,8 +1,8 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useState } from 'react';
-import { Loader2, Archive, RefreshCcw, Play, Trash2, FileText, ChevronRight, ChevronDown } from 'lucide-react';
+import { Suspense, useState, useEffect } from 'react';
+import { Loader2, Archive, RefreshCcw, Play, Trash2, FileText, ChevronRight, ChevronDown, AlertTriangle } from 'lucide-react';
 import { useWorkspaceTitle } from '@/hooks/use-workspace-title';
 import { useGitStashes, useGitAction, useStashFiles, useStashFileDiff } from '@/hooks/use-git';
 import { Button } from '@/components/ui/button';
@@ -49,6 +49,13 @@ function StashDiffView({ repoPath, stashIndex, filePath }: { repoPath: string; s
         }
     });
 
+    const [renderAnyway, setRenderAnyway] = useState(false);
+
+    // Reset renderAnyway when file or stash changes
+    useEffect(() => {
+        setRenderAnyway(false);
+    }, [filePath, stashIndex]);
+
     if (isLoading) {
         return <div className="flex items-center justify-center p-8 h-full"><Loader2 className="animate-spin text-muted-foreground" /></div>;
     }
@@ -76,6 +83,18 @@ function StashDiffView({ repoPath, stashIndex, filePath }: { repoPath: string; s
         );
     }
 
+    // Large file protection
+    const MAX_DIFF_SIZE = 100 * 1024; // 100KB
+    const MAX_DIFF_LINES = 3000;
+
+    const leftContent = data.left || '';
+    const rightContent = data.right || '';
+    const contentSize = leftContent.length + rightContent.length;
+    // Estimate lines
+    const lineCount = (leftContent.match(/\n/g) || []).length + (rightContent.match(/\n/g) || []).length;
+
+    const isLargeDiff = (contentSize > MAX_DIFF_SIZE || lineCount > MAX_DIFF_LINES);
+
     return (
         <div className="flex flex-col h-full bg-background">
             <div className="flex items-center justify-between px-4 h-[57px] border-b shrink-0 bg-background">
@@ -96,13 +115,28 @@ function StashDiffView({ repoPath, stashIndex, filePath }: { repoPath: string; s
                 </div>
             </div>
             <div className="flex-1 overflow-auto diff-viewer-wrapper">
-                <ReactDiffViewer
-                    oldValue={data.left || ''}
-                    newValue={data.right || ''}
-                    splitView={splitView}
-                    useDarkTheme={resolvedTheme === 'dark'}
-                    disableWordDiff={true}
-                />
+                {isLargeDiff && !renderAnyway ? (
+                    <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-4">
+                        <AlertTriangle className="h-12 w-12 text-yellow-500" />
+                        <div className="space-y-2">
+                            <h3 className="font-semibold text-lg">Large Diff Detected</h3>
+                            <p className="text-muted-foreground">
+                                This diff is large ({Math.round(contentSize / 1024)}KB, ~{lineCount} lines) and may freeze your browser if rendered.
+                            </p>
+                        </div>
+                        <Button variant="outline" onClick={() => setRenderAnyway(true)}>
+                            Show Diff Anyway
+                        </Button>
+                    </div>
+                ) : (
+                    <ReactDiffViewer
+                        oldValue={data.left || ''}
+                        newValue={data.right || ''}
+                        splitView={splitView}
+                        useDarkTheme={resolvedTheme === 'dark'}
+                        disableWordDiff={true}
+                    />
+                )}
             </div>
         </div>
     );
