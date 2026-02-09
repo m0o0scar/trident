@@ -1,6 +1,6 @@
 'use client';
 
-import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, BranchTrackingInfo, useRepository, useUpdateRepository } from '@/hooks/use-git';
+import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, BranchTrackingInfo, useRepository, useUpdateRepository, useSettings, useUpdateSettings } from '@/hooks/use-git';
 import { Repository } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal, X, Globe, ArrowUp, ArrowDown, Upload, AlertCircle, AlertTriangle } from 'lucide-react';
@@ -693,6 +693,9 @@ function BranchTreeItem({
 }
 
 export function HistoryView({ repoPath }: { repoPath: string }) {
+  const { data: settings } = useSettings();
+  const updateSettings = useUpdateSettings();
+  
   const [limit, setLimit] = useState(100);
   const { data: log, isLoading, isError, error, refetch, isFetching } = useGitLog(repoPath, limit);
   const { data: branchData, isLoading: isBranchesLoading } = useGitBranches(repoPath);
@@ -772,27 +775,32 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   // Bottom panel tab state
   const [activeTab, setActiveTab] = useState<'message' | 'changes'>('message');
   
-  // Resizable bottom panel state - load from localStorage
+  // Resizable bottom panel state - load from global settings or fallback to localStorage
   const panelHeightStorageKey = 'git-web:history-panel-height';
-  const [panelHeight, setPanelHeight] = useState(() => {
-    if (typeof window === 'undefined') return 200;
-    try {
-      const stored = localStorage.getItem(panelHeightStorageKey);
-      if (stored) {
-        const parsed = parseInt(stored, 10);
-        if (!isNaN(parsed) && parsed >= 100 && parsed <= 600) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load panel height from localStorage:', e);
-    }
-    return 200;
-  });
+  const [panelHeight, setPanelHeight] = useState(200);
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
 
-  // Save panel height to localStorage when it changes
+  // Load panel height from settings or localStorage
+  useEffect(() => {
+    if (settings?.historyPanelHeight) {
+      setPanelHeight(settings.historyPanelHeight);
+    } else {
+      try {
+        const stored = localStorage.getItem(panelHeightStorageKey);
+        if (stored) {
+          const parsed = parseInt(stored, 10);
+          if (!isNaN(parsed) && parsed >= 100 && parsed <= 600) {
+            setPanelHeight(parsed);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load panel height from localStorage:', e);
+      }
+    }
+  }, [settings?.historyPanelHeight]);
+
+  // Save panel height to localStorage for immediate persistence
   useEffect(() => {
     try {
       localStorage.setItem(panelHeightStorageKey, String(panelHeight));
@@ -800,6 +808,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       console.error('Failed to save panel height to localStorage:', e);
     }
   }, [panelHeight]);
+
+  // Sync to global settings when resizing stops
+  useEffect(() => {
+    if (!isResizing && settings && panelHeight !== settings.historyPanelHeight) {
+      updateSettings.mutate({ historyPanelHeight: panelHeight });
+    }
+  }, [isResizing, panelHeight, settings, updateSettings]);
 
   // Handle resize drag
   const handleResizeStart = useCallback((e: React.MouseEvent) => {

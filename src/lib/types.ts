@@ -12,6 +12,7 @@ export interface Repository {
 export interface AppSettings {
   defaultRootFolder: string | null;
   sidebarCollapsed?: boolean;
+  historyPanelHeight?: number;
 }
 
 export interface GitStatus {
