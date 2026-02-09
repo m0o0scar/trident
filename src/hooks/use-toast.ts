@@ -2,10 +2,8 @@
 
 import * as React from "react"
 
-import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
-
-const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_LIMIT = 5
+const TOAST_REMOVE_DELAY = 5000
 
 // Helper to copy text to clipboard
 async function copyToClipboard(text: string): Promise<boolean> {
@@ -31,19 +29,17 @@ async function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
-type ToasterToast = ToastProps & {
+export type ToastType = "default" | "success" | "warning" | "error" | "info"
+
+export interface Toast {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
-  action?: ToastActionElement
+  type?: ToastType
+  variant?: "default" | "destructive" | "warning" // For compatibility
+  duration?: number
+  action?: React.ReactNode
 }
-
-const actionTypes = {
-  ADD_TOAST: "ADD_TOAST",
-  UPDATE_TOAST: "UPDATE_TOAST",
-  DISMISS_TOAST: "DISMISS_TOAST",
-  REMOVE_TOAST: "REMOVE_TOAST",
-} as const
 
 let count = 0
 
@@ -52,33 +48,31 @@ function genId() {
   return count.toString()
 }
 
-type ActionType = typeof actionTypes
-
 type Action =
   | {
-      type: ActionType["ADD_TOAST"]
-      toast: ToasterToast
+      type: "ADD_TOAST"
+      toast: Toast
     }
   | {
-      type: ActionType["UPDATE_TOAST"]
-      toast: Partial<ToasterToast>
+      type: "UPDATE_TOAST"
+      toast: Partial<Toast>
     }
   | {
-      type: ActionType["DISMISS_TOAST"]
-      toastId?: ToasterToast["id"]
+      type: "DISMISS_TOAST"
+      toastId?: string
     }
   | {
-      type: ActionType["REMOVE_TOAST"]
-      toastId?: ToasterToast["id"]
+      type: "REMOVE_TOAST"
+      toastId?: string
     }
 
 interface State {
-  toasts: ToasterToast[]
+  toasts: Toast[]
 }
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
-const addToRemoveQueue = (toastId: string) => {
+const addToRemoveQueue = (toastId: string, duration = TOAST_REMOVE_DELAY) => {
   if (toastTimeouts.has(toastId)) {
     return
   }
@@ -89,7 +83,7 @@ const addToRemoveQueue = (toastId: string) => {
       type: "REMOVE_TOAST",
       toastId: toastId,
     })
-  }, TOAST_REMOVE_DELAY)
+  }, duration)
 
   toastTimeouts.set(toastId, timeout)
 }
@@ -114,23 +108,16 @@ export const reducer = (state: State, action: Action): State => {
       const { toastId } = action
 
       if (toastId) {
-        addToRemoveQueue(toastId)
+        addToRemoveQueue(toastId, 0) // Remove immediately for dismiss
       } else {
         state.toasts.forEach((toast) => {
-          addToRemoveQueue(toast.id)
+          addToRemoveQueue(toast.id, 0)
         })
       }
 
       return {
         ...state,
-        toasts: state.toasts.map((t) =>
-          t.id === toastId || toastId === undefined
-            ? {
-                ...t,
-                open: false,
-              }
-            : t
-        ),
+        toasts: state.toasts.filter((t) => t.id !== toastId && toastId !== undefined),
       }
     }
     case "REMOVE_TOAST":
@@ -158,12 +145,10 @@ function dispatch(action: Action) {
   })
 }
 
-type Toast = Omit<ToasterToast, "id">
-
-function toast({ ...props }: Toast) {
+function toast(props: Omit<Toast, "id">) {
   const id = genId()
 
-  const update = (props: ToasterToast) =>
+  const update = (props: Toast) =>
     dispatch({
       type: "UPDATE_TOAST",
       toast: { ...props, id },
@@ -175,12 +160,11 @@ function toast({ ...props }: Toast) {
     toast: {
       ...props,
       id,
-      open: true,
-      onOpenChange: (open: boolean) => {
-        if (!open) dismiss()
-      },
     },
   })
+
+  // Auto remove
+  addToRemoveQueue(id, props.duration || TOAST_REMOVE_DELAY)
 
   return {
     id: id,
@@ -240,61 +224,24 @@ function showGitErrorToast(error: Error | string, options: GitErrorToastOptions 
     },
       // Error message box
       React.createElement('div', { 
-        className: 'max-h-[120px] overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed bg-black/20 p-3 rounded-md break-words text-red-100 border border-red-900/30' 
+        className: 'max-h-[120px] overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed bg-black/20 p-3 rounded-md break-words text-error-content/90 border border-error-content/20'
       }, errorMessage),
       // Copy button
       React.createElement('button', {
         onClick: handleCopy,
         type: 'button',
-        className: `inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-all cursor-pointer ${
-          copied 
-            ? 'bg-green-600 text-white' 
-            : 'bg-white/10 hover:bg-white/20 text-red-100 border border-red-200/20'
-        }`,
+        className: `btn btn-xs ${copied ? 'btn-success' : 'btn-outline btn-error'}`,
       }, 
-        // Icon
-        copied 
-          ? React.createElement('svg', { 
-              className: 'w-3.5 h-3.5', 
-              fill: 'none', 
-              viewBox: '0 0 24 24', 
-              stroke: 'currentColor',
-              strokeWidth: 2
-            }, React.createElement('path', { 
-              strokeLinecap: 'round', 
-              strokeLinejoin: 'round', 
-              d: 'M5 13l4 4L19 7' 
-            }))
-          : React.createElement('svg', { 
-              className: 'w-3.5 h-3.5', 
-              fill: 'none', 
-              viewBox: '0 0 24 24', 
-              stroke: 'currentColor',
-              strokeWidth: 2
-            }, React.createElement('path', { 
-              strokeLinecap: 'round', 
-              strokeLinejoin: 'round', 
-              d: 'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z' 
-            })),
         copied ? 'Copied!' : 'Copy Error'
       )
     );
   };
   
-  dispatch({
-    type: "ADD_TOAST",
-    toast: {
-      id,
-      variant: "destructive",
-      title,
-      description: React.createElement(CopyableErrorDescription),
-      open: true,
-      onOpenChange: (open: boolean) => {
-        if (!open) {
-          dispatch({ type: "DISMISS_TOAST", toastId: id });
-        }
-      },
-    },
+  toast({
+    type: "error",
+    title,
+    description: React.createElement(CopyableErrorDescription),
+    duration: 10000 // Long duration for errors
   });
   
   return {

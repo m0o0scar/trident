@@ -2,22 +2,12 @@
 
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState, useEffect } from 'react';
-import { Loader2, Archive, RefreshCcw, Play, Trash2, FileText, ChevronRight, ChevronDown, AlertTriangle } from 'lucide-react';
 import { useWorkspaceTitle } from '@/hooks/use-workspace-title';
 import { useGitStashes, useGitAction, useStashFiles, useStashFileDiff } from '@/hooks/use-git';
-import { Button } from '@/components/ui/button';
-import {
-    ContextMenu,
-    ContextMenuContent,
-    ContextMenuItem,
-    ContextMenuTrigger,
-} from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 import ReactDiffViewer from '@alexbruf/react-diff-viewer';
 import '@alexbruf/react-diff-viewer/index.css';
 import { useTheme } from 'next-themes';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 
 // Check if content appears to be binary
 function isBinaryContent(content: string): boolean {
@@ -32,6 +22,27 @@ function isBinaryContent(content: string): boolean {
         }
     }
     return sample.length > 0 && (nonPrintable / sample.length) > 0.1;
+}
+
+function ContextMenu({ children, items }: { children: React.ReactNode, items: { label: React.ReactNode, onClick: () => void, danger?: boolean, icon?: React.ReactNode }[] }) {
+    return (
+        <div className="dropdown dropdown-bottom dropdown-end w-full group">
+            <div tabIndex={0} role="button" className="w-full text-left" onClick={(e) => e.stopPropagation()}>{children}</div>
+            <ul tabIndex={0} className="dropdown-content z-[10] menu p-2 shadow-lg bg-base-100 rounded-box w-52 border border-base-300">
+                {items.map((item, idx) => (
+                    <li key={idx}>
+                        <button onClick={(e) => { e.stopPropagation(); item.onClick();
+                            // Close dropdown by blurring
+                            (document.activeElement as HTMLElement)?.blur();
+                        }} className={item.danger ? "text-error" : ""}>
+                            {item.icon && <span className="mr-2">{item.icon}</span>}
+                            {item.label}
+                        </button>
+                    </li>
+                ))}
+            </ul>
+        </div>
+    )
 }
 
 function StashDiffView({ repoPath, stashIndex, filePath }: { repoPath: string; stashIndex: number; filePath: string }) {
@@ -57,12 +68,12 @@ function StashDiffView({ repoPath, stashIndex, filePath }: { repoPath: string; s
     }, [filePath, stashIndex]);
 
     if (isLoading) {
-        return <div className="flex items-center justify-center p-8 h-full"><Loader2 className="animate-spin text-muted-foreground" /></div>;
+        return <div className="flex items-center justify-center p-8 h-full"><span className="loading loading-spinner text-base-content/50"></span></div>;
     }
 
     if (!data) {
         return (
-            <div className="flex items-center justify-center h-full text-muted-foreground">
+            <div className="flex items-center justify-center h-full opacity-50">
                 No diff available
             </div>
         );
@@ -72,11 +83,11 @@ function StashDiffView({ repoPath, stashIndex, filePath }: { repoPath: string; s
 
     if (isBinary) {
         return (
-            <div className="flex flex-col h-full bg-background">
-                <div className="flex items-center justify-between px-4 h-[57px] border-b shrink-0 bg-background">
+            <div className="flex flex-col h-full bg-base-100">
+                <div className="flex items-center justify-between px-4 h-[57px] border-b border-base-300 shrink-0 bg-base-100">
                     <span className="text-sm font-mono truncate max-w-[70%]" title={filePath}>{filePath}</span>
                 </div>
-                <div className="flex-1 flex items-center justify-center text-muted-foreground">
+                <div className="flex-1 flex items-center justify-center opacity-50">
                     Binary file - diff not available
                 </div>
             </div>
@@ -104,37 +115,38 @@ function StashDiffView({ repoPath, stashIndex, filePath }: { repoPath: string; s
     const isLargeDiff = (contentSize > MAX_DIFF_SIZE || lineCount > MAX_DIFF_LINES);
 
     return (
-        <div className="flex flex-col h-full bg-background">
-            <div className="flex items-center justify-between px-4 h-[57px] border-b shrink-0 bg-background">
+        <div className="flex flex-col h-full bg-base-100">
+            <div className="flex items-center justify-between px-4 h-[57px] border-b border-base-300 shrink-0 bg-base-100">
                 <span className="text-sm font-mono truncate max-w-[70%]" title={filePath}>{filePath}</span>
                 <div className="flex items-center gap-2">
-                    <Label htmlFor="split-view-stash" className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer">Split View</Label>
-                    <Switch
+                    <label htmlFor="split-view-stash" className="text-[10px] uppercase tracking-wider font-bold cursor-pointer opacity-70">Split View</label>
+                    <input
+                        type="checkbox"
                         id="split-view-stash"
                         checked={splitView}
-                        onCheckedChange={(checked) => {
-                            setSplitView(checked);
+                        onChange={(e) => {
+                            setSplitView(e.target.checked);
                             try {
-                                localStorage.setItem(storageKey, JSON.stringify(checked));
+                                localStorage.setItem(storageKey, JSON.stringify(e.target.checked));
                             } catch { }
                         }}
-                        className="scale-75 origin-right"
+                        className="toggle toggle-xs toggle-primary"
                     />
                 </div>
             </div>
             <div className="flex-1 overflow-auto diff-viewer-wrapper">
                 {isLargeDiff && !renderAnyway ? (
                     <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-4">
-                        <AlertTriangle className="h-12 w-12 text-yellow-500" />
+                        <span className="text-4xl text-warning">⚠️</span>
                         <div className="space-y-2">
-                            <h3 className="font-semibold text-lg">Large Diff Detected</h3>
-                            <p className="text-muted-foreground">
+                            <h3 className="font-bold text-lg">Large Diff Detected</h3>
+                            <p className="opacity-70">
                                 This diff is large ({Math.round(contentSize / 1024)}KB, ~{lineCount} lines) and may freeze your browser if rendered.
                             </p>
                         </div>
-                        <Button variant="outline" onClick={() => setRenderAnyway(true)}>
+                        <button className="btn btn-outline" onClick={() => setRenderAnyway(true)}>
                             Show Diff Anyway
-                        </Button>
+                        </button>
                     </div>
                 ) : (
                     <ReactDiffViewer
@@ -170,7 +182,7 @@ function StashesContent() {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center h-64">
-                <Loader2 className="animate-spin text-muted-foreground" />
+                <span className="loading loading-spinner text-base-content/50"></span>
             </div>
         );
     }
@@ -178,12 +190,11 @@ function StashesContent() {
     if (isError) {
         return (
             <div className="flex items-center justify-center h-64 flex-col gap-4">
-                <p className="text-destructive font-medium">Error Loading Stashes</p>
-                <p className="text-sm text-muted-foreground">{(error as Error)?.message || 'An unknown error occurred'}</p>
-                <Button onClick={() => refetch()} variant="outline">
-                    <RefreshCcw className="w-4 h-4 mr-2" />
-                    Try Again
-                </Button>
+                <p className="text-error font-medium">Error Loading Stashes</p>
+                <p className="text-sm opacity-70">{(error as Error)?.message || 'An unknown error occurred'}</p>
+                <button onClick={() => refetch()} className="btn btn-outline btn-sm">
+                    🔄 Try Again
+                </button>
             </div>
         );
     }
@@ -242,10 +253,10 @@ function StashesContent() {
 
     const getStatusColor = (status: string) => {
         switch (status) {
-            case 'A': return 'text-green-600';
-            case 'D': return 'text-red-600';
-            case 'M': return 'text-yellow-600';
-            default: return 'text-muted-foreground';
+            case 'A': return 'text-success';
+            case 'D': return 'text-error';
+            case 'M': return 'text-warning';
+            default: return 'opacity-50';
         }
     };
 
@@ -261,22 +272,22 @@ function StashesContent() {
     return (
         <div className="flex h-full overflow-hidden">
             {/* Left Panel: Stash List */}
-            <div className="w-64 border-r flex flex-col bg-muted/10">
-                <div className="h-[57px] px-4 border-b flex items-center justify-between bg-background">
-                    <h1 className="font-semibold text-lg">Stashes</h1>
-                    <Button variant="ghost" size="icon" onClick={() => refetch()} disabled={action.isPending} title="Refresh">
-                        <RefreshCcw className={`w-4 h-4 ${action.isPending ? 'animate-spin' : ''}`} />
-                    </Button>
+            <div className="w-64 border-r border-base-300 flex flex-col bg-base-200/30">
+                <div className="h-[57px] px-4 border-b border-base-300 flex items-center justify-between bg-base-100">
+                    <h1 className="font-bold text-lg">Stashes</h1>
+                    <button className="btn btn-ghost btn-sm btn-square" onClick={() => refetch()} disabled={action.isPending} title="Refresh">
+                        {action.isPending ? <span className="loading loading-spinner loading-xs"></span> : <span>🔄</span>}
+                    </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto">
                     {!stashes || stashes.length === 0 ? (
-                        <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground h-64">
-                            <div className="p-8 rounded-full bg-muted/30 mb-4">
-                                <Archive className="w-8 h-8 opacity-20" />
+                        <div className="flex-1 flex flex-col items-center justify-center opacity-50 h-64">
+                            <div className="p-8 rounded-full bg-base-200 mb-4 text-4xl">
+                                📦
                             </div>
-                            <p className="text-sm font-medium">No stashes</p>
-                            <p className="text-xs text-muted-foreground mt-1">Stash changes from the Changes page</p>
+                            <p className="text-sm font-bold">No stashes</p>
+                            <p className="text-xs mt-1">Stash changes from the Changes page</p>
                         </div>
                     ) : (
                         <div className="p-2">
@@ -285,58 +296,56 @@ function StashesContent() {
                                 const isSelected = selectedStashIndex === stash.index;
 
                                 return (
-                                    <ContextMenu key={stash.hash}>
-                                        <ContextMenuTrigger asChild>
+                                    <ContextMenu
+                                        key={stash.hash}
+                                        items={[
+                                            { label: 'Apply (keep stash)', icon: <span>▶️</span>, onClick: () => handleApply(stash.index) },
+                                            { label: 'Pop (apply and delete)', icon: <span>💥</span>, onClick: () => handlePop(stash.index) },
+                                            { label: 'Delete', icon: <span>🗑️</span>, danger: true, onClick: () => handleDrop(stash.index) }
+                                        ]}
+                                    >
                                             <div className="mb-1">
                                                 <div
                                                     className={cn(
                                                         "p-2 rounded-md cursor-pointer transition-colors",
-                                                        isSelected ? "bg-muted" : "hover:bg-muted/50"
+                                                        isSelected ? "bg-base-200" : "hover:bg-base-200/50"
                                                     )}
                                                     onClick={() => toggleStashExpanded(stash.index)}
                                                 >
                                                     <div className="flex items-start gap-2">
-                                                        <div className="mt-0.5">
-                                                            {isExpanded ? (
-                                                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                                            ) : (
-                                                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                                            )}
+                                                        <div className="mt-0.5 opacity-50 text-xs">
+                                                            {isExpanded ? '▼' : '▶'}
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2 mb-0.5">
-                                                                <span className="text-[10px] font-mono bg-muted px-1 py-0.5 rounded">
+                                                                <span className="text-[10px] font-mono bg-base-300 px-1 py-0.5 rounded opacity-70">
                                                                     stash@{'{' + stash.index + '}'}
                                                                 </span>
-                                                                <span className="text-[10px] text-muted-foreground">
+                                                                <span className="text-[10px] opacity-50">
                                                                     {formatDate(stash.date)}
                                                                 </span>
                                                             </div>
-                                                            <p className="text-xs font-medium truncate" title={stash.message}>
+                                                            <p className="text-xs font-bold truncate opacity-90" title={stash.message}>
                                                                 {stash.message}
                                                             </p>
                                                         </div>
                                                         <div className="flex items-center gap-1 shrink-0">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-6 w-6"
+                                                            <button
+                                                                className="btn btn-ghost btn-xs btn-square"
                                                                 onClick={(e) => { e.stopPropagation(); handlePop(stash.index); }}
                                                                 disabled={action.isPending}
                                                                 title="Pop stash"
                                                             >
-                                                                <Play className="h-3 w-3" />
-                                                            </Button>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="icon"
-                                                                className="h-6 w-6 hover:text-destructive"
+                                                                💥
+                                                            </button>
+                                                            <button
+                                                                className="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10"
                                                                 onClick={(e) => { e.stopPropagation(); handleDrop(stash.index); }}
                                                                 disabled={action.isPending}
                                                                 title="Delete stash"
                                                             >
-                                                                <Trash2 className="h-3 w-3" />
-                                                            </Button>
+                                                                🗑️
+                                                            </button>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -345,8 +354,8 @@ function StashesContent() {
                                                 {isExpanded && isSelected && (
                                                     <div className="ml-6 mt-1 space-y-0.5">
                                                         {filesLoading ? (
-                                                            <div className="flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground">
-                                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                            <div className="flex items-center gap-2 px-2 py-1 text-xs opacity-50">
+                                                                <span className="loading loading-spinner loading-xs"></span>
                                                                 Loading files...
                                                             </div>
                                                         ) : stashFiles && stashFiles.length > 0 ? (
@@ -355,40 +364,25 @@ function StashesContent() {
                                                                     key={file.path}
                                                                     className={cn(
                                                                         "flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-colors text-xs",
-                                                                        selectedFile === file.path ? "bg-primary/10 text-primary" : "hover:bg-muted/50"
+                                                                        selectedFile === file.path ? "bg-primary/10 text-primary font-bold" : "hover:bg-base-200/50"
                                                                     )}
                                                                     onClick={(e) => { e.stopPropagation(); setSelectedFile(file.path); }}
                                                                 >
-                                                                    <FileText className="h-3 w-3 shrink-0" />
+                                                                    <span className="opacity-50">📄</span>
                                                                     <span className="font-mono truncate flex-1" title={file.path}>{file.path}</span>
-                                                                    <span className={cn("text-[10px] uppercase", getStatusColor(file.status))} title={getStatusLabel(file.status)}>
+                                                                    <span className={cn("text-[10px] uppercase font-bold", getStatusColor(file.status))} title={getStatusLabel(file.status)}>
                                                                         {file.status}
                                                                     </span>
                                                                 </div>
                                                             ))
                                                         ) : (
-                                                            <div className="px-2 py-1 text-xs text-muted-foreground italic">
+                                                            <div className="px-2 py-1 text-xs opacity-50 italic">
                                                                 No files in stash
                                                             </div>
                                                         )}
                                                     </div>
                                                 )}
                                             </div>
-                                        </ContextMenuTrigger>
-                                        <ContextMenuContent>
-                                            <ContextMenuItem onClick={() => handleApply(stash.index)}>
-                                                <Play className="h-4 w-4 mr-2" />
-                                                Apply (keep stash)
-                                            </ContextMenuItem>
-                                            <ContextMenuItem onClick={() => handlePop(stash.index)}>
-                                                <Play className="h-4 w-4 mr-2" />
-                                                Pop (apply and delete)
-                                            </ContextMenuItem>
-                                            <ContextMenuItem variant="destructive" onClick={() => handleDrop(stash.index)}>
-                                                <Trash2 className="h-4 w-4 mr-2" />
-                                                Delete
-                                            </ContextMenuItem>
-                                        </ContextMenuContent>
                                     </ContextMenu>
                                 );
                             })}
@@ -398,15 +392,15 @@ function StashesContent() {
             </div>
 
             {/* Right Panel: Diff View */}
-            <div className="flex-1 flex flex-col bg-background overflow-hidden">
+            <div className="flex-1 flex flex-col bg-base-100 overflow-hidden">
                 {selectedStashIndex !== null && selectedFile ? (
                     <StashDiffView repoPath={repoPath} stashIndex={selectedStashIndex} filePath={selectedFile} />
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
-                        <div className="p-8 rounded-full bg-muted/30 mb-4">
-                            <Archive className="w-8 h-8 opacity-20" />
+                    <div className="flex-1 flex flex-col items-center justify-center opacity-50">
+                        <div className="p-8 rounded-full bg-base-200 mb-4 text-4xl">
+                            📦
                         </div>
-                        <p className="text-sm font-medium">
+                        <p className="text-sm font-bold">
                             {selectedStashIndex !== null ? 'Select a file to view changes' : 'Select a stash to view files'}
                         </p>
                     </div>
@@ -418,7 +412,7 @@ function StashesContent() {
 
 export default function WorkspaceStashesPage() {
     return (
-        <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin" /></div>}>
+        <Suspense fallback={<div className="flex items-center justify-center h-full"><span className="loading loading-spinner"></span></div>}>
             <StashesContent />
         </Suspense>
     );

@@ -3,7 +3,6 @@
 import { useSearchParams } from 'next/navigation';
 import { HistoryView } from '@/components/git/history-view';
 import { Suspense } from 'react';
-import { Loader2 } from 'lucide-react';
 import { useWorkspaceTitle } from '@/hooks/use-workspace-title';
 
 function WorkspaceHistoryContent() {
@@ -21,7 +20,7 @@ function WorkspaceHistoryContent() {
 
 export default function WorkspaceHistoryPage() {
     return (
-        <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin" /></div>}>
+        <Suspense fallback={<div className="flex items-center justify-center h-full"><span className="loading loading-spinner"></span></div>}>
             <WorkspaceHistoryContent />
         </Suspense>
     );

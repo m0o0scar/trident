@@ -1,6 +1,5 @@
 import { Sidebar } from '@/components/layout/sidebar';
 import { Suspense } from 'react';
-import { Loader2 } from 'lucide-react';
 
 export default function WorkspaceLayout({
     children,
@@ -8,8 +7,8 @@ export default function WorkspaceLayout({
     children: React.ReactNode;
 }) {
     return (
-        <div className="flex min-h-screen max-h-screen">
-            <Suspense fallback={<div className="w-64 border-r min-h-screen bg-background flex items-center justify-center"><Loader2 className="animate-spin" /></div>}>
+        <div className="flex min-h-screen max-h-screen bg-base-100">
+            <Suspense fallback={<div className="w-64 border-r border-base-300 min-h-screen bg-base-200/30 flex items-center justify-center"><span className="loading loading-spinner"></span></div>}>
                 <Sidebar />
             </Suspense>
             <main className="flex-1 overflow-auto">

@@ -1,8 +1,6 @@
 'use client';
 
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { GitBranch, Clock, Settings, PanelLeftClose, PanelLeft, Archive } from 'lucide-react';
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
@@ -98,7 +96,7 @@ export function Sidebar({ className }: SidebarProps) {
         visibility: isHydrated ? 'visible' : 'hidden'
       }}
       className={cn(
-        "pb-12 border-r min-h-screen bg-background relative",
+        "pb-12 border-r border-base-300 min-h-screen bg-base-100 relative",
         enableTransition && "transition-all duration-300",
         // Use class for SSR width, inline style takes over after hydration
         !isHydrated && "w-64",
@@ -119,11 +117,11 @@ export function Sidebar({ className }: SidebarProps) {
                   e.preventDefault();
                   router.push('/');
                 }}
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer"
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer text-base-content"
                 title="Go to Home"
               >
                 <img src="/icon.png" alt="Trident" className="h-5 w-5" />
-                <h2 className="text-lg font-semibold tracking-tight">
+                <h2 className="text-lg font-bold tracking-tight">
                   Trident
                 </h2>
               </a>
@@ -146,94 +144,88 @@ export function Sidebar({ className }: SidebarProps) {
               </a>
             )}
             <div className={cn("flex items-center gap-1", isCollapsed && "flex-col")}>
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <button
+                className="btn btn-ghost btn-sm btn-square"
                 onClick={toggleCollapsed} 
                 title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"} 
-                className="h-8 w-8"
               >
-                {isCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
-              </Button>
+                {isCollapsed ? '➡️' : '⬅️'}
+              </button>
             </div>
           </div>
 
           {!isCollapsed && (
             <div className="px-4 mb-6">
-              <p className="text-xs font-mono text-muted-foreground break-all border rounded p-2 bg-muted/30" title={repoPath}>
+              <p className="text-xs font-mono opacity-70 break-all border border-base-300 rounded p-2 bg-base-200/50" title={repoPath}>
                 {repoPath.split('/').pop()}
               </p>
             </div>
           )}
 
           <div className="space-y-1">
-            <Button
-              variant={isActive('history') ? 'secondary' : 'ghost'}
+            <Link
+              href={getHref()}
               className={cn(
-                "w-full",
-                isCollapsed ? "justify-center px-2" : "justify-start",
-                isActive('history') && "font-medium"
+                "btn btn-ghost w-full justify-start font-normal",
+                isCollapsed ? "px-0 justify-center" : "",
+                isActive('history') && "btn-active font-medium"
               )}
-              asChild
               title={isCollapsed ? "History" : undefined}
             >
-              <Link href={getHref()}>
-                <GitBranch className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
-                {!isCollapsed && "History"}
-              </Link>
-            </Button>
-            <Button
-              variant={isActive('status') ? 'secondary' : 'ghost'}
+              <span className={cn("text-lg", !isCollapsed && "mr-2")}>🌿</span>
+              {!isCollapsed && "History"}
+            </Link>
+
+            <Link
+              href={getHref('/changes')}
               className={cn(
-                "w-full",
-                isCollapsed ? "justify-center px-2" : "justify-start",
-                isActive('status') && "font-medium"
+                "btn btn-ghost w-full justify-start font-normal",
+                isCollapsed ? "px-0 justify-center" : "",
+                isActive('status') && "btn-active font-medium"
               )}
-              asChild
               title={isCollapsed ? `Changes${changesCount > 0 ? ` (${changesCount})` : ''}` : undefined}
             >
-              <Link href={getHref('/changes')}>
-                <div className={cn("relative", !isCollapsed && "mr-2")}>
-                  <Clock className="h-4 w-4" />
+              <div className={cn("relative flex items-center", !isCollapsed && "mr-2")}>
+                  <span className="text-lg">🕒</span>
                   {isCollapsed && changesCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground">
+                    <span className="absolute -top-1 -right-1 badge badge-primary badge-xs scale-75">
                       {changesCount > 99 ? '99+' : changesCount}
                     </span>
                   )}
-                </div>
-                {!isCollapsed && (changesCount > 0 ? `Changes (${changesCount})` : "Changes")}
-              </Link>
-            </Button>
-            <Button
-              variant={isActive('stashes') ? 'secondary' : 'ghost'}
-              className={cn(
-                "w-full",
-                isCollapsed ? "justify-center px-2" : "justify-start",
-                isActive('stashes') && "font-medium"
+              </div>
+              {!isCollapsed && (
+                  <span className="flex-1 flex justify-between items-center">
+                      Changes
+                      {changesCount > 0 && <span className="badge badge-sm">{changesCount}</span>}
+                  </span>
               )}
-              asChild
+            </Link>
+
+            <Link
+              href={getHref('/stashes')}
+              className={cn(
+                "btn btn-ghost w-full justify-start font-normal",
+                isCollapsed ? "px-0 justify-center" : "",
+                isActive('stashes') && "btn-active font-medium"
+              )}
               title={isCollapsed ? "Stashes" : undefined}
             >
-              <Link href={getHref('/stashes')}>
-                <Archive className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
-                {!isCollapsed && "Stashes"}
-              </Link>
-            </Button>
-            <Button
-              variant={isActive('settings') ? 'secondary' : 'ghost'}
+              <span className={cn("text-lg", !isCollapsed && "mr-2")}>📦</span>
+              {!isCollapsed && "Stashes"}
+            </Link>
+
+            <Link
+              href={getHref('/settings')}
               className={cn(
-                "w-full",
-                isCollapsed ? "justify-center px-2" : "justify-start",
-                isActive('settings') && "font-medium"
+                "btn btn-ghost w-full justify-start font-normal",
+                isCollapsed ? "px-0 justify-center" : "",
+                isActive('settings') && "btn-active font-medium"
               )}
-              asChild
               title={isCollapsed ? "Settings" : undefined}
             >
-              <Link href={getHref('/settings')}>
-                <Settings className={cn("h-4 w-4", !isCollapsed && "mr-2")} />
-                {!isCollapsed && "Settings"}
-              </Link>
-            </Button>
+              <span className={cn("text-lg", !isCollapsed && "mr-2")}>⚙️</span>
+              {!isCollapsed && "Settings"}
+            </Link>
           </div>
         </div>
       </div>
@@ -241,7 +233,7 @@ export function Sidebar({ className }: SidebarProps) {
       <div className={cn("absolute bottom-4 left-0 w-full", isCollapsed ? "px-2" : "px-6")}>
         <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-2")}>
           <ThemeToggle />
-          {!isCollapsed && <span className="text-xs text-muted-foreground">Theme</span>}
+          {!isCollapsed && <span className="text-xs opacity-70">Theme</span>}
         </div>
       </div>
     </div>

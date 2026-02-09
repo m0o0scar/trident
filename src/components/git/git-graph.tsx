@@ -2,12 +2,8 @@
 
 import { useMemo, useRef, useState, useLayoutEffect, useImperativeHandle, forwardRef, useEffect, useCallback } from 'react';
 import { Commit } from '@/lib/types';
-import { generateGraphData, GraphNode } from '@/lib/graph-utils';
+import { generateGraphData } from '@/lib/graph-utils';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Search, X } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-
 
 const ROW_HEIGHT = 24; // Compact rows like Fork
 const LANE_WIDTH = 12;
@@ -47,7 +43,7 @@ function HighlightedText({ text, searchQuery }: { text: string; searchQuery: str
         <>
             {parts.map((part, i) => 
                 part.highlighted ? (
-                    <mark key={i} className="bg-yellow-300 dark:bg-yellow-500/50 text-inherit rounded-sm px-0.5">{part.text}</mark>
+                    <mark key={i} className="bg-warning text-warning-content rounded-sm px-0.5">{part.text}</mark>
                 ) : (
                     <span key={i}>{part.text}</span>
                 )
@@ -131,14 +127,8 @@ export const GitGraph = forwardRef<GitGraphHandle, {
 
     // Save scroll position
     useLayoutEffect(() => {
-        if (nodes && nodes.length > prevCount && scrollRef.current) {
-            // We added items, the scroll position might stay automatically if we are appending to bottom.
-            // If we were prepending, we'd need to adjust.
-            // But for infinite scroll down, the browser usually handles it unless we replace the whole DOM.
-            // The issue might be the ScrollArea forcing a reset or key change.
-        }
         setPrevCount(nodes?.length ?? 0);
-    }, [nodes?.length, prevCount]);
+    }, [nodes?.length]);
 
     if (!nodes || nodes.length === 0) return null;
 
@@ -155,32 +145,31 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     };
 
     return (
-        <div className="flex flex-col h-full bg-background overflow-hidden font-mono text-sm select-none">
+        <div className="flex flex-col h-full bg-base-100 overflow-hidden font-mono text-sm select-none">
             {/* Search Input - Sticky on top */}
             {isSearchOpen && (
-                <div className="sticky top-0 z-20 bg-background border-b px-2 py-2 flex items-center gap-2">
-                    <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <Input
+                <div className="sticky top-0 z-20 bg-base-100 border-b border-base-300 px-2 py-2 flex items-center gap-2">
+                    <span className="opacity-50">🔍</span>
+                    <input
                         ref={searchInputRef}
                         type="text"
                         placeholder="Search in commits..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="flex-1 h-8 text-sm"
+                        className="input input-bordered input-sm flex-1 text-sm"
                         autoFocus
                     />
                     <button
                         onClick={handleCloseSearch}
-                        className="p-1 hover:bg-muted rounded-md transition-colors cursor-pointer"
+                        className="btn btn-ghost btn-sm btn-square"
                         title="Close search (Esc)"
                     >
-                        <X className="h-4 w-4 text-muted-foreground" />
+                        ✖️
                     </button>
                 </div>
             )}
             
-            {/* Graph Column (SVG) + Message Column (combined to ensure alignment) */}
-            <ScrollArea className="flex-1 h-full max-w-full px-2" onScroll={handleScroll} ref={scrollRef}>
+            <div className="flex-1 overflow-auto h-full max-w-full px-2" onScroll={handleScroll} ref={scrollRef}>
                 <div className="relative min-w-full" style={{ height }}>
                     {/* SVG Graph Layout */}
                     <svg width={width} height={height} className="absolute top-0 left-0 pointer-events-none z-10">
@@ -209,7 +198,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                             key={i}
                                             d={d}
                                             stroke={path.color}
-                                            strokeWidth={STROKE_WIDTH} z-index={0}
+                                            strokeWidth={STROKE_WIDTH}
                                             fill="none"
                                             strokeLinecap="round"
                                         />
@@ -225,7 +214,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                 cx={node.x * LANE_WIDTH + LANE_WIDTH / 2}
                                 cy={node.y * ROW_HEIGHT + ROW_HEIGHT / 2}
                                 r={DOT_SIZE}
-                                fill="var(--background)" // Hollow effect (matches bg)
+                                fill="oklch(var(--b1))"
                                 stroke={node.color}
                                 strokeWidth={STROKE_WIDTH}
                             />
@@ -238,8 +227,8 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                             <div
                                 key={node.hash}
                                 className={cn(
-                                    "flex items-center hover:bg-muted/50 border-b last:border-0 cursor-pointer transition-colors",
-                                    selectedHash === node.hash && "bg-blue-100/40 dark:bg-blue-900/40"
+                                    "flex items-center hover:bg-base-200 border-b border-base-200 last:border-0 cursor-pointer transition-colors text-xs",
+                                    selectedHash === node.hash && "bg-primary/10"
                                 )}
                                 style={{ height: ROW_HEIGHT }}
                                 onClick={() => onSelectCommit?.(node.hash)}
@@ -258,8 +247,6 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                             const cleanDisplayName = displayName.replace(/^HEAD\s*->\s*/, '');
                                             
                                             // Skip hidden branches
-                                            // Check both the display name and remotes/ prefixed version
-                                            // (remote branches are stored as "remotes/origin/branch" but displayed as "origin/branch")
                                             if (hiddenBranches && (
                                                 hiddenBranches.has(cleanDisplayName) ||
                                                 hiddenBranches.has(`remotes/${cleanDisplayName}`)
@@ -276,11 +263,10 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                             return (
                                                 <span key={idx}
                                                     className={cn(
-                                                        "text-[10px] px-1.5 rounded-full border whitespace-nowrap shrink-0",
-                                                        isCurrent && "font-bold text-black dark:text-white"
+                                                        "text-[10px] px-1.5 rounded-full border border-current whitespace-nowrap shrink-0",
+                                                        isCurrent && "font-bold text-base-content"
                                                     )}
                                                     style={{
-                                                        borderColor: node.color,
                                                         color: isCurrent ? undefined : node.color,
                                                         backgroundColor: `${node.color}15` // 10% opacity
                                                     }}
@@ -290,17 +276,17 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                                 </span>
                                             );
                                         })}
-                                        <span className={cn("truncate min-w-0 max-w-[600px] text-xs", selectedHash === node.hash ? "font-semibold" : "")} title={node.message}>
+                                        <span className={cn("truncate min-w-0 max-w-[600px]", selectedHash === node.hash ? "font-semibold" : "")} title={node.message}>
                                             <HighlightedText text={node.message} searchQuery={searchQuery} />
                                         </span>
                                     </div>
-                                    <div className="w-32 truncate text-muted-foreground text-xs text-right">
+                                    <div className="w-32 truncate opacity-70 text-right">
                                         <HighlightedText text={node.author_name} searchQuery={searchQuery} />
                                     </div>
-                                    <div className="w-20 truncate text-muted-foreground text-xs text-right opacity-70 font-mono">
-                                        <HighlightedText text={node.hash} searchQuery={searchQuery} />
+                                    <div className="w-20 truncate opacity-50 font-mono text-right">
+                                        <HighlightedText text={node.hash.substring(0, 7)} searchQuery={searchQuery} />
                                     </div>
-                                    <div className="w-32 truncate text-muted-foreground text-xs text-right">
+                                    <div className="w-32 truncate opacity-70 text-right">
                                         {new Date(node.date).toLocaleString(undefined, {
                                             month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
                                         })}
@@ -311,14 +297,14 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                         
                         {/* Loading More Indicator */}
                         {isLoadingMore && (
-                            <div className="flex items-center justify-center py-8 border-b">
-                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                                <span className="ml-2 text-sm text-muted-foreground">Loading more commits...</span>
+                            <div className="flex items-center justify-center py-8 border-b border-base-300">
+                                <span className="loading loading-spinner text-base-content/50"></span>
+                                <span className="ml-2 text-sm opacity-70">Loading more commits...</span>
                             </div>
                         )}
                     </div>
                 </div>
-            </ScrollArea>
+            </div>
         </div>
     );
 });
