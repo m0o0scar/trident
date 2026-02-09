@@ -8,7 +8,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -106,6 +106,11 @@ export async function POST(request: Request) {
       case 'checkout':
         if (!data?.branch) throw new Error('Branch name is required for checkout');
         await git.checkout(data.branch);
+        break;
+      case 'checkout-to-local':
+        if (!data?.remoteBranch) throw new Error('Remote branch is required for checkout-to-local');
+        if (!data?.localBranch) throw new Error('Local branch name is required for checkout-to-local');
+        await git.checkoutRemoteToLocal(data.remoteBranch, data.localBranch);
         break;
       case 'branch':
         if (!data?.branch) throw new Error('Branch name is required to create branch');

@@ -399,6 +399,7 @@ function BranchTreeItem({
   expandedFolders,
   onToggleFolder,
   onCheckout,
+  onCheckoutToLocal,
   onCreateBranch,
   onDeleteBranch,
   onRenameBranch,
@@ -420,6 +421,7 @@ function BranchTreeItem({
   expandedFolders: Set<string>;
   onToggleFolder: (path: string) => void;
   onCheckout: (branch: string) => void;
+  onCheckoutToLocal: (remoteBranch: string) => void;
   onCreateBranch: () => void;
   onDeleteBranch: (branch: string) => void;
   onRenameBranch: (branch: string) => void;
@@ -503,6 +505,7 @@ function BranchTreeItem({
                   expandedFolders={expandedFolders}
                   onToggleFolder={onToggleFolder}
                   onCheckout={onCheckout}
+                  onCheckoutToLocal={onCheckoutToLocal}
                   onCreateBranch={onCreateBranch}
                   onDeleteBranch={onDeleteBranch}
                   onRenameBranch={onRenameBranch}
@@ -591,11 +594,18 @@ function BranchTreeItem({
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent>
-              {!isCurrent && (
+              {!isCurrent && !isRemote && (
                 <ContextMenuItem
                   onSelect={() => onCheckout(child.fullPath!)}
                 >
-                  {isRemote ? 'Checkout (detached HEAD)' : 'Checkout'}
+                  Checkout
+                </ContextMenuItem>
+              )}
+              {isRemote && (
+                <ContextMenuItem
+                  onSelect={() => onCheckoutToLocal(child.fullPath!)}
+                >
+                  Checkout to local...
                 </ContextMenuItem>
               )}
               <ContextMenuItem onSelect={onCreateBranch}>
@@ -708,6 +718,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [pullError, setPullError] = useState<string | null>(null);
   const [pullLoadingRemotes, setPullLoadingRemotes] = useState(false);
   const [pullLoadingBranches, setPullLoadingBranches] = useState(false);
+
+  // Checkout to local dialog state
+  const [isCheckoutToLocalOpen, setIsCheckoutToLocalOpen] = useState(false);
+  const [checkoutRemoteBranch, setCheckoutRemoteBranch] = useState<string | null>(null);
+  const [checkoutLocalBranchName, setCheckoutLocalBranchName] = useState('');
+  const [isCheckingOutToLocal, setIsCheckingOutToLocal] = useState(false);
 
   // Ref for GitGraph to scroll to commits
   const gitGraphRef = useRef<GitGraphHandle>(null);
@@ -1540,6 +1556,35 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }
 
+  const confirmCheckoutToLocal = (remoteBranch: string) => {
+    setCheckoutRemoteBranch(remoteBranch);
+    // Extract the branch name from remotes/origin/branch-name
+    const parts = remoteBranch.split('/');
+    // Skip 'remotes' and remote name (e.g., 'origin'), take the rest as branch name
+    const branchName = parts.slice(2).join('/');
+    setCheckoutLocalBranchName(branchName);
+    setIsCheckoutToLocalOpen(true);
+  }
+
+  const handleCheckoutToLocal = async () => {
+    if (!checkoutRemoteBranch || !checkoutLocalBranchName) return;
+    setIsCheckingOutToLocal(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'checkout-to-local',
+        data: { remoteBranch: checkoutRemoteBranch, localBranch: checkoutLocalBranchName }
+      });
+      setIsCheckoutToLocalOpen(false);
+      setCheckoutRemoteBranch(null);
+      setCheckoutLocalBranchName('');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsCheckingOutToLocal(false);
+    }
+  }
+
   const handleFetchFromAllRemotes = async () => {
     try {
       await runGitAction({
@@ -1662,6 +1707,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                     expandedFolders={expandedFolders}
                     onToggleFolder={toggleFolder}
                     onCheckout={handleCheckout}
+                    onCheckoutToLocal={confirmCheckoutToLocal}
                     onCreateBranch={() => setIsCreateBranchOpen(true)}
                     onDeleteBranch={confirmDeleteBranch}
                     onRenameBranch={confirmRenameBranch}
@@ -1739,6 +1785,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                           expandedFolders={expandedFolders}
                           onToggleFolder={toggleFolder}
                           onCheckout={handleCheckout}
+                          onCheckoutToLocal={confirmCheckoutToLocal}
                           onCreateBranch={() => setIsCreateBranchOpen(true)}
                           onDeleteBranch={confirmDeleteBranch}
                           onRenameBranch={confirmRenameBranch}
@@ -2259,6 +2306,39 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <Button variant="outline" onClick={() => setIsCreateBranchOpen(false)} disabled={isCreating}>Cancel</Button>
             <Button onClick={handleCreateBranch} disabled={!newBranchName || isCreating}>
               {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create & Checkout'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCheckoutToLocalOpen} onOpenChange={setIsCheckoutToLocalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Checkout to Local Branch</DialogTitle>
+            <DialogDescription>
+              Create a local branch from <span className="font-semibold text-foreground">{checkoutRemoteBranch?.replace(/^remotes\//, '')}</span> and set up tracking.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Label htmlFor="checkout-local-branch" className="text-sm font-medium">Local Branch Name</Label>
+            <Input
+              id="checkout-local-branch"
+              value={checkoutLocalBranchName}
+              onChange={e => setCheckoutLocalBranchName(sanitizeBranchName(e.target.value))}
+              placeholder="Local branch name"
+              disabled={isCheckingOutToLocal}
+              className="mt-2"
+              onKeyDown={e => {
+                if (e.key === 'Enter' && checkoutLocalBranchName && !isCheckingOutToLocal) {
+                  handleCheckoutToLocal();
+                }
+              }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCheckoutToLocalOpen(false)} disabled={isCheckingOutToLocal}>Cancel</Button>
+            <Button onClick={handleCheckoutToLocal} disabled={!checkoutLocalBranchName || isCheckingOutToLocal}>
+              {isCheckingOutToLocal ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Checkout'}
             </Button>
           </DialogFooter>
         </DialogContent>

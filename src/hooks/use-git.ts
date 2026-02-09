@@ -300,7 +300,7 @@ export function useStashFileDiff(repoPath: string | null, stashIndex: number | n
 }
 
 // Actions
-export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'branch' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'rebase' | 'merge' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop';
+export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'rebase' | 'merge' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop';
 
 interface GitActionPayload {
   repoPath: string;
