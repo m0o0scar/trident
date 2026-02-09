@@ -125,9 +125,22 @@
 }
 
 /* Custom styles for React Diff Viewer to match original design */
+.diff-viewer-wrapper {
+  width: 100% !important;
+}
+
+/* Force all nested divs and tables to be full width */
+.diff-viewer-wrapper div,
+.diff-viewer-wrapper table,
+.diff-viewer-wrapper tbody {
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
 .diff-container {
   font-size: 11px !important;
   font-family: monospace !important;
+  width: 100% !important;
 }
 
 .diff-container .line,
@@ -164,4 +177,42 @@
 .diff-viewer-wrapper table.split-view tbody tr td:nth-child(3),
 .diff-viewer-wrapper table.split-view tbody tr td:nth-child(6) {
   width: auto !important;
+}
+
+/* 5. Force text wrapping in diff content to prevent overflow */
+.diff-viewer-wrapper pre {
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+}
+
+/* Unified view: constrain table and allow content to wrap */
+.diff-viewer-wrapper table:not(.split-view) {
+  width: 100% !important;
+  max-width: 100% !important;
+  table-layout: auto !important;
+}
+
+/* Unified view: Constrain gutter columns to not expand */
+.diff-viewer-wrapper table:not(.split-view) td.gutter {
+  width: 1% !important;
+  white-space: nowrap !important;
+}
+
+/* Unified view: Constrain marker column */
+.diff-viewer-wrapper table:not(.split-view) td.marker {
+  width: 1% !important;
+  white-space: nowrap !important;
+}
+
+/* Unified view: Content column - force it to constrain and wrap */
+.diff-viewer-wrapper table:not(.split-view) td.content {
+  width: 97% !important;
+  max-width: 0 !important;
+}
+
+.diff-viewer-wrapper table:not(.split-view) td.content pre {
+  white-space: pre-wrap !important;
+  word-wrap: break-word !important;
+  overflow-wrap: anywhere !important;
 }
