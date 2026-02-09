@@ -7,6 +7,30 @@ import type { ToastActionElement, ToastProps } from "@/components/ui/toast"
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
 
+// Helper to copy text to clipboard
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Fallback for older browsers
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-9999px';
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      return true;
+    } catch {
+      return false;
+    } finally {
+      document.body.removeChild(textArea);
+    }
+  }
+}
+
 type ToasterToast = ToastProps & {
   id: string
   title?: React.ReactNode
@@ -185,4 +209,98 @@ function useToast() {
   }
 }
 
-export { useToast, toast }
+// Git error toast helper - shows a destructive toast with copy button
+interface GitErrorToastOptions {
+  title?: string;
+  operation?: string;
+}
+
+function showGitErrorToast(error: Error | string, options: GitErrorToastOptions = {}) {
+  const errorMessage = typeof error === 'string' ? error : error.message;
+  const title = options.title || (options.operation ? `${options.operation} Failed` : 'Git Operation Failed');
+  
+  const id = genId();
+  
+  // Create a stateful component for the copy button
+  const CopyableErrorDescription = () => {
+    const [copied, setCopied] = React.useState(false);
+    
+    const handleCopy = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const success = await copyToClipboard(errorMessage);
+      if (success) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    };
+    
+    // Container
+    return React.createElement('div', { 
+      className: 'mt-2 space-y-3' 
+    },
+      // Error message box
+      React.createElement('div', { 
+        className: 'max-h-[120px] overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed bg-black/20 p-3 rounded-md break-words text-red-100 border border-red-900/30' 
+      }, errorMessage),
+      // Copy button
+      React.createElement('button', {
+        onClick: handleCopy,
+        type: 'button',
+        className: `inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+          copied 
+            ? 'bg-green-600 text-white' 
+            : 'bg-white/10 hover:bg-white/20 text-red-100 border border-red-200/20'
+        }`,
+      }, 
+        // Icon
+        copied 
+          ? React.createElement('svg', { 
+              className: 'w-3.5 h-3.5', 
+              fill: 'none', 
+              viewBox: '0 0 24 24', 
+              stroke: 'currentColor',
+              strokeWidth: 2
+            }, React.createElement('path', { 
+              strokeLinecap: 'round', 
+              strokeLinejoin: 'round', 
+              d: 'M5 13l4 4L19 7' 
+            }))
+          : React.createElement('svg', { 
+              className: 'w-3.5 h-3.5', 
+              fill: 'none', 
+              viewBox: '0 0 24 24', 
+              stroke: 'currentColor',
+              strokeWidth: 2
+            }, React.createElement('path', { 
+              strokeLinecap: 'round', 
+              strokeLinejoin: 'round', 
+              d: 'M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z' 
+            })),
+        copied ? 'Copied!' : 'Copy Error'
+      )
+    );
+  };
+  
+  dispatch({
+    type: "ADD_TOAST",
+    toast: {
+      id,
+      variant: "destructive",
+      title,
+      description: React.createElement(CopyableErrorDescription),
+      open: true,
+      onOpenChange: (open: boolean) => {
+        if (!open) {
+          dispatch({ type: "DISMISS_TOAST", toastId: id });
+        }
+      },
+    },
+  });
+  
+  return {
+    id,
+    dismiss: () => dispatch({ type: "DISMISS_TOAST", toastId: id }),
+  };
+}
+
+export { useToast, toast, showGitErrorToast }

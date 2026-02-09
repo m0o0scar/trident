@@ -1,6 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { GitStatus, GitLog, Repository } from '@/lib/types';
+import { showGitErrorToast } from './use-toast';
 
 const API_BASE = '/api';
 
@@ -302,6 +303,33 @@ export function useStashFileDiff(repoPath: string | null, stashIndex: number | n
 // Actions
 export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'rebase' | 'merge' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop';
 
+// Map action types to human-readable operation names
+const actionOperationNames: Record<GitActionType, string> = {
+  'commit': 'Commit',
+  'push': 'Push',
+  'pull': 'Pull',
+  'fetch': 'Fetch',
+  'stage': 'Stage',
+  'unstage': 'Unstage',
+  'checkout': 'Checkout',
+  'checkout-to-local': 'Checkout',
+  'branch': 'Create Branch',
+  'delete-branch': 'Delete Branch',
+  'delete-remote-branch': 'Delete Remote Branch',
+  'rename-branch': 'Rename Branch',
+  'rebase': 'Rebase',
+  'merge': 'Merge',
+  'get-remotes': 'Get Remotes',
+  'get-remote-branches': 'Get Remote Branches',
+  'get-tracking-branch': 'Get Tracking Branch',
+  'push-to-remote': 'Push',
+  'pull-from-remote': 'Pull',
+  'stash': 'Stash',
+  'stash-apply': 'Apply Stash',
+  'stash-drop': 'Drop Stash',
+  'stash-pop': 'Pop Stash',
+};
+
 interface GitActionPayload {
   repoPath: string;
   action: GitActionType;
@@ -329,6 +357,14 @@ export function useGitAction() {
       if (!readOnlyActions.includes(variables.action)) {
         // Invalidate relevant queries
         queryClient.invalidateQueries({ queryKey: ['git', variables.repoPath] });
+      }
+    },
+    onError: (error: Error, variables) => {
+      // Show error toast for git operations (except read-only actions)
+      const readOnlyActions = ['get-remotes', 'get-remote-branches', 'get-tracking-branch'];
+      if (!readOnlyActions.includes(variables.action)) {
+        const operationName = actionOperationNames[variables.action] || variables.action;
+        showGitErrorToast(error, { operation: operationName });
       }
     },
   });
