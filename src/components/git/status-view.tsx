@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useState } from 'react';
-import { Loader2, Plus, Minus, RefreshCcw, Check, Archive, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Minus, RefreshCcw, Check, Archive, Trash2, ArrowDown, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DiffView } from './diff-view';
 import {
@@ -107,8 +107,8 @@ export function StatusView({ repoPath }: { repoPath: string }) {
     return (
         <div className="flex h-full overflow-hidden">
             {/* Left Panel: File List */}
-            <div className="w-80 border-r flex flex-col bg-muted/10">
-                <div className="p-4 border-b flex items-center justify-between bg-background">
+            <div className="w-64 border-r flex flex-col bg-muted/10">
+                <div className="h-[57px] px-4 border-b flex items-center justify-between bg-background">
                     <h1 className="font-semibold text-lg">Changes</h1>
                     <Button variant="ghost" size="icon" onClick={() => refetch()} disabled={action.isPending} title="Refresh">
                         <RefreshCcw className={`w-4 h-4 ${action.isPending ? 'animate-spin' : ''}`} />
@@ -120,19 +120,21 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                     <div className="p-2">
                         <div className="flex items-center justify-between px-2 py-2 mb-1">
                             <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Changes ({changes.length})</h3>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center gap-0.5">
                                 {changes.length === 0 && staged.length > 0 ? (
-                                    <Button variant="ghost" size="xs" onClick={handleUnstageAll} className="h-5 text-[10px] px-2">Unstage All</Button>
+                                    <Button variant="ghost" size="icon" onClick={handleUnstageAll} className="h-5 w-5" title="Unstage All">
+                                        <ArrowUp className="h-3 w-3" />
+                                    </Button>
                                 ) : (
-                                    <Button variant="ghost" size="xs" onClick={handleStageAll} className="h-5 text-[10px] px-2" disabled={changes.length === 0}>Stage All</Button>
+                                    <Button variant="ghost" size="icon" onClick={handleStageAll} className="h-5 w-5" disabled={changes.length === 0} title="Stage All">
+                                        <ArrowDown className="h-3 w-3" />
+                                    </Button>
                                 )}
-                                <Button variant="ghost" size="xs" onClick={() => setStashDialogOpen(true)} className="h-5 text-[10px] px-2" disabled={changes.length === 0 && staged.length === 0}>
-                                    <Archive className="h-3 w-3 mr-1" />
-                                    Stash
+                                <Button variant="ghost" size="icon" onClick={() => setStashDialogOpen(true)} className="h-5 w-5" disabled={changes.length === 0 && staged.length === 0} title="Stash">
+                                    <Archive className="h-3 w-3" />
                                 </Button>
-                                <Button variant="ghost" size="xs" onClick={() => setDiscardDialogOpen(true)} className="h-5 text-[10px] px-2 hover:text-destructive" disabled={changes.length === 0}>
-                                    <Trash2 className="h-3 w-3 mr-1" />
-                                    Discard
+                                <Button variant="ghost" size="icon" onClick={() => setDiscardDialogOpen(true)} className="h-5 w-5 hover:text-destructive" disabled={changes.length === 0} title="Discard All">
+                                    <Trash2 className="h-3 w-3" />
                                 </Button>
                             </div>
                         </div>

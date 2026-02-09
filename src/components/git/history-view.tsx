@@ -1665,10 +1665,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       {/* Branch Sidebar */}
       <div className="w-64 flex flex-col border-r bg-muted/10">
         <div className="p-4 border-b flex items-center justify-between bg-background h-[57px]">
-          <div className="flex items-center gap-2 font-semibold">
-             <GitBranch className="h-4 w-4" />
-             Branches
-          </div>
+          <h1 className="font-semibold text-lg">Branches</h1>
           <div className="flex items-center gap-1">
             {hasVisibilityFilters && (
               <Button 

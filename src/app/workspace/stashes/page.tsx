@@ -219,12 +219,9 @@ function StashesContent() {
     return (
         <div className="flex h-full overflow-hidden">
             {/* Left Panel: Stash List */}
-            <div className="w-80 border-r flex flex-col bg-muted/10">
-                <div className="p-4 border-b flex items-center justify-between bg-background">
-                    <h1 className="font-semibold text-lg flex items-center gap-2">
-                        <Archive className="h-5 w-5" />
-                        Stashes
-                    </h1>
+            <div className="w-64 border-r flex flex-col bg-muted/10">
+                <div className="h-[57px] px-4 border-b flex items-center justify-between bg-background">
+                    <h1 className="font-semibold text-lg">Stashes</h1>
                     <Button variant="ghost" size="icon" onClick={() => refetch()} disabled={action.isPending} title="Refresh">
                         <RefreshCcw className={`w-4 h-4 ${action.isPending ? 'animate-spin' : ''}`} />
                     </Button>
