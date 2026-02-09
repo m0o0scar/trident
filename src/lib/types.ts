@@ -3,6 +3,15 @@ export interface Repository {
   path: string;
   name: string;
   credentialId?: string | null;
+  expandedFolders?: string[];
+  visibilityMap?: Record<string, 'visible' | 'hidden'>;
+  localGroupExpanded?: boolean;
+  remotesGroupExpanded?: boolean;
+}
+
+export interface AppSettings {
+  defaultRootFolder: string | null;
+  sidebarCollapsed?: boolean;
 }
 
 export interface GitStatus {

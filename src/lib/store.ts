@@ -2,7 +2,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { Repository } from './types';
+import { Repository, AppSettings } from './types';
 
 // Get cross-platform app data directory
 function getAppDataDir(): string {
@@ -83,15 +83,12 @@ export function removeRepository(repoPath: string): void {
 }
 
 // Settings management
-export interface AppSettings {
-  defaultRootFolder: string | null;
-}
-
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 
 export function getSettings(): AppSettings {
   const defaults: AppSettings = {
     defaultRootFolder: null, // null means use user's home directory
+    sidebarCollapsed: false,
   };
 
   if (!fs.existsSync(SETTINGS_FILE)) {

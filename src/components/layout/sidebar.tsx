@@ -6,8 +6,8 @@ import { GitBranch, Clock, Settings, PanelLeftClose, PanelLeft, Archive } from '
 import Link from 'next/link';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { useGitStatus } from '@/hooks/use-git';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { useGitStatus, useSettings, useUpdateSettings } from '@/hooks/use-git';
 
 const SIDEBAR_COLLAPSED_KEY = 'workspace-sidebar-collapsed';
 const SIDEBAR_WIDTH_EXPANDED = 256; // w-64
@@ -27,15 +27,25 @@ export function Sidebar({ className }: SidebarProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   const [enableTransition, setEnableTransition] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
+
+  const { data: settings } = useSettings();
+  const updateSettings = useUpdateSettings();
   
   // Fetch git status to get uncommitted changes count
   const { data: gitStatus } = useGitStatus(repoPath || null);
   const changesCount = gitStatus?.files?.length ?? 0;
 
-  // Load collapsed state from localStorage synchronously before paint
+  // Load collapsed state from global settings or fallback to localStorage
   useIsomorphicLayoutEffect(() => {
-    const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-    const collapsed = stored === 'true';
+    let collapsed = false;
+    
+    if (settings && settings.sidebarCollapsed !== undefined) {
+      collapsed = settings.sidebarCollapsed;
+    } else {
+      const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+      collapsed = stored === 'true';
+    }
+
     setIsCollapsed(collapsed);
     setIsHydrated(true);
     
@@ -50,14 +60,16 @@ export function Sidebar({ className }: SidebarProps) {
         setEnableTransition(true);
       });
     });
-  }, []);
+  }, [settings]);
 
-  // Save collapsed state to localStorage
-  const toggleCollapsed = () => {
+  // Save collapsed state to global settings and localStorage
+  const toggleCollapsed = useCallback(() => {
     const newValue = !isCollapsed;
     setIsCollapsed(newValue);
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(newValue));
-  };
+    
+    updateSettings.mutate({ sidebarCollapsed: newValue });
+  }, [isCollapsed, updateSettings]);
 
   const getHref = (subPath: string = '') => {
     const p = new URLSearchParams(searchParams.toString());

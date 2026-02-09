@@ -18,6 +18,10 @@ const updateRepoSchema = z.object({
   updates: z.object({
     name: z.string().optional(),
     credentialId: z.string().optional().nullable(),
+    expandedFolders: z.array(z.string()).optional(),
+    visibilityMap: z.record(z.string(), z.enum(['visible', 'hidden'])).optional(),
+    localGroupExpanded: z.boolean().optional(),
+    remotesGroupExpanded: z.boolean().optional(),
   }),
 });
 

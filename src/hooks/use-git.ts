@@ -1,9 +1,39 @@
 
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GitStatus, GitLog, Repository } from '@/lib/types';
+import { GitStatus, GitLog, Repository, AppSettings } from '@/lib/types';
 import { showGitErrorToast } from './use-toast';
 
 const API_BASE = '/api';
+
+export function useSettings() {
+  return useQuery<AppSettings & { resolvedDefaultFolder: string }>({
+    queryKey: ['settings'],
+    queryFn: async () => {
+      const res = await fetch(`${API_BASE}/settings`);
+      if (!res.ok) throw new Error('Failed to fetch settings');
+      return res.json();
+    },
+  });
+}
+
+export function useUpdateSettings() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (updates: Partial<AppSettings>) => {
+      const res = await fetch(`${API_BASE}/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (!res.ok) throw new Error('Failed to update settings');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settings'] });
+    },
+  });
+}
 
 export function useRepositories() {
   return useQuery<Repository[]>({
@@ -14,6 +44,13 @@ export function useRepositories() {
       return res.json();
     },
   });
+}
+
+export function useRepository(repoPath: string | null) {
+  const { data: repos } = useRepositories();
+  return useMemo(() => 
+    repos?.find(r => r.path === repoPath) || null,
+  [repos, repoPath]);
 }
 
 export function useAddRepository() {

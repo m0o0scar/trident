@@ -1,6 +1,7 @@
 'use client';
 
-import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, BranchTrackingInfo } from '@/hooks/use-git';
+import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, BranchTrackingInfo, useRepository, useUpdateRepository } from '@/hooks/use-git';
+import { Repository } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal, X, Globe, ArrowUp, ArrowDown, Upload, AlertCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -808,62 +809,62 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   // Check if we have any remote branches
   const hasRemotes = remoteBranchTrees && remoteBranchTrees.size > 0;
   
+  const repository = useRepository(repoPath);
+  const updateRepository = useUpdateRepository();
+
   // Group expanded state (for "Branches" and "Remotes" group headers)
   const [localGroupExpanded, setLocalGroupExpanded] = useState(true);
   const [remotesGroupExpanded, setRemotesGroupExpanded] = useState(true);
 
-  // Storage key for this repo's expanded folders
-  const storageKey = `git-web:branch-tree-expanded:${repoPath}`;
-
-  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => {
-    // Load from local storage on initial render
-    if (typeof window === 'undefined') return new Set();
-    try {
-      const key = `git-web:branch-tree-expanded:${repoPath}`;
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        return new Set(JSON.parse(stored));
-      }
-    } catch (e) {
-      console.error('Failed to load expanded folders from localStorage:', e);
-    }
-    return new Set();
-  });
-
-  // Save to local storage whenever expanded folders change
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(Array.from(expandedFolders)));
-    } catch (e) {
-      console.error('Failed to save expanded folders to localStorage:', e);
-    }
-  }, [expandedFolders, storageKey]);
-
-  // Storage key for this repo's branch visibility
-  const visibilityStorageKey = `git-web:branch-visibility:${repoPath}`;
-
   // Visibility state for branches/folders
-  const [visibilityMap, setVisibilityMap] = useState<VisibilityMap>(() => {
-    if (typeof window === 'undefined') return {};
-    try {
-      const stored = localStorage.getItem(visibilityStorageKey);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch (e) {
-      console.error('Failed to load visibility from localStorage:', e);
-    }
-    return {};
-  });
+  const [visibilityMap, setVisibilityMap] = useState<VisibilityMap>({});
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
 
-  // Save visibility to localStorage
+  // Load settings from repository data when it's available
+  const lastInitializedRepo = useRef<string | null>(null);
   useEffect(() => {
-    try {
-      localStorage.setItem(visibilityStorageKey, JSON.stringify(visibilityMap));
-    } catch (e) {
-      console.error('Failed to save visibility to localStorage:', e);
+    if (repository && repository.path !== lastInitializedRepo.current) {
+      lastInitializedRepo.current = repository.path;
+      if (repository.localGroupExpanded !== undefined) setLocalGroupExpanded(repository.localGroupExpanded);
+      if (repository.remotesGroupExpanded !== undefined) setRemotesGroupExpanded(repository.remotesGroupExpanded);
+      if (repository.expandedFolders) setExpandedFolders(new Set(repository.expandedFolders));
+      if (repository.visibilityMap) setVisibilityMap(repository.visibilityMap as VisibilityMap);
     }
-  }, [visibilityMap, visibilityStorageKey]);
+  }, [repository]);
+
+  // Helper to save settings to the backend
+  const saveSettings = useCallback((updates: Partial<Repository>) => {
+    updateRepository.mutate({
+      path: repoPath,
+      updates
+    });
+  }, [repoPath, updateRepository]);
+
+  const handleToggleLocalGroup = useCallback(() => {
+    const newValue = !localGroupExpanded;
+    setLocalGroupExpanded(newValue);
+    saveSettings({ localGroupExpanded: newValue });
+  }, [localGroupExpanded, saveSettings]);
+
+  const handleToggleRemotesGroup = useCallback(() => {
+    const newValue = !remotesGroupExpanded;
+    setRemotesGroupExpanded(newValue);
+    saveSettings({ remotesGroupExpanded: newValue });
+  }, [remotesGroupExpanded, saveSettings]);
+
+  // Toggle folder expansion
+  const toggleFolder = useCallback((path: string) => {
+    setExpandedFolders(prev => {
+      const next = new Set(prev);
+      if (next.has(path)) {
+        next.delete(path);
+      } else {
+        next.add(path);
+      }
+      saveSettings({ expandedFolders: Array.from(next) });
+      return next;
+    });
+  }, [saveSettings]);
 
   // Toggle visibility for a path
   const handleToggleVisibility = useCallback((path: string, type: 'visible' | 'hidden') => {
@@ -876,14 +877,16 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         // Set to this type (auto-removes the other one since we're replacing)
         next[path] = type;
       }
+      saveSettings({ visibilityMap: next as any });
       return next;
     });
-  }, []);
+  }, [saveSettings]);
 
   // Clear all visibility filters
   const handleClearAllFilters = useCallback(() => {
     setVisibilityMap({});
-  }, []);
+    saveSettings({ visibilityMap: {} });
+  }, [saveSettings]);
 
   // Helper to get effective visibility for a branch considering group paths
   const getBranchEffectiveVisibility = useCallback((branch: string, isRemoteBranch: boolean) => {
@@ -1120,18 +1123,6 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setPendingScrollCommit(commitHash);
     setSelectedHash(commitHash);
   }, [branchData?.branchCommits, log?.all]);
-
-  const toggleFolder = useCallback((path: string) => {
-    setExpandedFolders(prev => {
-      const next = new Set(prev);
-      if (next.has(path)) {
-        next.delete(path);
-      } else {
-        next.add(path);
-      }
-      return next;
-    });
-  }, []);
 
   const confirmDeleteBranch = (branch: string) => {
     setBranchToDelete(branch);
@@ -1693,7 +1684,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   groupPath="__local__"
                   icon={<GitBranch className="h-3.5 w-3.5 shrink-0" />}
                   isExpanded={localGroupExpanded}
-                  onToggle={() => setLocalGroupExpanded(!localGroupExpanded)}
+                  onToggle={handleToggleLocalGroup}
                   visibilityMap={visibilityMap}
                   onToggleVisibility={handleToggleVisibility}
                 />
@@ -1733,7 +1724,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                       groupPath="__remotes__"
                       icon={<Globe className="h-3.5 w-3.5 shrink-0" />}
                       isExpanded={remotesGroupExpanded}
-                      onToggle={() => setRemotesGroupExpanded(!remotesGroupExpanded)}
+                      onToggle={handleToggleRemotesGroup}
                       visibilityMap={visibilityMap}
                       onToggleVisibility={handleToggleVisibility}
                     />

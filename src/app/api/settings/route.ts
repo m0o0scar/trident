@@ -14,6 +14,7 @@ export async function GET() {
 
 const updateSettingsSchema = z.object({
   defaultRootFolder: z.string().nullable().optional(),
+  sidebarCollapsed: z.boolean().optional(),
 });
 
 export async function PUT(request: Request) {
