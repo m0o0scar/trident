@@ -44,8 +44,8 @@
 /* 2. Constrain Gutters (Columns 1 & 4) */
 .diff-viewer-wrapper table.split-view tbody tr td:nth-child(1),
 .diff-viewer-wrapper table.split-view tbody tr td:nth-child(4) {
-  width: 40px !important;
-  min-width: 40px !important;
+  width: 64px !important;
+  min-width: 64px !important;
   white-space: nowrap !important;
 }
 
@@ -63,10 +63,17 @@
 }
 
 /* 5. Force text wrapping in diff content to prevent overflow */
-.diff-viewer-wrapper pre {
+.diff-viewer-wrapper td.content pre {
   white-space: pre-wrap !important;
   word-wrap: break-word !important;
   overflow-wrap: break-word !important;
+}
+
+/* Keep gutter line numbers on a single line (prevents 1694 -> 169 + 4 wrapping) */
+.diff-viewer-wrapper td.gutter pre.line-number {
+  white-space: nowrap !important;
+  word-wrap: normal !important;
+  overflow-wrap: normal !important;
 }
 
 /* Unified view: constrain table and allow content to wrap */
