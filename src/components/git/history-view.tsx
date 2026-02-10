@@ -1691,11 +1691,42 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   };
 
+  const currentBranch = branchData?.current;
+  const trackingInfoByBranch = branchData?.trackingInfo;
   const localChangesCount = statusData?.files?.length;
-  const currentBranchName = branchData?.current || (isBranchesLoading ? 'Loading branches...' : 'Detached HEAD');
-  const currentBranchLabel = branchData?.current && typeof localChangesCount === 'number' && localChangesCount > 0
-    ? `${branchData.current} (${localChangesCount})`
+  const currentBranchName = currentBranch || (isBranchesLoading ? 'Loading branches...' : 'Detached HEAD');
+  const currentBranchLabel = currentBranch && typeof localChangesCount === 'number' && localChangesCount > 0
+    ? `${currentBranch} (${localChangesCount})`
     : currentBranchName;
+  const currentTrackingBranch = useMemo(() => {
+    if (!currentBranch) return null;
+    const tracking = trackingInfoByBranch?.[currentBranch];
+    if (!tracking?.upstream) return null;
+    const slashIndex = tracking.upstream.indexOf('/');
+    if (slashIndex <= 0) return null;
+
+    return {
+      upstream: tracking.upstream,
+      remote: tracking.upstream.slice(0, slashIndex),
+      branch: tracking.upstream.slice(slashIndex + 1),
+    };
+  }, [currentBranch, trackingInfoByBranch]);
+  const trackingActionDisabledReason = useMemo(() => {
+    if (isBranchesLoading) return 'Loading branches...';
+    if (!currentBranch) return 'Not on a local branch';
+    if (!currentTrackingBranch) return `Branch "${currentBranch}" has no tracking remote branch`;
+    return null;
+  }, [currentBranch, currentTrackingBranch, isBranchesLoading]);
+
+  const confirmPullCurrentBranch = () => {
+    if (!currentBranch || trackingActionDisabledReason) return;
+    void confirmPullFromRemote(currentBranch);
+  };
+
+  const confirmPushCurrentBranch = () => {
+    if (!currentBranch || trackingActionDisabledReason) return;
+    void confirmPushToRemote(currentBranch);
+  };
 
   const branchTreePopoverContent = (
     <div className="w-[22rem] max-w-[calc(100vw-2rem)] flex flex-col border border-base-300 bg-base-100 rounded-box shadow-xl overflow-hidden">
@@ -2268,11 +2299,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         </dialog>
       )}
 
-
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 bg-base-100">
         <div className="h-[57px] flex items-center px-6 border-b border-base-300 shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             <h1 className="font-bold text-lg">History</h1>
             <div className="relative" ref={branchPopoverRef}>
               <button
@@ -2288,6 +2318,34 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   {branchTreePopoverContent}
                 </div>
               )}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                className="btn btn-sm gap-2"
+                onClick={confirmPullCurrentBranch}
+                disabled={!!trackingActionDisabledReason || isPullOpen || isPushOpen}
+                title={trackingActionDisabledReason || `Pull from ${currentTrackingBranch?.upstream}`}
+              >
+                {pullLoadingRemotes ? (
+                  <span className="loading loading-spinner loading-xs"></span>
+                ) : (
+                  <ArrowDownIcon className="h-4 w-4" />
+                )}
+                Pull
+              </button>
+              <button
+                className="btn btn-sm gap-2"
+                onClick={confirmPushCurrentBranch}
+                disabled={!!trackingActionDisabledReason || isPullOpen || isPushOpen}
+                title={trackingActionDisabledReason || `Push to ${currentTrackingBranch?.upstream}`}
+              >
+                {pushLoadingRemotes ? (
+                  <span className="loading loading-spinner loading-xs"></span>
+                ) : (
+                  <ArrowUpIcon className="h-4 w-4" />
+                )}
+                Push
+              </button>
             </div>
           </div>
         </div>
