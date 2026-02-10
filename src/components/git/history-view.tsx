@@ -9,7 +9,7 @@ import '@alexbruf/react-diff-viewer/index.css';
 import { useTheme } from 'next-themes';
 import { cn, sanitizeBranchName, isFileBinary } from '@/lib/utils';
 import { ContextMenu } from '@/components/context-menu';
-import { ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, Bars3CenterLeftIcon, EyeIcon, EyeSlashIcon, FolderIcon, FunnelIcon, GlobeAltIcon, PlusCircleIcon } from '@heroicons/react/24/outline';
+import { ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, Bars3CenterLeftIcon, ChevronDownIcon, EyeIcon, EyeSlashIcon, FolderIcon, FunnelIcon, GlobeAltIcon, PlusCircleIcon } from '@heroicons/react/24/outline';
 
 
 // Visibility state for branches/folders
@@ -705,6 +705,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   
   // State for pending scroll to branch commit
   const [pendingScrollCommit, setPendingScrollCommit] = useState<string | null>(null);
+  const [isBranchPopoverOpen, setIsBranchPopoverOpen] = useState(false);
+  const branchPopoverRef = useRef<HTMLDivElement>(null);
 
   // Resizable bottom panel state - load from global settings or fallback to localStorage
   const panelHeightStorageKey = 'git-web:history-panel-height';
@@ -782,6 +784,30 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizing]);
+
+  useEffect(() => {
+    if (!isBranchPopoverOpen) return;
+
+    const handleMouseDown = (event: MouseEvent) => {
+      if (branchPopoverRef.current && !branchPopoverRef.current.contains(event.target as Node)) {
+        setIsBranchPopoverOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsBranchPopoverOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isBranchPopoverOpen]);
 
   // Build branch trees for local and remote branches
   const localBranchTree = useMemo(() => {
@@ -1089,6 +1115,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     
     const commitHash = branchData.branchCommits[branch];
     if (!commitHash) return;
+    setIsBranchPopoverOpen(false);
     
     // Check if commit is already in view
     const commitExists = log?.all?.some(c => c.hash === commitHash);
@@ -1664,6 +1691,140 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   };
 
+  const currentBranchLabel = branchData?.current || (isBranchesLoading ? 'Loading branches...' : 'Detached HEAD');
+
+  const branchTreePopoverContent = (
+    <div className="w-[22rem] max-w-[calc(100vw-2rem)] flex flex-col border border-base-300 bg-base-100 rounded-box shadow-xl overflow-hidden">
+      <div className="px-4 border-b border-base-300 flex items-center justify-between bg-base-100 h-[57px] shrink-0">
+        <h2 className="font-bold text-lg">Branches</h2>
+        <div className="flex items-center gap-1">
+          {hasVisibilityFilters && (
+            <div className="tooltip tooltip-left z-20" data-tip="Clear filters">
+              <button
+                className="btn btn-ghost btn-xs btn-square"
+                onClick={handleClearAllFilters}
+              >
+                <FunnelIcon className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+          <div className="tooltip tooltip-left z-20" data-tip="Create Branch">
+            <button className="btn btn-ghost btn-xs btn-square" onClick={() => setIsCreateBranchOpen(true)}>
+              <PlusCircleIcon className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+      <div className="max-h-[70vh] overflow-auto">
+        <div className="p-2 space-y-0.5">
+          {localBranchTree && (
+            <>
+              <GroupHeader
+                name="Branches"
+                groupPath="__local__"
+                icon={<Bars3CenterLeftIcon className="h-3.5 w-3.5" />}
+                isExpanded={localGroupExpanded}
+                onToggle={handleToggleLocalGroup}
+                visibilityMap={visibilityMap}
+                onToggleVisibility={handleToggleVisibility}
+              />
+              {localGroupExpanded && (
+                <BranchTreeItem
+                  node={localBranchTree}
+                  currentBranch={branchData?.current}
+                  expandedFolders={expandedFolders}
+                  onToggleFolder={toggleFolder}
+                  onCheckout={handleCheckout}
+                  onCheckoutToLocal={confirmCheckoutToLocal}
+                  onCreateBranch={() => setIsCreateBranchOpen(true)}
+                  onDeleteBranch={confirmDeleteBranch}
+                  onRenameBranch={confirmRenameBranch}
+                  onRebase={confirmRebase}
+                  onMerge={confirmMerge}
+                  onPushToRemote={confirmPushToRemote}
+                  onPullFromRemote={confirmPullFromRemote}
+                  onBranchClick={handleBranchClick}
+                  visibilityMap={visibilityMap}
+                  onToggleVisibility={handleToggleVisibility}
+                  depth={1}
+                  groupPath="__local__"
+                  trackingInfo={branchData?.trackingInfo}
+                />
+              )}
+            </>
+          )}
+
+          {(hasRemotes || isBranchesLoading) && (
+            <>
+              <ContextMenu items={[{ label: "Fetch from all remotes", onClick: handleFetchFromAllRemotes }]}>
+                <GroupHeader
+                  name="Remotes"
+                  groupPath="__remotes__"
+                  icon={<GlobeAltIcon className="h-3.5 w-3.5" />}
+                  isExpanded={remotesGroupExpanded}
+                  onToggle={handleToggleRemotesGroup}
+                  visibilityMap={visibilityMap}
+                  onToggleVisibility={handleToggleVisibility}
+                />
+              </ContextMenu>
+              {remotesGroupExpanded && isBranchesLoading && !remoteBranchTrees && (
+                <div className="flex items-center gap-2 px-2 py-2 text-sm opacity-70" style={{ paddingLeft: '20px' }}>
+                  <span className="loading loading-spinner loading-xs"></span>
+                  <span>Loading remotes...</span>
+                </div>
+              )}
+              {remotesGroupExpanded && remoteBranchTrees && Array.from(remoteBranchTrees.entries()).map(([remoteName, tree]) => {
+                const remoteGroupPath = `__remotes__/${remoteName}`;
+                const isRemoteExpanded = expandedFolders.has(remoteGroupPath);
+
+                return (
+                  <div key={remoteName}>
+                    <ContextMenu items={[{ label: `Fetch from ${remoteName}`, onClick: () => handleFetchFromRemote(remoteName) }]}>
+                      <GroupHeader
+                        name={remoteName}
+                        groupPath={remoteGroupPath}
+                        icon={<GlobeAltIcon className="h-3.5 w-3.5 opacity-50" />}
+                        isExpanded={isRemoteExpanded}
+                        onToggle={() => toggleFolder(remoteGroupPath)}
+                        visibilityMap={visibilityMap}
+                        onToggleVisibility={handleToggleVisibility}
+                        depth={1}
+                      />
+                    </ContextMenu>
+                    {isRemoteExpanded && (
+                      <BranchTreeItem
+                        node={tree}
+                        currentBranch={branchData?.current}
+                        expandedFolders={expandedFolders}
+                        onToggleFolder={toggleFolder}
+                        onCheckout={handleCheckout}
+                        onCheckoutToLocal={confirmCheckoutToLocal}
+                        onCreateBranch={() => setIsCreateBranchOpen(true)}
+                        onDeleteBranch={confirmDeleteBranch}
+                        onRenameBranch={confirmRenameBranch}
+                        onRebase={confirmRebase}
+                        onMerge={confirmMerge}
+                        onPushToRemote={confirmPushToRemote}
+                        onPullFromRemote={confirmPullFromRemote}
+                        onBranchClick={handleBranchClick}
+                        visibilityMap={visibilityMap}
+                        onToggleVisibility={handleToggleVisibility}
+                        depth={2}
+                        groupPath={remoteGroupPath}
+                        isRemote={true}
+                        trackingInfo={branchData?.trackingInfo}
+                      />
+                    )}
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
   if (isLoading && limit === 100) {
     return <div className="flex items-center justify-center p-8 h-full"><span className="loading loading-spinner text-base-content/50"></span></div>;
   }
@@ -1685,139 +1846,6 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Branch Sidebar */}
-      <div className="w-64 flex flex-col border-r border-base-300 bg-base-200/30">
-        <div className="p-4 border-b border-base-300 flex items-center justify-between bg-base-100 h-[57px] z-10">
-          <h1 className="font-bold text-lg">Branches</h1>
-          <div className="flex items-center gap-1">
-            {hasVisibilityFilters && (
-              <div className="tooltip tooltip-left z-20" data-tip="Clear filters">
-                <button
-                  className="btn btn-ghost btn-xs btn-square"
-                  onClick={handleClearAllFilters} 
-                >
-                  <FunnelIcon className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-            <div className="tooltip tooltip-left z-20" data-tip="Create Branch">
-              <button className="btn btn-ghost btn-xs btn-square" onClick={() => setIsCreateBranchOpen(true)}>
-                <PlusCircleIcon className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-        <div className="flex-1 overflow-auto">
-          <div className="p-2 space-y-0.5">
-            {/* Local Branches Group */}
-            {localBranchTree && (
-              <>
-                <GroupHeader
-                  name="Branches"
-                  groupPath="__local__"
-                  icon={<Bars3CenterLeftIcon className="h-3.5 w-3.5" />}
-                  isExpanded={localGroupExpanded}
-                  onToggle={handleToggleLocalGroup}
-                  visibilityMap={visibilityMap}
-                  onToggleVisibility={handleToggleVisibility}
-                />
-                {localGroupExpanded && (
-                  <BranchTreeItem
-                    node={localBranchTree}
-                    currentBranch={branchData?.current}
-                    expandedFolders={expandedFolders}
-                    onToggleFolder={toggleFolder}
-                    onCheckout={handleCheckout}
-                    onCheckoutToLocal={confirmCheckoutToLocal}
-                    onCreateBranch={() => setIsCreateBranchOpen(true)}
-                    onDeleteBranch={confirmDeleteBranch}
-                    onRenameBranch={confirmRenameBranch}
-                    onRebase={confirmRebase}
-                    onMerge={confirmMerge}
-                    onPushToRemote={confirmPushToRemote}
-                    onPullFromRemote={confirmPullFromRemote}
-                    onBranchClick={handleBranchClick}
-                    visibilityMap={visibilityMap}
-                    onToggleVisibility={handleToggleVisibility}
-                    depth={1}
-                    groupPath="__local__"
-                    trackingInfo={branchData?.trackingInfo}
-                  />
-                )}
-              </>
-            )}
-            
-            {/* Remote Branches Group */}
-            {(hasRemotes || isBranchesLoading) && (
-              <>
-                <ContextMenu items={[{ label: "Fetch from all remotes", onClick: handleFetchFromAllRemotes }]}>
-                    <GroupHeader
-                      name="Remotes"
-                      groupPath="__remotes__"
-                      icon={<GlobeAltIcon className="h-3.5 w-3.5" />}
-                      isExpanded={remotesGroupExpanded}
-                      onToggle={handleToggleRemotesGroup}
-                      visibilityMap={visibilityMap}
-                      onToggleVisibility={handleToggleVisibility}
-                    />
-                </ContextMenu>
-                {remotesGroupExpanded && isBranchesLoading && !remoteBranchTrees && (
-                  <div className="flex items-center gap-2 px-2 py-2 text-sm opacity-70" style={{ paddingLeft: '20px' }}>
-                    <span className="loading loading-spinner loading-xs"></span>
-                    <span>Loading remotes...</span>
-                  </div>
-                )}
-                {remotesGroupExpanded && remoteBranchTrees && Array.from(remoteBranchTrees.entries()).map(([remoteName, tree]) => {
-                  const remoteGroupPath = `__remotes__/${remoteName}`;
-                  const isRemoteExpanded = expandedFolders.has(remoteGroupPath);
-                  
-                  return (
-                    <div key={remoteName}>
-                        <ContextMenu items={[{ label: `Fetch from ${remoteName}`, onClick: () => handleFetchFromRemote(remoteName) }]}>
-                          <GroupHeader
-                            name={remoteName}
-                            groupPath={remoteGroupPath}
-                            icon={<GlobeAltIcon className="h-3.5 w-3.5 opacity-50" />}
-                            isExpanded={isRemoteExpanded}
-                            onToggle={() => toggleFolder(remoteGroupPath)}
-                            visibilityMap={visibilityMap}
-                            onToggleVisibility={handleToggleVisibility}
-                            depth={1}
-                          />
-                        </ContextMenu>
-                      {isRemoteExpanded && (
-                        <BranchTreeItem
-                          node={tree}
-                          currentBranch={branchData?.current}
-                          expandedFolders={expandedFolders}
-                          onToggleFolder={toggleFolder}
-                          onCheckout={handleCheckout}
-                          onCheckoutToLocal={confirmCheckoutToLocal}
-                          onCreateBranch={() => setIsCreateBranchOpen(true)}
-                          onDeleteBranch={confirmDeleteBranch}
-                          onRenameBranch={confirmRenameBranch}
-                          onRebase={confirmRebase}
-                          onMerge={confirmMerge}
-                          onPushToRemote={confirmPushToRemote}
-                          onPullFromRemote={confirmPullFromRemote}
-                          onBranchClick={handleBranchClick}
-                          visibilityMap={visibilityMap}
-                          onToggleVisibility={handleToggleVisibility}
-                          depth={2}
-                          groupPath={remoteGroupPath}
-                          isRemote={true}
-                          trackingInfo={branchData?.trackingInfo}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
       {isResetOpen && (
         <dialog className="modal modal-open">
           <div className="modal-box">
@@ -2239,8 +2267,25 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 bg-base-100">
-        <div className="h-[57px] flex items-center justify-between px-6 border-b border-base-300 shrink-0">
-          <h1 className="font-bold text-lg">History</h1>
+        <div className="h-[57px] flex items-center px-6 border-b border-base-300 shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <h1 className="font-bold text-lg">History</h1>
+            <div className="relative" ref={branchPopoverRef}>
+              <button
+                className="btn btn-sm btn-outline gap-2 max-w-[24rem]"
+                onClick={() => setIsBranchPopoverOpen(prev => !prev)}
+                title={currentBranchLabel}
+              >
+                <span className="truncate">{currentBranchLabel}</span>
+                <ChevronDownIcon className={cn("h-4 w-4 shrink-0 transition-transform", isBranchPopoverOpen && "rotate-180")} />
+              </button>
+              {isBranchPopoverOpen && (
+                <div className="absolute left-0 top-full mt-2 z-50">
+                  {branchTreePopoverContent}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="flex-1 overflow-hidden relative">
