@@ -1,11 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { FolderOpen, Loader2 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 import { FileSystemBrowser } from './fs-browser';
 
 interface Settings {
@@ -20,11 +16,17 @@ interface HomeSettingsModalProps {
 }
 
 export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: HomeSettingsModalProps) {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
   const [localDefaultFolder, setLocalDefaultFolder] = useState<string>('');
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const loadSettings = async () => {
     setIsLoading(true);
@@ -79,70 +81,98 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
     setLocalDefaultFolder('');
   };
 
+  if (!open) return null;
+
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Settings</DialogTitle>
-            <DialogDescription>
-              Configure your application preferences.
-            </DialogDescription>
-          </DialogHeader>
+      <dialog className="modal modal-open">
+        <div className="modal-box">
+          <h3 className="font-bold text-lg">Settings</h3>
+          <p className="py-4 opacity-70">Configure your application preferences.</p>
 
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="animate-spin w-6 h-6 text-muted-foreground" />
+              <span className="loading loading-spinner loading-md"></span>
             </div>
           ) : (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="defaultRootFolder">Default Root Folder</Label>
-                <p className="text-xs text-muted-foreground">
-                  The starting folder when browsing for new repositories. Leave empty to use your home folder.
-                </p>
+            <div className="space-y-6">
+              {/* Theme Selection */}
+              <div className="form-control w-full">
+                <label className="label">
+                  <span className="label-text">Color Theme</span>
+                </label>
+                <div className="text-xs opacity-70 mb-2">
+                  Choose your preferred color theme for the application.
+                </div>
                 <div className="flex gap-2">
-                  <Input
-                    id="defaultRootFolder"
+                  <button
+                    className={`btn flex-1 ${theme === 'system' ? 'btn-primary' : ''}`}
+                    onClick={() => setTheme('system')}
+                    disabled={!mounted}
+                  >
+                    <span className="text-lg mr-2">💻</span>
+                    System
+                  </button>
+                  <button
+                    className={`btn flex-1 ${theme === 'light' ? 'btn-primary' : ''}`}
+                    onClick={() => setTheme('light')}
+                    disabled={!mounted}
+                  >
+                    <span className="text-lg mr-2">☀️</span>
+                    Light
+                  </button>
+                  <button
+                    className={`btn flex-1 ${theme === 'dark' ? 'btn-primary' : ''}`}
+                    onClick={() => setTheme('dark')}
+                    disabled={!mounted}
+                  >
+                    <span className="text-lg mr-2">🌒</span>
+                    Dark
+                  </button>
+                </div>
+              </div>
+
+              {/* Default Root Folder */}
+              <div className="form-control w-full">
+                <label className="label">
+                  <span className="label-text">Default Root Folder</span>
+                </label>
+                <div className="text-xs opacity-70 mb-2">
+                  The starting folder when browsing for new repositories. Leave empty to use your home folder.
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder={settings?.resolvedDefaultFolder || 'User home folder'}
+                    className="input input-bordered w-full font-mono text-sm"
                     value={localDefaultFolder}
                     onChange={(e) => setLocalDefaultFolder(e.target.value)}
-                    placeholder={settings?.resolvedDefaultFolder || 'User home folder'}
-                    className="font-mono text-sm"
                   />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setFolderBrowserOpen(true)}
-                    title="Browse folders"
-                  >
-                    <FolderOpen className="w-4 h-4" />
-                  </Button>
+                  <button className="btn btn-square" onClick={() => setFolderBrowserOpen(true)} title="Browse folders">
+                    📂
+                  </button>
                 </div>
                 {localDefaultFolder && (
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0 text-xs"
-                    onClick={handleReset}
-                  >
-                    Reset to default (home folder)
-                  </Button>
+                  <label className="label">
+                    <span className="label-text-alt link link-hover text-primary" onClick={handleReset}>Reset to default (home folder)</span>
+                  </label>
                 )}
               </div>
             </div>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={isSaving || isLoading}>
-              {isSaving && <Loader2 className="animate-spin w-4 h-4 mr-2" />}
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <div className="modal-action">
+             <button className="btn" onClick={() => onOpenChange(false)}>Close</button>
+             <button className="btn btn-primary" onClick={handleSave} disabled={isSaving || isLoading}>
+               {isSaving && <span className="loading loading-spinner loading-xs"></span>}
+               Save Folder Settings
+             </button>
+          </div>
+        </div>
+        <form method="dialog" className="modal-backdrop">
+            <button onClick={() => onOpenChange(false)}>close</button>
+        </form>
+      </dialog>
 
       <FileSystemBrowser
         open={folderBrowserOpen}

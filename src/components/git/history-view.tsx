@@ -2,52 +2,13 @@
 
 import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, BranchTrackingInfo, useRepository, useUpdateRepository, useSettings, useUpdateSettings } from '@/hooks/use-git';
 import { Repository } from '@/lib/types';
-import { Button } from '@/components/ui/button';
-import { Loader2, RefreshCcw, GitBranch, Plus, ChevronRight, ChevronDown, Folder, Eye, EyeOff, FilterX, FileText, FilePlus, FileMinus, FileEdit, GripHorizontal, X, Globe, ArrowUp, ArrowDown, Upload, AlertCircle, AlertTriangle } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn, sanitizeBranchName, isFileBinary } from '@/lib/utils';
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import ReactDiffViewer from '@alexbruf/react-diff-viewer';
 import '@alexbruf/react-diff-viewer/index.css';
 import { useTheme } from 'next-themes';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { cn, sanitizeBranchName, isFileBinary } from '@/lib/utils';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 
 // Visibility state for branches/folders
 type VisibilityState = 'visible' | 'hidden' | null;
@@ -67,13 +28,13 @@ interface BranchTreeNode {
 function FileStatusIcon({ status }: { status: string }) {
   switch (status) {
     case 'A':
-      return <FilePlus className="h-3.5 w-3.5 text-green-500" />;
+      return <span className="text-success">➕</span>;
     case 'D':
-      return <FileMinus className="h-3.5 w-3.5 text-red-500" />;
+      return <span className="text-error">➖</span>;
     case 'M':
-      return <FileEdit className="h-3.5 w-3.5 text-yellow-500" />;
+      return <span className="text-warning">📝</span>;
     default:
-      return <FileText className="h-3.5 w-3.5 text-muted-foreground" />;
+      return <span className="opacity-50">📄</span>;
   }
 }
 
@@ -89,18 +50,18 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
   }, [filePath, commitHash]);
 
   if (isLoading) {
-    return <div className="flex items-center justify-center p-8"><Loader2 className="animate-spin text-muted-foreground" /></div>;
+    return <div className="flex items-center justify-center p-8"><span className="loading loading-spinner text-base-content/50"></span></div>;
   }
 
   if (!data) {
-    return <div className="flex items-center justify-center p-8 text-muted-foreground">No diff available</div>;
+    return <div className="flex items-center justify-center p-8 opacity-50">No diff available</div>;
   }
 
   // Check if file is binary (first by extension, then by content if unknown)
   const isBinary = isFileBinary(filePath, data.left, data.right);
 
   if (isBinary) {
-    return <div className="flex items-center justify-center p-8 text-muted-foreground">Binary file - diff not available</div>;
+    return <div className="flex items-center justify-center p-8 opacity-50">Binary file - diff not available</div>;
   }
 
   // Large file protection
@@ -126,16 +87,16 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
   if (isLargeDiff && !renderAnyway) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
-        <AlertTriangle className="h-12 w-12 text-yellow-500" />
+        <span className="text-4xl text-warning">⚠️</span>
         <div className="space-y-2">
-          <h3 className="font-semibold text-lg">Large Diff Detected</h3>
-          <p className="text-muted-foreground">
+          <h3 className="font-bold text-lg">Large Diff Detected</h3>
+          <p className="opacity-70">
             This diff is large ({Math.round(contentSize / 1024)}KB, ~{lineCount} lines) and may freeze your browser if rendered.
           </p>
         </div>
-        <Button variant="outline" onClick={() => setRenderAnyway(true)}>
+        <button className="btn btn-outline" onClick={() => setRenderAnyway(true)}>
           Show Diff Anyway
-        </Button>
+        </button>
       </div>
     );
   }
@@ -194,28 +155,28 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
   }, [data?.files, selectedFile]);
 
   if (isLoading) {
-    return <div className="flex items-center justify-center p-8 h-full"><Loader2 className="animate-spin text-muted-foreground" /></div>;
+    return <div className="flex items-center justify-center p-8 h-full"><span className="loading loading-spinner text-base-content/50"></span></div>;
   }
 
   if (!data || data.files.length === 0) {
-    return <div className="flex items-center justify-center p-8 h-full text-muted-foreground">No changes in this commit</div>;
+    return <div className="flex items-center justify-center p-8 h-full opacity-50">No changes in this commit</div>;
   }
 
   return (
     <div className="flex h-full">
       {/* File list */}
-      <div className="w-64 border-r flex flex-col bg-muted/5 shrink-0">
-        <div className="px-3 py-2 text-xs font-semibold text-muted-foreground border-b bg-background">
+      <div className="w-64 border-r border-base-300 flex flex-col bg-base-200/30 shrink-0">
+        <div className="px-3 py-2 text-xs font-bold opacity-70 border-b border-base-300 bg-base-100">
           {data.files.length} file{data.files.length !== 1 ? 's' : ''} changed
         </div>
-        <ScrollArea className="flex-1 min-h-0">
+        <div className="flex-1 overflow-y-auto min-h-0">
           <div className="p-1">
             {data.files.map((file) => (
               <div
                 key={file.path}
                 className={cn(
-                  "flex items-center gap-2 px-2 py-1.5 text-xs rounded cursor-pointer hover:bg-muted/50 transition-colors",
-                  selectedFile === file.path && "bg-muted"
+                  "flex items-center gap-2 px-2 py-1.5 text-xs rounded cursor-pointer hover:bg-base-200 transition-colors",
+                  selectedFile === file.path && "bg-base-200 font-medium"
                 )}
                 onClick={() => setSelectedFile(file.path)}
                 title={file.path}
@@ -225,22 +186,23 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
               </div>
             ))}
           </div>
-        </ScrollArea>
+        </div>
       </div>
 
       {/* Diff view */}
       <div className="flex-1 overflow-hidden">
         {selectedFile ? (
           <div className="h-full flex flex-col">
-            <div className="px-4 py-2 text-xs font-mono text-muted-foreground border-b bg-background shrink-0 truncate flex items-center justify-between">
+            <div className="px-4 py-2 text-xs font-mono opacity-70 border-b border-base-300 bg-base-100 shrink-0 truncate flex items-center justify-between">
               <span className="truncate">{selectedFile}</span>
               <div className="flex items-center gap-2 shrink-0 ml-4">
-                <Label htmlFor="commit-diff-split-view" className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold cursor-pointer">Split View</Label>
-                <Switch
+                <label htmlFor="commit-diff-split-view" className="text-[10px] uppercase tracking-wider font-bold cursor-pointer opacity-70">Split View</label>
+                <input
+                  type="checkbox"
                   id="commit-diff-split-view"
                   checked={splitView}
-                  onCheckedChange={setSplitView}
-                  className="scale-75 origin-right"
+                  onChange={(e) => setSplitView(e.target.checked)}
+                  className="toggle toggle-xs toggle-primary"
                 />
               </div>
             </div>
@@ -249,7 +211,7 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+          <div className="flex items-center justify-center h-full opacity-70 text-sm">
             Select a file to view changes
           </div>
         )}
@@ -367,16 +329,12 @@ function GroupHeader({
   return (
     <div
       className={cn(
-        "group flex items-center gap-1 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-muted/50 transition-colors font-medium",
+        "group flex items-center gap-1 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-base-200 transition-colors font-medium",
       )}
       style={{ paddingLeft: `${depth * 12 + 8}px` }}
     >
       <div className="flex items-center gap-1.5 flex-1 min-w-0" onClick={onToggle}>
-        {isExpanded ? (
-          <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-        ) : (
-          <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-        )}
+        <span className="text-xs opacity-70">{isExpanded ? '▼' : '▶'}</span>
         {icon}
         <span className="truncate">{name}</span>
       </div>
@@ -415,7 +373,7 @@ function VisibilityToggle({
   onClick: (e: React.MouseEvent) => void;
   showOnHover: boolean;
 }) {
-  const Icon = type === 'visible' ? Eye : EyeOff;
+  const icon = type === 'visible' ? '👁️' : '🚫';
   const title = type === 'visible' 
     ? (isActive ? 'Remove visible filter' : 'Show only this branch')
     : (isActive ? 'Remove hide filter' : 'Hide this branch');
@@ -423,17 +381,174 @@ function VisibilityToggle({
   return (
     <button
       className={cn(
-        "p-0.5 rounded hover:bg-muted transition-colors shrink-0 cursor-pointer",
-        isActive && "text-primary",
+        "p-0.5 rounded hover:bg-base-300 transition-colors shrink-0 cursor-pointer text-xs",
+        isActive && "bg-primary/10",
         isInherited && "opacity-50",
         !isActive && !showOnHover && "opacity-0 group-hover:opacity-100"
       )}
       onClick={onClick}
       title={title}
     >
-      <Icon className="h-3 w-3" />
+      {icon}
     </button>
   );
+}
+
+// Custom Context Menu Dropdown
+function ContextMenu({ children, items }: { children: React.ReactNode, items: { label: string, onClick: () => void, danger?: boolean }[] }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const [position, setPosition] = useState({ x: 0, y: 0 });
+    const menuRef = useRef<HTMLUListElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const handleContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Calculate position relative to viewport
+        const x = e.clientX;
+        const y = e.clientY;
+        
+        setPosition({ x, y });
+        setIsOpen(true);
+    };
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleClickOutside = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node) &&
+                containerRef.current && !containerRef.current.contains(e.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setIsOpen(false);
+            }
+        };
+
+        // Use setTimeout to avoid immediate closure
+        setTimeout(() => {
+            document.addEventListener('click', handleClickOutside);
+            document.addEventListener('contextmenu', handleClickOutside);
+            document.addEventListener('keydown', handleEscape);
+        }, 0);
+
+        return () => {
+            document.removeEventListener('click', handleClickOutside);
+            document.removeEventListener('contextmenu', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, [isOpen]);
+
+    // Calculate menu width based on content and adjust position if menu would go off-screen
+    useEffect(() => {
+        if (!isOpen || !menuRef.current) return;
+
+        const menu = menuRef.current;
+        
+        // Use requestAnimationFrame to ensure styles are applied
+        requestAnimationFrame(() => {
+            // Calculate optimal width based on content
+            // Create a temporary element to measure text width
+            const tempElement = document.createElement('div');
+            tempElement.style.position = 'absolute';
+            tempElement.style.visibility = 'hidden';
+            tempElement.style.whiteSpace = 'nowrap';
+            tempElement.style.pointerEvents = 'none';
+            
+            // Copy font styles from menu
+            const menuStyles = window.getComputedStyle(menu);
+            tempElement.style.fontSize = menuStyles.fontSize;
+            tempElement.style.fontFamily = menuStyles.fontFamily;
+            tempElement.style.fontWeight = menuStyles.fontWeight;
+            tempElement.style.padding = '0.5rem 0.75rem'; // Match menu item padding
+            tempElement.style.boxSizing = 'border-box';
+            
+            document.body.appendChild(tempElement);
+
+            let maxWidth = 0;
+            items.forEach(item => {
+                tempElement.textContent = item.label;
+                const width = tempElement.getBoundingClientRect().width;
+                if (width > maxWidth) {
+                    maxWidth = width;
+                }
+            });
+
+            document.body.removeChild(tempElement);
+
+            // Set menu width (add padding: 1rem on each side = 2rem total = 32px)
+            const menuWidth = Math.max(maxWidth + 32, 280); // Minimum 280px, or content width + padding
+            menu.style.width = `${menuWidth}px`;
+            menu.style.minWidth = `${menuWidth}px`;
+
+            // Now adjust position if menu would go off-screen
+            const rect = menu.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const viewportHeight = window.innerHeight;
+
+            let adjustedX = position.x;
+            let adjustedY = position.y;
+
+            // Adjust horizontal position if menu goes off right edge
+            if (rect.right > viewportWidth) {
+                adjustedX = viewportWidth - rect.width - 10;
+            }
+            // Adjust horizontal position if menu goes off left edge
+            if (adjustedX < 10) {
+                adjustedX = 10;
+            }
+
+            // Adjust vertical position if menu goes off bottom edge
+            if (rect.bottom > viewportHeight) {
+                adjustedY = viewportHeight - rect.height - 10;
+            }
+            // Adjust vertical position if menu goes off top edge
+            if (adjustedY < 10) {
+                adjustedY = 10;
+            }
+
+            if (adjustedX !== position.x || adjustedY !== position.y) {
+                menu.style.left = `${adjustedX}px`;
+                menu.style.top = `${adjustedY}px`;
+            }
+        });
+    }, [isOpen, position, items]);
+
+    return (
+        <div ref={containerRef} className="w-full" onContextMenu={handleContextMenu}>
+            {children}
+            {isOpen && (
+                <ul
+                    ref={menuRef}
+                    className="fixed z-[9999] menu p-2 shadow-lg bg-base-100 rounded-box border border-base-200"
+                    style={{
+                        left: `${position.x}px`,
+                        top: `${position.y}px`,
+                    }}
+                >
+                    {items.map((item, idx) => (
+                        <li key={idx}>
+                            <a
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    item.onClick();
+                                    setIsOpen(false);
+                                }}
+                                className={cn(item.danger ? "text-error" : "", "whitespace-nowrap")}
+                            >
+                                {item.label}
+                            </a>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
 }
 
 // Recursive component to render branch tree
@@ -512,17 +627,13 @@ function BranchTreeItem({
             <div key={itemPath}>
               <div
                 className={cn(
-                  "group flex items-center gap-1 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-muted/50 transition-colors text-muted-foreground",
+                  "group flex items-center gap-1 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-base-200 transition-colors opacity-70",
                 )}
                 style={{ paddingLeft: `${depth * 12 + 8}px` }}
               >
                 <div className="flex items-center gap-1 flex-1 min-w-0" onClick={() => onToggleFolder(itemPath)}>
-                  {isExpanded ? (
-                    <ChevronDown className="h-3 w-3 shrink-0" />
-                  ) : (
-                    <ChevronRight className="h-3 w-3 shrink-0" />
-                  )}
-                  <Folder className="h-3 w-3 shrink-0" />
+                  <span className="text-xs opacity-70">{isExpanded ? '▼' : '▶'}</span>
+                  <span className="text-sm">📁</span>
                   <span className="truncate">{child.name}</span>
                 </div>
                 <div className="flex items-center gap-0.5 ml-auto">
@@ -574,13 +685,25 @@ function BranchTreeItem({
         // Render leaf (actual branch)
         const branchTracking = !isRemote && child.fullPath ? trackingInfo?.[child.fullPath] : undefined;
         const hasDivergence = branchTracking && (branchTracking.ahead > 0 || branchTracking.behind > 0);
+
+        const menuItems = [];
+        if (!isCurrent && !isRemote) menuItems.push({ label: "Checkout", onClick: () => onCheckout(child.fullPath!) });
+        if (isRemote) menuItems.push({ label: "Checkout to local...", onClick: () => onCheckoutToLocal(child.fullPath!) });
+        menuItems.push({ label: "Create Branch...", onClick: onCreateBranch });
+        if (!isRemote) menuItems.push({ label: "Rename Branch...", onClick: () => onRenameBranch(child.fullPath!) });
+        if (!isRemote) menuItems.push({ label: "Push to Remote...", onClick: () => onPushToRemote(child.fullPath!) });
+        if (!isRemote) menuItems.push({ label: "Pull from Remote...", onClick: () => onPullFromRemote(child.fullPath!) });
+        if (!isCurrent) menuItems.push({ label: `Rebase ${currentBranch} onto ${child.name}`, onClick: () => onRebase(child.fullPath!) });
+        if (!isCurrent) menuItems.push({ label: `Merge ${child.name} into ${currentBranch}`, onClick: () => onMerge(child.fullPath!) });
+        if (!isCurrent) menuItems.push({ label: isRemote ? "Delete Remote Branch..." : "Delete Branch...", onClick: () => onDeleteBranch(child.fullPath!), danger: true });
+
+
         return (
-          <ContextMenu key={child.fullPath}>
-            <ContextMenuTrigger>
+          <ContextMenu key={child.fullPath} items={menuItems}>
               <div
                 className={cn(
-                  "group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-muted/50 transition-colors",
-                  isCurrent && "bg-muted font-medium text-primary"
+                  "group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-base-200 transition-colors",
+                  isCurrent && "bg-base-200 font-medium text-primary"
                 )}
                 style={{ paddingLeft: `${depth * 12 + 8}px` }}
               >
@@ -594,25 +717,25 @@ function BranchTreeItem({
                       <span className="w-2 h-2 rounded-full bg-primary" />
                     </span>
                   ) : isRemote ? (
-                    <Globe className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    <span className="text-xs opacity-50">🌐</span>
                   ) : (
-                    <GitBranch className="h-3 w-3 shrink-0 text-muted-foreground" />
+                    <span className="text-xs opacity-50">🔀</span>
                   )}
                   <span className="truncate" title={child.fullPath}>{child.name}</span>
                   {hasDivergence && (
                     <span 
-                      className="flex items-center gap-1 text-xs text-muted-foreground shrink-0"
+                      className="flex items-center gap-1 text-xs opacity-70 shrink-0"
                       title={`${branchTracking.ahead} ahead, ${branchTracking.behind} behind ${branchTracking.upstream}`}
                     >
                       {branchTracking.ahead > 0 && (
-                        <span className="flex items-center">
-                          <ArrowUp className="h-3 w-3" />
+                        <span className="flex items-center gap-0.5 text-xs">
+                          <span>⬆️</span>
                           <span>{branchTracking.ahead}</span>
                         </span>
                       )}
                       {branchTracking.behind > 0 && (
-                        <span className="flex items-center">
-                          <ArrowDown className="h-3 w-3" />
+                        <span className="flex items-center gap-0.5 text-xs">
+                          <span>⬇️</span>
                           <span>{branchTracking.behind}</span>
                         </span>
                       )}
@@ -636,63 +759,6 @@ function BranchTreeItem({
                   />
                 </div>
               </div>
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-              {!isCurrent && !isRemote && (
-                <ContextMenuItem
-                  onSelect={() => onCheckout(child.fullPath!)}
-                >
-                  Checkout
-                </ContextMenuItem>
-              )}
-              {isRemote && (
-                <ContextMenuItem
-                  onSelect={() => onCheckoutToLocal(child.fullPath!)}
-                >
-                  Checkout to local...
-                </ContextMenuItem>
-              )}
-              <ContextMenuItem onSelect={onCreateBranch}>
-                Create Branch...
-              </ContextMenuItem>
-              {!isRemote && (
-                <ContextMenuItem onSelect={() => onRenameBranch(child.fullPath!)}>
-                  Rename Branch...
-                </ContextMenuItem>
-              )}
-              {!isRemote && (
-                <ContextMenuItem onSelect={() => onPushToRemote(child.fullPath!)}>
-                  Push to Remote...
-                </ContextMenuItem>
-              )}
-              {!isRemote && (
-                <ContextMenuItem onSelect={() => onPullFromRemote(child.fullPath!)}>
-                  Pull from Remote...
-                </ContextMenuItem>
-              )}
-              {!isCurrent && (
-                <ContextMenuItem
-                  onSelect={() => onRebase(child.fullPath!)}
-                >
-                  Rebase {currentBranch} onto {child.name}
-                </ContextMenuItem>
-              )}
-              {!isCurrent && (
-                <ContextMenuItem
-                  onSelect={() => onMerge(child.fullPath!)}
-                >
-                  Merge {child.name} into {currentBranch}
-                </ContextMenuItem>
-              )}
-              {!isCurrent && (
-                <ContextMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onSelect={() => onDeleteBranch(child.fullPath!)}
-                >
-                  {isRemote ? 'Delete Remote Branch...' : 'Delete Branch...'}
-                </ContextMenuItem>
-              )}
-            </ContextMenuContent>
           </ContextMenu>
         );
       })}
@@ -1119,12 +1185,6 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const MAX_AUTO_FETCH_LIMIT = 5000;
   
   useEffect(() => {
-    // Only auto-fetch if:
-    // 1. Visibility filters are active
-    // 2. We have fewer filtered commits than the minimum threshold
-    // 3. We're not already fetching
-    // 4. We haven't hit the max limit
-    // 5. There might be more commits to fetch (raw count >= current limit)
     if (
       hasVisibilityFilters &&
       filteredCommits.length < MIN_FILTERED_COMMITS &&
@@ -1702,48 +1762,45 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   };
 
   if (isLoading && limit === 100) {
-    return <div className="flex items-center justify-center p-8 h-full"><Loader2 className="animate-spin text-muted-foreground" /></div>;
+    return <div className="flex items-center justify-center p-8 h-full"><span className="loading loading-spinner text-base-content/50"></span></div>;
   }
 
   if (isError) {
     return (
       <div className="flex items-center justify-center p-8 h-full flex-col gap-4">
-        <p className="text-destructive font-medium">Error Loading History</p>
-        <p className="text-sm text-muted-foreground">{(error as Error)?.message || 'An unknown error occurred'}</p>
-        <Button onClick={() => refetch()} variant="outline">
-            <RefreshCcw className="w-4 h-4 mr-2" />
-            Try Again
-        </Button>
+        <p className="text-error font-medium">Error Loading History</p>
+        <p className="text-sm opacity-70">{(error as Error)?.message || 'An unknown error occurred'}</p>
+        <button onClick={() => refetch()} className="btn btn-outline btn-sm">
+            🔄 Try Again
+        </button>
       </div>
     );
   }
 
-  if (!log) return <div className="flex items-center justify-center p-8 h-full text-muted-foreground">No history data available</div>;
+  if (!log) return <div className="flex items-center justify-center p-8 h-full opacity-70">No history data available</div>;
 
   return (
     <div className="flex h-full overflow-hidden">
       {/* Branch Sidebar */}
-      <div className="w-64 flex flex-col border-r bg-muted/10">
-        <div className="p-4 border-b flex items-center justify-between bg-background h-[57px]">
-          <h1 className="font-semibold text-lg">Branches</h1>
+      <div className="w-64 flex flex-col border-r border-base-300 bg-base-200/30">
+        <div className="p-4 border-b border-base-300 flex items-center justify-between bg-base-100 h-[57px]">
+          <h1 className="font-bold text-lg">Branches</h1>
           <div className="flex items-center gap-1">
             {hasVisibilityFilters && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-6 w-6 cursor-pointer" 
+              <button
+                className="btn btn-ghost btn-xs btn-square"
                 onClick={handleClearAllFilters} 
                 title="Clear all filters"
               >
-                <FilterX className="h-4 w-4" />
-              </Button>
+                ✖️
+              </button>
             )}
-            <Button variant="ghost" size="icon" className="h-6 w-6 cursor-pointer" onClick={() => setIsCreateBranchOpen(true)} title="Create Branch">
-              <Plus className="h-4 w-4" />
-            </Button>
+            <button className="btn btn-ghost btn-xs btn-square" onClick={() => setIsCreateBranchOpen(true)} title="Create Branch">
+              ➕
+            </button>
           </div>
         </div>
-        <ScrollArea className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto">
           <div className="p-2 space-y-0.5">
             {/* Local Branches Group */}
             {localBranchTree && (
@@ -1751,7 +1808,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 <GroupHeader
                   name="Branches"
                   groupPath="__local__"
-                  icon={<GitBranch className="h-3.5 w-3.5 shrink-0" />}
+                  icon={<span className="text-xs">🔀</span>}
                   isExpanded={localGroupExpanded}
                   onToggle={handleToggleLocalGroup}
                   visibilityMap={visibilityMap}
@@ -1786,27 +1843,20 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             {/* Remote Branches Group */}
             {(hasRemotes || isBranchesLoading) && (
               <>
-                <ContextMenu>
-                  <ContextMenuTrigger>
+                <ContextMenu items={[{ label: "Fetch from all remotes", onClick: handleFetchFromAllRemotes }]}>
                     <GroupHeader
                       name="Remotes"
                       groupPath="__remotes__"
-                      icon={<Globe className="h-3.5 w-3.5 shrink-0" />}
+                      icon={<span className="text-xs">🌐</span>}
                       isExpanded={remotesGroupExpanded}
                       onToggle={handleToggleRemotesGroup}
                       visibilityMap={visibilityMap}
                       onToggleVisibility={handleToggleVisibility}
                     />
-                  </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    <ContextMenuItem onSelect={handleFetchFromAllRemotes}>
-                      Fetch from all remotes
-                    </ContextMenuItem>
-                  </ContextMenuContent>
                 </ContextMenu>
                 {remotesGroupExpanded && isBranchesLoading && !remoteBranchTrees && (
-                  <div className="flex items-center gap-2 px-2 py-2 text-sm text-muted-foreground" style={{ paddingLeft: '20px' }}>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <div className="flex items-center gap-2 px-2 py-2 text-sm opacity-70" style={{ paddingLeft: '20px' }}>
+                    <span className="loading loading-spinner loading-xs"></span>
                     <span>Loading remotes...</span>
                   </div>
                 )}
@@ -1816,25 +1866,18 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   
                   return (
                     <div key={remoteName}>
-                      <ContextMenu>
-                        <ContextMenuTrigger>
+                        <ContextMenu items={[{ label: `Fetch from ${remoteName}`, onClick: () => handleFetchFromRemote(remoteName) }]}>
                           <GroupHeader
                             name={remoteName}
                             groupPath={remoteGroupPath}
-                            icon={<Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                            icon={<span className="text-xs opacity-50">🌐</span>}
                             isExpanded={isRemoteExpanded}
                             onToggle={() => toggleFolder(remoteGroupPath)}
                             visibilityMap={visibilityMap}
                             onToggleVisibility={handleToggleVisibility}
                             depth={1}
                           />
-                        </ContextMenuTrigger>
-                        <ContextMenuContent>
-                          <ContextMenuItem onSelect={() => handleFetchFromRemote(remoteName)}>
-                            Fetch from {remoteName}
-                          </ContextMenuItem>
-                        </ContextMenuContent>
-                      </ContextMenu>
+                        </ContextMenu>
                       {isRemoteExpanded && (
                         <BranchTreeItem
                           node={tree}
@@ -1865,578 +1908,376 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               </>
             )}
           </div>
-        </ScrollArea>
+        </div>
       </div>
 
-      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Branch</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete the branch <span className="font-semibold text-foreground">{branchToDelete}</span>?
+      {isDeleteOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Delete Branch</h3>
+            <p className="py-4">
+              Are you sure you want to delete the branch <span className="font-bold">{branchToDelete}</span>?
               This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          
-          {branchToDelete && !branchToDelete.startsWith('remotes/') && branchData?.trackingInfo?.[branchToDelete] && (
-            <div className="flex items-center space-x-2 py-2">
-              <Checkbox 
-                id="delete-remote-branch" 
-                checked={deleteRemoteBranch}
-                onCheckedChange={(checked) => setDeleteRemoteBranch(checked === true)}
-                disabled={isDeleting}
-              />
-              <Label htmlFor="delete-remote-branch" className="text-sm font-normal cursor-pointer">
-                Delete tracking remote branch <span className="font-mono text-muted-foreground">{branchData.trackingInfo[branchToDelete].upstream}</span>
-              </Label>
+            </p>
+            {branchToDelete && !branchToDelete.startsWith('remotes/') && branchData?.trackingInfo?.[branchToDelete] && (
+                <div className="form-control">
+                <label className="label cursor-pointer justify-start gap-2">
+                    <input type="checkbox" className="checkbox checkbox-sm" checked={deleteRemoteBranch} onChange={(e) => setDeleteRemoteBranch(e.target.checked)} disabled={isDeleting} />
+                    <span className="label-text">Delete tracking remote branch <span className="font-mono opacity-70">{branchData.trackingInfo[branchToDelete].upstream}</span></span>
+                </label>
+                </div>
+            )}
+            <div className="modal-action">
+              <button className="btn" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>Cancel</button>
+              <button className="btn btn-error" onClick={handleDeleteBranch} disabled={isDeleting}>
+                {isDeleting && <span className="loading loading-spinner loading-xs"></span>}
+                Delete
+              </button>
             </div>
-          )}
-
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); handleDeleteBranch(); }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={isDeleting}
-            >
-              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Delete'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <Dialog open={isRenameOpen} onOpenChange={setIsRenameOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rename Branch</DialogTitle>
-            <DialogDescription>
-              Enter a new name for the branch <span className="font-semibold text-foreground">{branchToRename}</span>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <Input
-              value={newBranchNameForRename}
-              onChange={e => setNewBranchNameForRename(sanitizeBranchName(e.target.value))}
-              placeholder="New branch name"
-              disabled={isRenaming}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && newBranchNameForRename && newBranchNameForRename !== branchToRename && !isRenaming) {
-                  handleRenameBranch();
-                }
-              }}
-            />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRenameOpen(false)} disabled={isRenaming}>Cancel</Button>
-            <Button 
-              onClick={handleRenameBranch} 
-              disabled={!newBranchNameForRename || newBranchNameForRename === branchToRename || isRenaming}
-            >
-              {isRenaming ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Rename'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={() => setIsDeleteOpen(false)}>close</button>
+          </form>
+        </dialog>
+      )}
 
-      <Dialog open={isRebaseOpen} onOpenChange={setIsRebaseOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Rebase</DialogTitle>
-            <DialogDescription asChild>
-              <div className="space-y-2">
-                <p>Copy commits from one branch to another.</p>
-                <p>Are you sure to rebase <span className="font-semibold text-foreground">{branchData?.current}</span> onto <span className="font-semibold text-foreground">{rebaseTargetBranch}</span>?</p>
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="stash-changes" 
-                checked={rebaseStashChanges}
-                onCheckedChange={(checked) => setRebaseStashChanges(checked === true)}
-                disabled={isRebasing}
-              />
-              <Label htmlFor="stash-changes" className="text-sm font-normal cursor-pointer">
-                Stash and reapply local changes
-              </Label>
+      {isRenameOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Rename Branch</h3>
+            <p className="py-4">Enter a new name for the branch <span className="font-bold">{branchToRename}</span>.</p>
+            <input
+                type="text"
+                className="input input-bordered w-full"
+                value={newBranchNameForRename}
+                onChange={e => setNewBranchNameForRename(sanitizeBranchName(e.target.value))}
+                placeholder="New branch name"
+                disabled={isRenaming}
+                onKeyDown={e => {
+                    if (e.key === 'Enter' && newBranchNameForRename && newBranchNameForRename !== branchToRename && !isRenaming) {
+                        handleRenameBranch();
+                    }
+                }}
+            />
+            <div className="modal-action">
+              <button className="btn" onClick={() => setIsRenameOpen(false)} disabled={isRenaming}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleRenameBranch} disabled={!newBranchNameForRename || newBranchNameForRename === branchToRename || isRenaming}>
+                {isRenaming && <span className="loading loading-spinner loading-xs"></span>}
+                Rename
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={() => setIsRenameOpen(false)}>close</button>
+          </form>
+        </dialog>
+      )}
+
+      {isRebaseOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Rebase</h3>
+            <p className="py-4">
+                Copy commits from one branch to another.<br/>
+                Are you sure to rebase <span className="font-bold">{branchData?.current}</span> onto <span className="font-bold">{rebaseTargetBranch}</span>?
+            </p>
+            <div className="form-control">
+                <label className="label cursor-pointer justify-start gap-2">
+                    <input type="checkbox" className="checkbox checkbox-sm" checked={rebaseStashChanges} onChange={(e) => setRebaseStashChanges(e.target.checked)} disabled={isRebasing} />
+                    <span className="label-text">Stash and reapply local changes</span>
+                </label>
             </div>
             {!rebaseStashChanges && (
-              <p className="text-xs text-muted-foreground mt-2 ml-6">
+              <p className="text-xs text-warning mt-2 ml-6">
                 Warning: All local changes will be discarded.
               </p>
             )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsRebaseOpen(false)} disabled={isRebasing}>Cancel</Button>
-            <Button onClick={handleRebase} disabled={isRebasing}>
-              {isRebasing ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isMergeOpen} onOpenChange={setIsMergeOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Merge</DialogTitle>
-            <DialogDescription asChild>
-              <div className="space-y-2">
-                <p>Merge branch into another one.</p>
-                <p>Are you sure to merge <span className="font-semibold text-foreground">{mergeTargetBranch}</span> into <span className="font-semibold text-foreground">{branchData?.current}</span>?</p>
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2 space-y-3">
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="rebase-before-merge" 
-                checked={mergeRebaseBeforeMerge}
-                onCheckedChange={(checked) => setMergeRebaseBeforeMerge(checked === true)}
-                disabled={isMerging}
-              />
-              <Label htmlFor="rebase-before-merge" className="text-sm font-normal cursor-pointer">
-                Rebase before merge
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="squash-before-merge" 
-                checked={mergeSquash}
-                onCheckedChange={(checked) => setMergeSquash(checked === true)}
-                disabled={isMerging}
-              />
-              <Label htmlFor="squash-before-merge" className="text-sm font-normal cursor-pointer">
-                Squash before merge
-              </Label>
-            </div>
-            {mergeSquash && (
-              <div className="ml-6">
-                <Textarea
-                  placeholder="Commit message for squash merge"
-                  value={mergeSquashMessage}
-                  onChange={(e) => setMergeSquashMessage(e.target.value)}
-                  disabled={isMerging}
-                  className="min-h-20"
-                />
-              </div>
-            )}
-            <div className="flex items-center space-x-2">
-              <Checkbox 
-                id="fast-forward-merge" 
-                checked={mergeFastForward}
-                onCheckedChange={(checked) => setMergeFastForward(checked === true)}
-                disabled={isMerging}
-              />
-              <Label htmlFor="fast-forward-merge" className="text-sm font-normal cursor-pointer">
-                Fast forward merge
-              </Label>
+            <div className="modal-action">
+              <button className="btn" onClick={() => setIsRebaseOpen(false)} disabled={isRebasing}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleRebase} disabled={isRebasing}>
+                {isRebasing && <span className="loading loading-spinner loading-xs"></span>}
+                Confirm
+              </button>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsMergeOpen(false)} disabled={isMerging}>Cancel</Button>
-            <Button onClick={handleMerge} disabled={isMerging}>
-              {isMerging ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={() => setIsRebaseOpen(false)}>close</button>
+          </form>
+        </dialog>
+      )}
 
-      <Dialog open={isPushOpen} onOpenChange={setIsPushOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Push to Remote</DialogTitle>
-            <DialogDescription>
-              Push <span className="font-semibold text-foreground">{pushBranch}</span> to a remote repository.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {pushError && pushRemotes.length === 0 ? (
-            // Error state when no remotes
-            <div className="py-4">
-              <div className="flex items-start gap-3 p-4 rounded-md bg-destructive/10 border border-destructive/20">
-                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-destructive">Error</p>
-                  <p className="text-sm text-muted-foreground">{pushError}</p>
+      {isMergeOpen && (
+        <dialog className="modal modal-open">
+            <div className="modal-box">
+                <h3 className="font-bold text-lg">Merge</h3>
+                <p className="py-4">
+                    Merge branch into another one.<br/>
+                    Are you sure to merge <span className="font-bold">{branchData?.current}</span> into <span className="font-bold">{mergeTargetBranch}</span>?
+                </p>
+                <div className="form-control">
+                    <label className="label cursor-pointer justify-start gap-2">
+                        <input type="checkbox" className="checkbox checkbox-sm" checked={mergeRebaseBeforeMerge} onChange={(e) => setMergeRebaseBeforeMerge(e.target.checked)} disabled={isMerging} />
+                        <span className="label-text">Rebase before merge</span>
+                    </label>
                 </div>
-              </div>
-            </div>
-          ) : pushLoadingRemotes ? (
-            // Loading state
-            <div className="py-8 flex items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            // Normal state with remotes
-            <div className="py-2 space-y-4">
-              {/* Remote selection */}
-              <div className="space-y-2">
-                <Label htmlFor="push-remote" className="text-sm font-medium">Remote Repository</Label>
-                <Select
-                  value={pushSelectedRemote}
-                  onValueChange={handlePushRemoteChange}
-                  disabled={isPushing}
-                >
-                  <SelectTrigger id="push-remote">
-                    <SelectValue placeholder="Select remote" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pushRemotes.map((remote) => (
-                      <SelectItem key={remote} value={remote}>
-                        {remote}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {/* Remote branch selection */}
-              <div className="space-y-2">
-                <Label htmlFor="push-remote-branch" className="text-sm font-medium">Remote Branch</Label>
-                {pushLoadingBranches ? (
-                  <div className="flex items-center gap-2 h-9 px-3 border rounded-md bg-muted/50">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Loading branches...</span>
-                  </div>
-                ) : (
-                  <Select
-                    value={pushSelectedRemoteBranch}
-                    onValueChange={setPushSelectedRemoteBranch}
-                    disabled={isPushing}
-                  >
-                    <SelectTrigger id="push-remote-branch">
-                      <SelectValue placeholder="Select or create branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {/* Show the local branch name as an option if it doesn't exist on remote */}
-                      {pushBranch && !pushRemoteBranches.includes(pushBranch) && (
-                        <SelectItem value={pushBranch}>
-                          {pushBranch} (new)
-                        </SelectItem>
-                      )}
-                      {pushRemoteBranches.map((branch) => (
-                        <SelectItem key={branch} value={branch}>
-                          {branch}
-                          {pushTrackingBranch?.remote === pushSelectedRemote && 
-                           pushTrackingBranch?.branch === branch && 
-                           ' (tracking)'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                
-                {/* Info message about new branch creation */}
-                {pushSelectedRemoteBranch && !pushRemoteBranches.includes(pushSelectedRemoteBranch) && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <AlertCircle className="h-3 w-3" />
-                    A new remote branch <span className="font-medium">{pushSelectedRemoteBranch}</span> will be created and tracked by <span className="font-medium">{pushBranch}</span>.
-                  </p>
-                )}
-              </div>
-              
-              {/* Options */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="push-rebase-first" 
-                    checked={pushRebaseFirst}
-                    onCheckedChange={(checked) => setPushRebaseFirst(checked === true)}
-                    disabled={isPushing}
-                  />
-                  <Label htmlFor="push-rebase-first" className="text-sm font-normal cursor-pointer">
-                    Rebase onto remote branch before pushing
-                  </Label>
+                <div className="form-control">
+                    <label className="label cursor-pointer justify-start gap-2">
+                        <input type="checkbox" className="checkbox checkbox-sm" checked={mergeSquash} onChange={(e) => setMergeSquash(e.target.checked)} disabled={isMerging} />
+                        <span className="label-text">Squash before merge</span>
+                    </label>
                 </div>
-                {!pushRebaseFirst && (
-                  <p className="text-xs text-muted-foreground ml-6">
-                    Remote branch will be merged into local branch first, then pushed.
-                  </p>
-                )}
-                
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="push-force" 
-                    checked={pushForcePush}
-                    onCheckedChange={(checked) => setPushForcePush(checked === true)}
-                    disabled={isPushing}
-                  />
-                  <Label htmlFor="push-force" className="text-sm font-normal cursor-pointer">
-                    Force push
-                  </Label>
-                </div>
-                {pushForcePush && (
-                  <p className="text-xs text-destructive ml-6">
-                    Warning: Force push will overwrite remote history. Use with caution.
-                  </p>
-                )}
-
-                <div className="flex items-center space-x-2 pt-2 border-t mt-2">
-                  <Checkbox 
-                    id="push-squash" 
-                    checked={pushSquash}
-                    onCheckedChange={(checked) => setPushSquash(checked === true)}
-                    disabled={isPushing}
-                  />
-                  <Label htmlFor="push-squash" className="text-sm font-normal cursor-pointer">
-                    Squash local commits before push
-                  </Label>
-                </div>
-                {pushSquash && (
-                  <div className="ml-6 space-y-2">
-                    <p className="text-xs text-muted-foreground">
-                      All local commits will be combined into one.
-                    </p>
-                    <Textarea
-                      placeholder="Commit message for squash"
-                      value={pushSquashMessage}
-                      onChange={(e) => setPushSquashMessage(e.target.value)}
-                      disabled={isPushing}
-                      className="min-h-[80px]"
+                {mergeSquash && (
+                    <textarea
+                        className="textarea textarea-bordered w-full mt-2"
+                        placeholder="Commit message for squash merge"
+                        value={mergeSquashMessage}
+                        onChange={(e) => setMergeSquashMessage(e.target.value)}
+                        disabled={isMerging}
                     />
-                  </div>
                 )}
-              </div>
-              
-              {/* Error message during push */}
-              {pushError && (
-                <div className="flex items-start gap-3 p-3 rounded-md bg-destructive/10 border border-destructive/20">
-                  <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                  <p className="text-sm text-destructive">{pushError}</p>
+                <div className="form-control">
+                    <label className="label cursor-pointer justify-start gap-2">
+                        <input type="checkbox" className="checkbox checkbox-sm" checked={mergeFastForward} onChange={(e) => setMergeFastForward(e.target.checked)} disabled={isMerging} />
+                        <span className="label-text">Fast forward merge</span>
+                    </label>
                 </div>
-              )}
+                <div className="modal-action">
+                    <button className="btn" onClick={() => setIsMergeOpen(false)} disabled={isMerging}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleMerge} disabled={isMerging}>
+                        {isMerging && <span className="loading loading-spinner loading-xs"></span>}
+                        Confirm
+                    </button>
+                </div>
             </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPushOpen(false)} disabled={isPushing}>
-              Cancel
-            </Button>
-            {pushRemotes.length > 0 && (
-              <Button 
-                onClick={handlePushToRemote} 
-                disabled={isPushing || !pushSelectedRemote || !pushSelectedRemoteBranch}
-              >
-                {isPushing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
-                Push
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <form method="dialog" className="modal-backdrop">
+                <button onClick={() => setIsMergeOpen(false)}>close</button>
+            </form>
+        </dialog>
+      )}
 
-      <Dialog open={isPullOpen} onOpenChange={setIsPullOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Pull from Remote</DialogTitle>
-            <DialogDescription>
-              Pull changes from a remote branch into <span className="font-semibold text-foreground">{pullBranch}</span>.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {pullError && pullRemotes.length === 0 ? (
-            // Error state when no remotes
-            <div className="py-4">
-              <div className="flex items-start gap-3 p-4 rounded-md bg-destructive/10 border border-destructive/20">
-                <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-destructive">Error</p>
-                  <p className="text-sm text-muted-foreground">{pullError}</p>
-                </div>
-              </div>
-            </div>
-          ) : pullLoadingRemotes ? (
-            // Loading state
-            <div className="py-8 flex items-center justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            // Normal state with remotes
-            <div className="py-2 space-y-4">
-              {/* Remote selection */}
-              <div className="space-y-2">
-                <Label htmlFor="pull-remote" className="text-sm font-medium">Remote Repository</Label>
-                <Select
-                  value={pullSelectedRemote}
-                  onValueChange={handlePullRemoteChange}
-                  disabled={isPulling}
-                >
-                  <SelectTrigger id="pull-remote">
-                    <SelectValue placeholder="Select remote" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {pullRemotes.map((remote) => (
-                      <SelectItem key={remote} value={remote}>
-                        {remote}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              {/* Remote branch selection */}
-              <div className="space-y-2">
-                <Label htmlFor="pull-remote-branch" className="text-sm font-medium">Remote Branch</Label>
-                {pullLoadingBranches ? (
-                  <div className="flex items-center gap-2 h-9 px-3 border rounded-md bg-muted/50">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm text-muted-foreground">Loading branches...</span>
-                  </div>
+      {isPushOpen && (
+        <dialog className="modal modal-open">
+            <div className="modal-box">
+                <h3 className="font-bold text-lg">Push to Remote</h3>
+                <p className="py-4">Push <span className="font-bold">{pushBranch}</span> to a remote repository.</p>
+
+                {pushError && pushRemotes.length === 0 ? (
+                    <div className="alert alert-error">
+                        <span className="text-xl">⚠️</span>
+                        <span>{pushError}</span>
+                    </div>
+                ) : pushLoadingRemotes ? (
+                    <div className="flex justify-center py-8">
+                        <span className="loading loading-spinner loading-lg"></span>
+                    </div>
                 ) : (
-                  <Select
-                    value={pullSelectedRemoteBranch}
-                    onValueChange={setPullSelectedRemoteBranch}
-                    disabled={isPulling}
-                  >
-                    <SelectTrigger id="pull-remote-branch">
-                      <SelectValue placeholder="Select branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {pullRemoteBranches.map((branch) => (
-                        <SelectItem key={branch} value={branch}>
-                          {branch}
-                          {pullTrackingBranch?.remote === pullSelectedRemote && 
-                           pullTrackingBranch?.branch === branch && 
-                           ' (tracking)'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <div className="flex flex-col gap-4">
+                        <div className="form-control w-full flex flex-row items-center justify-between gap-4">
+                            <label className="label flex-shrink-0"><span className="label-text">Remote Repository</span></label>
+                            <select className="select select-bordered w-64" value={pushSelectedRemote} onChange={(e) => handlePushRemoteChange(e.target.value)} disabled={isPushing}>
+                                {pushRemotes.map((remote) => <option key={remote} value={remote}>{remote}</option>)}
+                            </select>
+                        </div>
+
+                        <div className="form-control w-full flex flex-row items-center justify-between gap-4">
+                            <label className="label flex-shrink-0"><span className="label-text">Remote Branch</span></label>
+                            <div className="flex flex-col items-end gap-1 w-64">
+                                {pushLoadingBranches ? (
+                                    <div className="flex items-center gap-2 p-3 border rounded-lg bg-base-200 opacity-70 w-full">
+                                        <span className="loading loading-spinner loading-xs"></span> Loading branches...
+                                    </div>
+                                ) : (
+                                    <select className="select select-bordered w-full" value={pushSelectedRemoteBranch} onChange={(e) => setPushSelectedRemoteBranch(e.target.value)} disabled={isPushing}>
+                                        {pushBranch && !pushRemoteBranches.includes(pushBranch) && <option value={pushBranch}>{pushBranch} (new)</option>}
+                                        {pushRemoteBranches.map((branch) => <option key={branch} value={branch}>{branch}{pushTrackingBranch?.remote === pushSelectedRemote && pushTrackingBranch?.branch === branch ? ' (tracking)' : ''}</option>)}
+                                    </select>
+                                )}
+                                {pushSelectedRemoteBranch && !pushRemoteBranches.includes(pushSelectedRemoteBranch) && (
+                                    <div className="label"><span className="label-text-alt text-warning">New branch will be created</span></div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="form-control">
+                            <label className="label cursor-pointer justify-start gap-2">
+                                <input type="checkbox" className="checkbox checkbox-sm" checked={pushRebaseFirst} onChange={(e) => setPushRebaseFirst(e.target.checked)} disabled={isPushing} />
+                                <span className="label-text">Rebase onto remote branch before pushing</span>
+                            </label>
+                        </div>
+
+                        <div className="form-control">
+                            <label className="label cursor-pointer justify-start gap-2">
+                                <input type="checkbox" className="checkbox checkbox-sm checkbox-error" checked={pushForcePush} onChange={(e) => setPushForcePush(e.target.checked)} disabled={isPushing} />
+                                <span className="label-text text-error">Force push</span>
+                            </label>
+                        </div>
+
+                        <div className="form-control">
+                            <label className="label cursor-pointer justify-start gap-2">
+                                <input type="checkbox" className="checkbox checkbox-sm" checked={pushSquash} onChange={(e) => setPushSquash(e.target.checked)} disabled={isPushing} />
+                                <span className="label-text">Squash local commits before push</span>
+                            </label>
+                        </div>
+                        {pushSquash && (
+                            <textarea className="textarea textarea-bordered w-full" placeholder="Commit message for squash" value={pushSquashMessage} onChange={(e) => setPushSquashMessage(e.target.value)} disabled={isPushing} />
+                        )}
+
+                        {pushError && (
+                            <div className="alert alert-error text-sm">
+                                <span>{pushError}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                <div className="modal-action">
+                    <button className="btn" onClick={() => setIsPushOpen(false)} disabled={isPushing}>Cancel</button>
+                    {pushRemotes.length > 0 && (
+                        <button className="btn btn-primary" onClick={handlePushToRemote} disabled={isPushing || !pushSelectedRemote || !pushSelectedRemoteBranch}>
+                            {isPushing && <span className="loading loading-spinner loading-xs"></span>} Push
+                        </button>
+                    )}
+                </div>
+            </div>
+            <form method="dialog" className="modal-backdrop">
+                <button onClick={() => setIsPushOpen(false)}>close</button>
+            </form>
+        </dialog>
+      )}
+
+      {isPullOpen && (
+        <dialog className="modal modal-open">
+            <div className="modal-box">
+                <h3 className="font-bold text-lg">Pull from Remote</h3>
+                <p className="py-4">Pull changes from a remote branch into <span className="font-bold">{pullBranch}</span>.</p>
+
+                {pullError && pullRemotes.length === 0 ? (
+                    <div className="alert alert-error"><span>{pullError}</span></div>
+                ) : pullLoadingRemotes ? (
+                    <div className="flex justify-center py-8"><span className="loading loading-spinner loading-lg"></span></div>
+                ) : (
+                    <div className="flex flex-col gap-4">
+                        <div className="form-control w-full flex flex-row items-center justify-between gap-4">
+                            <label className="label flex-shrink-0"><span className="label-text">Remote Repository</span></label>
+                            <select className="select select-bordered w-64" value={pullSelectedRemote} onChange={(e) => handlePullRemoteChange(e.target.value)} disabled={isPulling}>
+                                {pullRemotes.map((remote) => <option key={remote} value={remote}>{remote}</option>)}
+                            </select>
+                        </div>
+
+                        <div className="form-control w-full flex flex-row items-center justify-between gap-4">
+                            <label className="label flex-shrink-0"><span className="label-text">Remote Branch</span></label>
+                            {pullLoadingBranches ? (
+                                <div className="flex items-center gap-2 p-3 border rounded-lg bg-base-200 opacity-70 w-64">
+                                    <span className="loading loading-spinner loading-xs"></span> Loading branches...
+                                </div>
+                            ) : (
+                                <select className="select select-bordered w-64" value={pullSelectedRemoteBranch} onChange={(e) => setPullSelectedRemoteBranch(e.target.value)} disabled={isPulling}>
+                                    {pullRemoteBranches.map((branch) => <option key={branch} value={branch}>{branch}{pullTrackingBranch?.remote === pullSelectedRemote && pullTrackingBranch?.branch === branch ? ' (tracking)' : ''}</option>)}
+                                </select>
+                            )}
+                        </div>
+
+                        <div className="form-control">
+                            <label className="label cursor-pointer justify-start gap-2">
+                                <input type="checkbox" className="checkbox checkbox-sm" checked={pullRebase} onChange={(e) => setPullRebase(e.target.checked)} disabled={isPulling} />
+                                <span className="label-text">Rebase onto remote branch</span>
+                            </label>
+                        </div>
+
+                        {pullError && <div className="alert alert-error text-sm"><span>{pullError}</span></div>}
+                    </div>
                 )}
                 
-                {/* Error message when no tracking branch is selected */}
-                {!pullLoadingBranches && pullRemoteBranches.length > 0 && !pullSelectedRemoteBranch && (
-                  <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 border border-destructive/20">
-                    <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                    <p className="text-sm text-destructive">
-                      Branch <span className="font-medium">{pullBranch}</span> has no tracking remote branch on <span className="font-medium">{pullSelectedRemote}</span>. Please select a remote branch to pull from.
-                    </p>
-                  </div>
-                )}
-              </div>
-              
-              {/* Options */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="pull-rebase" 
-                    checked={pullRebase}
-                    onCheckedChange={(checked) => setPullRebase(checked === true)}
-                    disabled={isPulling}
-                  />
-                  <Label htmlFor="pull-rebase" className="text-sm font-normal cursor-pointer">
-                    Rebase onto remote branch
-                  </Label>
+                <div className="modal-action">
+                    <button className="btn" onClick={() => setIsPullOpen(false)} disabled={isPulling}>Cancel</button>
+                    {pullRemotes.length > 0 && (
+                        <button className="btn btn-primary" onClick={handlePullFromRemote} disabled={isPulling || !pullSelectedRemote || !pullSelectedRemoteBranch}>
+                            {isPulling && <span className="loading loading-spinner loading-xs"></span>} Pull
+                        </button>
+                    )}
                 </div>
-                {!pullRebase && (
-                  <p className="text-xs text-muted-foreground ml-6">
-                    Remote branch will be merged into local branch instead.
-                  </p>
-                )}
-              </div>
-              
-              {/* Error message during pull */}
-              {pullError && (
-                <div className="flex items-start gap-3 p-3 rounded-md bg-destructive/10 border border-destructive/20">
-                  <AlertCircle className="h-4 w-4 text-destructive shrink-0 mt-0.5" />
-                  <p className="text-sm text-destructive">{pullError}</p>
-                </div>
-              )}
             </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPullOpen(false)} disabled={isPulling}>
-              Cancel
-            </Button>
-            {pullRemotes.length > 0 && (
-              <Button 
-                onClick={handlePullFromRemote} 
-                disabled={isPulling || !pullSelectedRemote || !pullSelectedRemoteBranch}
-              >
-                {isPulling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ArrowDown className="h-4 w-4 mr-2" />}
-                Pull
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <form method="dialog" className="modal-backdrop">
+                <button onClick={() => setIsPullOpen(false)}>close</button>
+            </form>
+        </dialog>
+      )}
 
-      <Dialog open={iscreateBranchOpen} onOpenChange={setIsCreateBranchOpen}>
+      {iscreateBranchOpen && (
+        <dialog className="modal modal-open">
+            <div className="modal-box">
+                <h3 className="font-bold text-lg">Create New Branch</h3>
+                <p className="py-4">Create a new branch from the current HEAD.</p>
+                <input
+                    type="text"
+                    className="input input-bordered w-full"
+                    value={newBranchName}
+                    onChange={e => setNewBranchName(sanitizeBranchName(e.target.value))}
+                    placeholder="Branch name"
+                    disabled={isCreating}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter' && newBranchName && !isCreating) {
+                            handleCreateBranch();
+                        }
+                    }}
+                />
+                <div className="modal-action">
+                    <button className="btn" onClick={() => setIsCreateBranchOpen(false)} disabled={isCreating}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleCreateBranch} disabled={!newBranchName || isCreating}>
+                        {isCreating && <span className="loading loading-spinner loading-xs"></span>} Create & Checkout
+                    </button>
+                </div>
+            </div>
+            <form method="dialog" className="modal-backdrop">
+                <button onClick={() => setIsCreateBranchOpen(false)}>close</button>
+            </form>
+        </dialog>
+      )}
 
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Branch</DialogTitle>
-            <DialogDescription>
-              Create a new branch from the current HEAD.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <Input
-              value={newBranchName}
-              onChange={e => setNewBranchName(sanitizeBranchName(e.target.value))}
-              placeholder="Branch name"
-              disabled={isCreating}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && newBranchName && !isCreating) {
-                  handleCreateBranch();
-                }
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateBranchOpen(false)} disabled={isCreating}>Cancel</Button>
-            <Button onClick={handleCreateBranch} disabled={!newBranchName || isCreating}>
-              {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create & Checkout'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isCheckoutToLocalOpen} onOpenChange={setIsCheckoutToLocalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Checkout to Local Branch</DialogTitle>
-            <DialogDescription>
-              Create a local branch from <span className="font-semibold text-foreground">{checkoutRemoteBranch?.replace(/^remotes\//, '')}</span> and set up tracking.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-2">
-            <Label htmlFor="checkout-local-branch" className="text-sm font-medium">Local Branch Name</Label>
-            <Input
-              id="checkout-local-branch"
-              value={checkoutLocalBranchName}
-              onChange={e => setCheckoutLocalBranchName(sanitizeBranchName(e.target.value))}
-              placeholder="Local branch name"
-              disabled={isCheckingOutToLocal}
-              className="mt-2"
-              onKeyDown={e => {
-                if (e.key === 'Enter' && checkoutLocalBranchName && !isCheckingOutToLocal) {
-                  handleCheckoutToLocal();
-                }
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCheckoutToLocalOpen(false)} disabled={isCheckingOutToLocal}>Cancel</Button>
-            <Button onClick={handleCheckoutToLocal} disabled={!checkoutLocalBranchName || isCheckingOutToLocal}>
-              {isCheckingOutToLocal ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Checkout'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {isCheckoutToLocalOpen && (
+        <dialog className="modal modal-open">
+            <div className="modal-box">
+                <h3 className="font-bold text-lg">Checkout to Local Branch</h3>
+                <p className="py-4">Create a local branch from <span className="font-bold">{checkoutRemoteBranch?.replace(/^remotes\//, '')}</span> and set up tracking.</p>
+                <div className="form-control w-full">
+                    <label className="label"><span className="label-text">Local Branch Name</span></label>
+                    <input
+                        type="text"
+                        className="input input-bordered w-full"
+                        value={checkoutLocalBranchName}
+                        onChange={e => setCheckoutLocalBranchName(sanitizeBranchName(e.target.value))}
+                        placeholder="Local branch name"
+                        disabled={isCheckingOutToLocal}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter' && checkoutLocalBranchName && !isCheckingOutToLocal) {
+                                handleCheckoutToLocal();
+                            }
+                        }}
+                    />
+                </div>
+                <div className="modal-action">
+                    <button className="btn" onClick={() => setIsCheckoutToLocalOpen(false)} disabled={isCheckingOutToLocal}>Cancel</button>
+                    <button className="btn btn-primary" onClick={handleCheckoutToLocal} disabled={!checkoutLocalBranchName || isCheckingOutToLocal}>
+                        {isCheckingOutToLocal && <span className="loading loading-spinner loading-xs"></span>} Checkout
+                    </button>
+                </div>
+            </div>
+            <form method="dialog" className="modal-backdrop">
+                <button onClick={() => setIsCheckoutToLocalOpen(false)}>close</button>
+            </form>
+        </dialog>
+      )}
 
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 bg-background">
-        <div className="h-[57px] flex items-center justify-between px-6 border-b shrink-0">
-          <h1 className="font-semibold text-lg">History</h1>
-          <div className="text-xs text-muted-foreground font-mono">
+      <div className="flex-1 flex flex-col min-w-0 bg-base-100">
+        <div className="h-[57px] flex items-center justify-between px-6 border-b border-base-300 shrink-0">
+          <h1 className="font-bold text-lg">History</h1>
+          <div className="text-xs opacity-50 font-mono">
             {filteredCommits.length !== log.all.length 
               ? `${filteredCommits.length} / ${log.all.length} commits` 
               : `${log.all.length} commits`
-            } {isFetching && <Loader2 className="inline ml-2 h-3 w-3 animate-spin" />}
+            } {isFetching && <span className="loading loading-spinner loading-xs ml-2"></span>}
           </div>
         </div>
 
@@ -2444,7 +2285,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           {/* Show loading spinner while branches are loading if visibility filters are set */}
           {hasVisibilityFilters && isBranchesLoading ? (
             <div className="flex items-center justify-center h-full">
-              <Loader2 className="animate-spin text-muted-foreground" />
+              <span className="loading loading-spinner loading-lg opacity-50"></span>
             </div>
           ) : (
             <GitGraph
@@ -2466,37 +2307,37 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
         {selectedHash && (
           <div 
-            className="flex flex-col overflow-hidden border-t bg-muted/10"
+            className="flex flex-col overflow-hidden border-t border-base-300 bg-base-200/30"
             style={{ height: panelHeight }}
           >
             {/* Resize handle */}
             <div 
               className={cn(
-                "h-1.5 cursor-ns-resize flex items-center justify-center hover:bg-muted/50 transition-colors group shrink-0",
-                isResizing && "bg-muted/50"
+                "h-1.5 cursor-ns-resize flex items-center justify-center hover:bg-base-200 transition-colors group shrink-0",
+                isResizing && "bg-base-200"
               )}
               onMouseDown={handleResizeStart}
             >
-              <GripHorizontal className="h-3 w-3 text-muted-foreground/50 group-hover:text-muted-foreground transition-colors" />
+              <div className="w-8 h-1 rounded-full bg-base-300 group-hover:bg-base-content/20 transition-colors" />
             </div>
 
             {/* Header with commit info and tabs */}
-            <div className="flex flex-row items-center py-2 px-4 border-b bg-background shrink-0 justify-between gap-4">
+            <div className="flex flex-row items-center py-2 px-4 border-b border-base-300 bg-base-100 shrink-0 justify-between gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
-                <span className="text-sm font-semibold truncate">
+                <span className="text-sm font-bold truncate">
                   {log.all.find(c => c.hash === selectedHash)?.message}
                 </span>
-                <span className="text-xs font-mono text-muted-foreground shrink-0">
+                <span className="text-xs font-mono opacity-50 shrink-0">
                   {selectedHash.substring(0, 7)}
                 </span>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   className={cn(
-                    "px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer",
+                    "px-3 py-1 text-xs font-bold rounded-md transition-colors cursor-pointer",
                     activeTab === 'message' 
-                      ? "bg-muted text-foreground" 
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      ? "bg-base-200 text-base-content"
+                      : "text-base-content/50 hover:text-base-content hover:bg-base-200/50"
                   )}
                   onClick={() => setActiveTab('message')}
                 >
@@ -2504,35 +2345,35 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 </button>
                 <button
                   className={cn(
-                    "px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer",
+                    "px-3 py-1 text-xs font-bold rounded-md transition-colors cursor-pointer",
                     activeTab === 'changes' 
-                      ? "bg-muted text-foreground" 
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      ? "bg-base-200 text-base-content"
+                      : "text-base-content/50 hover:text-base-content hover:bg-base-200/50"
                   )}
                   onClick={() => setActiveTab('changes')}
                 >
                   Changes
                 </button>
                 <button
-                  className="ml-2 p-1 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors cursor-pointer"
+                  className="ml-2 btn btn-ghost btn-xs btn-square"
                   onClick={() => setSelectedHash(null)}
                   title="Close"
                 >
-                  <X className="h-4 w-4" />
+                  ✕
                 </button>
               </div>
             </div>
 
             {/* Tab content */}
-            <div className="flex-1 overflow-hidden bg-background">
+            <div className="flex-1 overflow-hidden bg-base-100">
               {activeTab === 'message' ? (
-                <ScrollArea className="h-full">
+                <div className="h-full overflow-auto">
                   <div className="p-4">
-                    <div className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
+                    <div className="text-xs opacity-70 whitespace-pre-wrap font-mono">
                       {log.all.find(c => c.hash === selectedHash)?.body || 'No additional message'}
                     </div>
                   </div>
-                </ScrollArea>
+                </div>
               ) : (
                 <CommitChangesView repoPath={repoPath} commitHash={selectedHash} />
               )}
