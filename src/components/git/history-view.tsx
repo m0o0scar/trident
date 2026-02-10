@@ -2072,28 +2072,30 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                     </div>
                 ) : (
                     <div className="flex flex-col gap-4">
-                        <div className="form-control w-full">
-                            <label className="label"><span className="label-text">Remote Repository</span></label>
-                            <select className="select select-bordered" value={pushSelectedRemote} onChange={(e) => handlePushRemoteChange(e.target.value)} disabled={isPushing}>
+                        <div className="form-control w-full flex flex-row items-center justify-between gap-4">
+                            <label className="label flex-shrink-0"><span className="label-text">Remote Repository</span></label>
+                            <select className="select select-bordered w-64" value={pushSelectedRemote} onChange={(e) => handlePushRemoteChange(e.target.value)} disabled={isPushing}>
                                 {pushRemotes.map((remote) => <option key={remote} value={remote}>{remote}</option>)}
                             </select>
                         </div>
 
-                        <div className="form-control w-full">
-                            <label className="label"><span className="label-text">Remote Branch</span></label>
-                            {pushLoadingBranches ? (
-                                <div className="flex items-center gap-2 p-3 border rounded-lg bg-base-200 opacity-70">
-                                    <span className="loading loading-spinner loading-xs"></span> Loading branches...
-                                </div>
-                            ) : (
-                                <select className="select select-bordered" value={pushSelectedRemoteBranch} onChange={(e) => setPushSelectedRemoteBranch(e.target.value)} disabled={isPushing}>
-                                    {pushBranch && !pushRemoteBranches.includes(pushBranch) && <option value={pushBranch}>{pushBranch} (new)</option>}
-                                    {pushRemoteBranches.map((branch) => <option key={branch} value={branch}>{branch}{pushTrackingBranch?.remote === pushSelectedRemote && pushTrackingBranch?.branch === branch ? ' (tracking)' : ''}</option>)}
-                                </select>
-                            )}
-                            {pushSelectedRemoteBranch && !pushRemoteBranches.includes(pushSelectedRemoteBranch) && (
-                                <div className="label"><span className="label-text-alt text-warning">New branch will be created</span></div>
-                            )}
+                        <div className="form-control w-full flex flex-row items-center justify-between gap-4">
+                            <label className="label flex-shrink-0"><span className="label-text">Remote Branch</span></label>
+                            <div className="flex flex-col items-end gap-1 w-64">
+                                {pushLoadingBranches ? (
+                                    <div className="flex items-center gap-2 p-3 border rounded-lg bg-base-200 opacity-70 w-full">
+                                        <span className="loading loading-spinner loading-xs"></span> Loading branches...
+                                    </div>
+                                ) : (
+                                    <select className="select select-bordered w-full" value={pushSelectedRemoteBranch} onChange={(e) => setPushSelectedRemoteBranch(e.target.value)} disabled={isPushing}>
+                                        {pushBranch && !pushRemoteBranches.includes(pushBranch) && <option value={pushBranch}>{pushBranch} (new)</option>}
+                                        {pushRemoteBranches.map((branch) => <option key={branch} value={branch}>{branch}{pushTrackingBranch?.remote === pushSelectedRemote && pushTrackingBranch?.branch === branch ? ' (tracking)' : ''}</option>)}
+                                    </select>
+                                )}
+                                {pushSelectedRemoteBranch && !pushRemoteBranches.includes(pushSelectedRemoteBranch) && (
+                                    <div className="label"><span className="label-text-alt text-warning">New branch will be created</span></div>
+                                )}
+                            </div>
                         </div>
 
                         <div className="form-control">
@@ -2117,7 +2119,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                             </label>
                         </div>
                         {pushSquash && (
-                            <textarea className="textarea textarea-bordered" placeholder="Commit message for squash" value={pushSquashMessage} onChange={(e) => setPushSquashMessage(e.target.value)} disabled={isPushing} />
+                            <textarea className="textarea textarea-bordered w-full" placeholder="Commit message for squash" value={pushSquashMessage} onChange={(e) => setPushSquashMessage(e.target.value)} disabled={isPushing} />
                         )}
 
                         {pushError && (
