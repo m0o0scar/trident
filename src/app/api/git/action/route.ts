@@ -8,7 +8,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'reset', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'reset', 'cherry-pick', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -135,6 +135,10 @@ export async function POST(request: Request) {
       case 'reset':
         if (!data?.commitHash) throw new Error('Commit hash is required for reset');
         await git.reset(data.commitHash, data.mode ?? 'hard');
+        break;
+      case 'cherry-pick':
+        if (!data?.commitHash) throw new Error('Commit hash is required for cherry-pick');
+        await git.cherryPick(data.commitHash);
         break;
       case 'rebase':
         if (!data?.ontoBranch) throw new Error('Target branch is required for rebase');

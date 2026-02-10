@@ -338,6 +338,10 @@ export class GitService {
     await this.git.reset([`--${mode}`, commitHash]);
   }
 
+  async cherryPick(commitHash: string): Promise<void> {
+    await this.git.raw(['cherry-pick', commitHash]);
+  }
+
   async rebase(ontoBranch: string, stashChanges: boolean = true): Promise<void> {
     if (stashChanges) {
       // Stash any local changes before rebasing

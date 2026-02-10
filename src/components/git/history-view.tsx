@@ -636,6 +636,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [deleteRemoteBranch, setDeleteRemoteBranch] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [isCherryPickOpen, setIsCherryPickOpen] = useState(false);
+  const [commitToCherryPick, setCommitToCherryPick] = useState<{ hash: string; message: string } | null>(null);
+  const [isCherryPicking, setIsCherryPicking] = useState(false);
+
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [branchToRename, setBranchToRename] = useState<string | null>(null);
   const [newBranchNameForRename, setNewBranchNameForRename] = useState('');
@@ -1602,6 +1606,29 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   };
 
+  const confirmCherryPickCommit = (commitHash: string, commitMessage: string) => {
+    setCommitToCherryPick({ hash: commitHash, message: commitMessage });
+    setIsCherryPickOpen(true);
+  };
+
+  const handleCherryPickCommit = async () => {
+    if (!commitToCherryPick) return;
+    setIsCherryPicking(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'cherry-pick',
+        data: { commitHash: commitToCherryPick.hash }
+      });
+      setIsCherryPickOpen(false);
+      setCommitToCherryPick(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsCherryPicking(false);
+    }
+  };
+
   const handleCreateBranch = async () => {
     if (!newBranchName) return;
     setIsCreating(true);
@@ -1800,6 +1827,44 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           </div>
           <form method="dialog" className="modal-backdrop">
             <button onClick={() => setIsDeleteOpen(false)}>close</button>
+          </form>
+        </dialog>
+      )}
+
+      {isCherryPickOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Cherry Pick</h3>
+            <p className="text-sm opacity-70 mt-1">Apply changes of the individual commit</p>
+            <p className="py-4 break-words">
+              Are you sure to apply <span className="font-bold font-mono break-all">{commitToCherryPick?.hash}</span> <span className="font-bold break-words">{commitToCherryPick?.message}</span> to <span className="font-bold break-all">{branchData?.current || 'current'}</span> branch?
+            </p>
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={() => {
+                  setIsCherryPickOpen(false);
+                  setCommitToCherryPick(null);
+                }}
+                disabled={isCherryPicking}
+              >
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleCherryPickCommit} disabled={isCherryPicking}>
+                {isCherryPicking && <span className="loading loading-spinner loading-xs"></span>}
+                Confirm
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button
+              onClick={() => {
+                setIsCherryPickOpen(false);
+                setCommitToCherryPick(null);
+              }}
+            >
+              close
+            </button>
           </form>
         </dialog>
       )}
@@ -2157,6 +2222,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               selectedHash={selectedHash || undefined}
               onSelectCommit={setSelectedHash}
               onResetToCommit={handleResetToCommit}
+              onCherryPickCommit={confirmCherryPickCommit}
               onEndReached={() => {
                 if (!isFetching && log.all.length >= limit) {
                   setLimit(l => l + 50);

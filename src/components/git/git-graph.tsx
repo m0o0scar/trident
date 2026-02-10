@@ -62,6 +62,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     commits: Commit[],
     onSelectCommit?: (hash: string) => void,
     onResetToCommit?: (hash: string) => void,
+    onCherryPickCommit?: (hash: string, message: string) => void,
     selectedHash?: string,
     onEndReached?: () => void,
     isLoadingMore?: boolean,
@@ -71,6 +72,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     commits,
     onSelectCommit,
     onResetToCommit,
+    onCherryPickCommit,
     selectedHash,
     onEndReached,
     isLoadingMore,
@@ -228,10 +230,19 @@ export const GitGraph = forwardRef<GitGraphHandle, {
 
                     {/* List Rows */}
                     <div style={{ width: '100%' }}>
-                        {nodes.map((node, idx) => (
-                            <ContextMenu key={node.hash} items={[
-                                { label: "Reset to here", onClick: () => onResetToCommit?.(node.hash) }
-                            ]}>
+                        {nodes.map((node) => {
+                            const menuItems = [
+                                { label: "Reset to here", onClick: () => onResetToCommit?.(node.hash) },
+                            ];
+                            if (onCherryPickCommit) {
+                                menuItems.push({
+                                    label: "Cherry-pick commit",
+                                    onClick: () => onCherryPickCommit(node.hash, node.message),
+                                });
+                            }
+
+                            return (
+                            <ContextMenu key={node.hash} items={menuItems}>
                                 <div
                                     className={cn(
                                         "flex items-center hover:bg-base-200 border-b border-base-200 last:border-0 cursor-pointer transition-colors text-xs",
@@ -300,7 +311,8 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                     </div>
                                 </div>
                             </ContextMenu>
-                        ))}
+                            );
+                        })}
                         
                         {/* Loading More Indicator */}
                         {isLoadingMore && (
