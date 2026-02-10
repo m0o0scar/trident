@@ -4,68 +4,58 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { HomeSettingsModal } from '@/components/home-settings-modal';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
-import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { useGitStatus, useSettings, useUpdateSettings } from '@/hooks/use-git';
+import { useState, useEffect, useCallback } from 'react';
+import { useGitStatus, useUpdateSettings } from '@/hooks/use-git';
 
 const SIDEBAR_COLLAPSED_KEY = 'workspace-sidebar-collapsed';
 const SIDEBAR_WIDTH_EXPANDED = 256; // w-64
 const SIDEBAR_WIDTH_COLLAPSED = 64; // w-16
 
 type SidebarProps = React.HTMLAttributes<HTMLDivElement>;
+type SidebarPropsWithInitialState = SidebarProps & {
+  initialCollapsed?: boolean;
+};
 
-// Use useLayoutEffect on client, useEffect on server to avoid SSR warnings
-const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
-
-export function Sidebar({ className }: SidebarProps) {
+export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWithInitialState) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
   const repoPath = searchParams.get('path') || '';
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(initialCollapsed);
   const [enableTransition, setEnableTransition] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const sidebarRef = useRef<HTMLDivElement>(null);
 
-  const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
   
   // Fetch git status to get uncommitted changes count
   const { data: gitStatus } = useGitStatus(repoPath || null);
   const changesCount = gitStatus?.files?.length ?? 0;
 
-  // Load collapsed state from global settings or fallback to localStorage
-  useIsomorphicLayoutEffect(() => {
-    let collapsed = false;
-    
-    if (settings && settings.sidebarCollapsed !== undefined) {
-      collapsed = settings.sidebarCollapsed;
-    } else {
-      const stored = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
-      collapsed = stored === 'true';
-    }
-
-    setIsCollapsed(collapsed);
-    setIsHydrated(true);
-    
-    // Set width directly via style to ensure correct width before any paint
-    if (sidebarRef.current) {
-      sidebarRef.current.style.width = `${collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED}px`;
-    }
-    
-    // Enable transitions after two frames to avoid initial animation
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
+  // Enable transitions only after initial paint to avoid first-load animation.
+  useEffect(() => {
+    let frame2: number | null = null;
+    const frame1 = requestAnimationFrame(() => {
+      frame2 = requestAnimationFrame(() => {
         setEnableTransition(true);
       });
     });
-  }, [settings]);
+
+    return () => {
+      cancelAnimationFrame(frame1);
+      if (frame2 !== null) {
+        cancelAnimationFrame(frame2);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(isCollapsed));
+  }, [isCollapsed]);
 
   // Save collapsed state to global settings and localStorage
   const toggleCollapsed = useCallback(() => {
     const newValue = !isCollapsed;
     setIsCollapsed(newValue);
-    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(newValue));
     
     updateSettings.mutate({ sidebarCollapsed: newValue });
   }, [isCollapsed, updateSettings]);
@@ -90,17 +80,12 @@ export function Sidebar({ className }: SidebarProps) {
 
   return (
     <div 
-      ref={sidebarRef}
       style={{ 
-        width: isHydrated ? sidebarWidth : undefined,
-        // Start invisible to prevent flash of wrong width
-        visibility: isHydrated ? 'visible' : 'hidden'
+        width: sidebarWidth
       }}
       className={cn(
         "pb-12 border-r border-base-300 min-h-screen bg-base-100 relative",
         enableTransition && "transition-all duration-300",
-        // Use class for SSR width, inline style takes over after hydration
-        !isHydrated && "w-64",
         className
       )}
     >
