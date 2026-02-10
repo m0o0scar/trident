@@ -1,6 +1,6 @@
 'use client';
 
-import { useGitLog, useGitBranches, useGitStatus, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, BranchTrackingInfo, useRepository, useUpdateRepository, useSettings, useUpdateSettings } from '@/hooks/use-git';
+import { useGitLog, useGitBranches, useGitStatus, useGitAction, useCommitDiff, useCommitFileDiff, useRangeDiff, useRangeFileDiff, CommitFile, BranchTrackingInfo, useRepository, useUpdateRepository, useSettings, useUpdateSettings } from '@/hooks/use-git';
 import { Repository } from '@/lib/types';
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -46,16 +46,19 @@ function FileStatusIcon({ status }: { status: string }) {
   }
 }
 
-// Component to show commit file diff
-function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { repoPath: string; commitHash: string; filePath: string; splitView: boolean }) {
-  const { data, isLoading } = useCommitFileDiff(repoPath, commitHash, filePath);
+// Component to show file diff (commit or range)
+function FileDiffView({ repoPath, commitHash, fromHash, toHash, filePath, splitView }: { repoPath: string; commitHash?: string; fromHash?: string; toHash?: string; filePath: string; splitView: boolean }) {
+  const commitDiff = useCommitFileDiff(repoPath, commitHash || null, filePath);
+  const rangeDiff = useRangeFileDiff(repoPath, fromHash || null, toHash || null, filePath);
+
+  const { data, isLoading } = (commitHash ? commitDiff : rangeDiff);
   const { resolvedTheme } = useTheme();
   const [renderAnyway, setRenderAnyway] = useState(false);
 
   // Reset renderAnyway when file or commit changes
   useEffect(() => {
     setRenderAnyway(false);
-  }, [filePath, commitHash]);
+  }, [filePath, commitHash, fromHash, toHash]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8"><span className="loading loading-spinner text-base-content/50"></span></div>;
@@ -121,9 +124,12 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
   );
 }
 
-// Component to show commit changes
-function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitHash: string }) {
-  const { data, isLoading } = useCommitDiff(repoPath, commitHash);
+// Component to show changes (commit or range)
+function ChangesView({ repoPath, commitHash, fromHash, toHash }: { repoPath: string; commitHash?: string; fromHash?: string; toHash?: string }) {
+  const commitDiff = useCommitDiff(repoPath, commitHash || null);
+  const rangeDiff = useRangeDiff(repoPath, fromHash || null, toHash || null);
+
+  const { data, isLoading } = (commitHash ? commitDiff : rangeDiff);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   
   // Storage key for split view preference - same as in DiffView
@@ -149,10 +155,10 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
     }
   }, [splitView]);
 
-  // Reset selected file when commit changes
+  // Reset selected file when commit/range changes
   useEffect(() => {
     setSelectedFile(null);
-  }, [commitHash]);
+  }, [commitHash, fromHash, toHash]);
 
   // Auto-select first file when data loads and no file is selected
   useEffect(() => {
@@ -214,7 +220,14 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
               </div>
             </div>
             <div className="flex-1 overflow-auto diff-viewer-wrapper">
-              <CommitFileDiffView repoPath={repoPath} commitHash={commitHash} filePath={selectedFile} splitView={splitView} />
+              <FileDiffView
+                repoPath={repoPath}
+                commitHash={commitHash}
+                fromHash={fromHash}
+                toHash={toHash}
+                filePath={selectedFile}
+                splitView={splitView}
+              />
             </div>
           </div>
         ) : (
@@ -623,11 +636,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const { data: log, isLoading, isError, error, refetch, isFetching } = useGitLog(repoPath, limit);
   const { data: branchData, isLoading: isBranchesLoading } = useGitBranches(repoPath);
   const { data: statusData } = useGitStatus(repoPath);
-  const [selectedHash, setSelectedHash] = useState<string | null>(null);
+  const [selectedHashes, setSelectedHashes] = useState<string[]>([]);
+  const [anchorHash, setAnchorHash] = useState<string | null>(null);
 
   // Clear selected commit and close commit details panel when repository changes
   useEffect(() => {
-    setSelectedHash(null);
+    setSelectedHashes([]);
+    setAnchorHash(null);
   }, [repoPath]);
 
   const { mutateAsync: runGitAction } = useGitAction();
@@ -1096,7 +1111,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       requestAnimationFrame(() => {
         const scrolled = gitGraphRef.current?.scrollToCommit(pendingScrollCommit);
         if (scrolled) {
-          setSelectedHash(pendingScrollCommit);
+          setSelectedHashes([pendingScrollCommit]);
+          setAnchorHash(pendingScrollCommit);
           setPendingScrollCommit(null);
         }
       });
@@ -1126,14 +1142,16 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     if (commitExists && gitGraphRef.current) {
       const scrolled = gitGraphRef.current.scrollToCommit(commitHash);
       if (scrolled) {
-        setSelectedHash(commitHash);
+        setSelectedHashes([commitHash]);
+        setAnchorHash(commitHash);
         return;
       }
     }
     
     // Need to load more commits or scroll failed, set pending
     setPendingScrollCommit(commitHash);
-    setSelectedHash(commitHash);
+    setSelectedHashes([commitHash]);
+    setAnchorHash(commitHash);
   }, [branchData?.branchCommits, log?.all]);
 
   const confirmDeleteBranch = (branch: string) => {
@@ -2363,8 +2381,34 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <GitGraph
               ref={gitGraphRef}
               commits={filteredCommits}
-              selectedHash={selectedHash || undefined}
-              onSelectCommit={setSelectedHash}
+              selectedHashes={selectedHashes}
+              onSelectCommit={(hash, e) => {
+                if (e.metaKey || e.ctrlKey) {
+                  // Cmd+Click: Toggle
+                  if (selectedHashes.includes(hash)) {
+                    setSelectedHashes(prev => prev.filter(h => h !== hash));
+                    setAnchorHash(hash);
+                  } else {
+                    setSelectedHashes(prev => [...prev, hash]);
+                    setAnchorHash(hash);
+                  }
+                } else if (e.shiftKey && anchorHash) {
+                  // Shift+Click: Range from anchor
+                  const anchorIdx = log.all.findIndex(c => c.hash === anchorHash);
+                  const currentIdx = log.all.findIndex(c => c.hash === hash);
+
+                  if (anchorIdx !== -1 && currentIdx !== -1) {
+                    const start = Math.min(anchorIdx, currentIdx);
+                    const end = Math.max(anchorIdx, currentIdx);
+                    const range = log.all.slice(start, end + 1).map(c => c.hash);
+                    setSelectedHashes(range);
+                  }
+                } else {
+                  // Single click
+                  setSelectedHashes([hash]);
+                  setAnchorHash(hash);
+                }
+              }}
               onResetToCommit={handleResetToCommit}
               onCherryPickCommit={confirmCherryPickCommit}
               onEndReached={() => {
@@ -2379,7 +2423,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           )}
         </div>
 
-        {selectedHash && (
+        {selectedHashes.length > 0 && (
           <div 
             className="flex flex-col overflow-hidden border-t border-base-300 bg-base-200/30"
             style={{ height: panelHeight }}
@@ -2397,18 +2441,46 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
             {/* Header with commit info */}
             <div className="flex flex-row items-center py-2 px-4 border-b border-base-300 bg-base-100 shrink-0 justify-between gap-4">
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                <span className="text-sm font-bold truncate">
-                  {log.all.find(c => c.hash === selectedHash)?.message}
-                </span>
-                <span className="text-xs font-mono opacity-50 shrink-0">
-                  {selectedHash.substring(0, 7)}
-                </span>
+              <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                {(() => {
+                  // Calculate selected commits details
+                  const hashSet = new Set(selectedHashes);
+                  const selectedCommits = log.all.filter(c => hashSet.has(c.hash));
+                  const latestCommit = selectedCommits[0];
+                  const oldestCommit = selectedCommits[selectedCommits.length - 1];
+                  const isRangeSelection = selectedCommits.length > 1;
+
+                  if (isRangeSelection) {
+                    return (
+                      <>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-[10px] font-bold bg-base-200 px-1.5 py-0.5 rounded opacity-70 uppercase tracking-wider shrink-0">Latest</span>
+                          <span className="text-sm font-bold truncate" title={latestCommit.message}>{latestCommit.message}</span>
+                        </div>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-[10px] font-bold bg-base-200 px-1.5 py-0.5 rounded opacity-70 uppercase tracking-wider shrink-0">Oldest</span>
+                          <span className="text-sm font-bold truncate" title={oldestCommit.message}>{oldestCommit.message}</span>
+                        </div>
+                      </>
+                    );
+                  } else {
+                    return (
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm font-bold truncate">
+                          {latestCommit?.message}
+                        </span>
+                        <span className="text-xs font-mono opacity-50 shrink-0">
+                          {latestCommit?.hash.substring(0, 7)}
+                        </span>
+                      </div>
+                    );
+                  }
+                })()}
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   className="ml-2 btn btn-ghost btn-xs btn-square"
-                  onClick={() => setSelectedHash(null)}
+                  onClick={() => setSelectedHashes([])}
                   title="Close"
                 >
                   ✕
@@ -2418,24 +2490,43 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
             {/* Combined commit message and changes content */}
             <div className="flex-1 overflow-hidden bg-base-100 flex flex-col">
-              <div className="border-b border-base-300 bg-base-100 shrink-0 h-24 flex flex-col">
-                <div className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60">
-                  Message
-                </div>
-                <div className="px-4 pb-3 overflow-auto flex-1 min-h-0">
-                  <div className="text-xs opacity-70 whitespace-pre-wrap font-mono">
-                    {log.all.find(c => c.hash === selectedHash)?.body || 'No additional message'}
-                  </div>
-                </div>
-              </div>
-              <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
-                <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60 border-b border-base-300 bg-base-100 shrink-0">
-                  Changes
-                </div>
-                <div className="flex-1 min-h-0">
-                  <CommitChangesView repoPath={repoPath} commitHash={selectedHash} />
-                </div>
-              </div>
+              {(() => {
+                  const hashSet = new Set(selectedHashes);
+                  const selectedCommits = log.all.filter(c => hashSet.has(c.hash));
+                  const latestCommit = selectedCommits[0];
+                  const oldestCommit = selectedCommits[selectedCommits.length - 1];
+                  const isRangeSelection = selectedCommits.length > 1;
+
+                  return (
+                    <>
+                      {!isRangeSelection && (
+                        <div className="border-b border-base-300 bg-base-100 shrink-0 h-24 flex flex-col">
+                          <div className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60">
+                            Message
+                          </div>
+                          <div className="px-4 pb-3 overflow-auto flex-1 min-h-0">
+                            <div className="text-xs opacity-70 whitespace-pre-wrap font-mono">
+                              {latestCommit?.body || 'No additional message'}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+                        <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60 border-b border-base-300 bg-base-100 shrink-0">
+                          Changes
+                        </div>
+                        <div className="flex-1 min-h-0">
+                          <ChangesView
+                            repoPath={repoPath}
+                            commitHash={!isRangeSelection ? latestCommit?.hash : undefined}
+                            fromHash={isRangeSelection ? oldestCommit?.hash : undefined}
+                            toHash={isRangeSelection ? latestCommit?.hash : undefined}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  );
+              })()}
             </div>
           </div>
         )}
