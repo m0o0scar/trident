@@ -719,7 +719,7 @@ function BranchTreeItem({
                   ) : isRemote ? (
                     <span className="text-xs opacity-50">🌐</span>
                   ) : (
-                    <span className="text-xs opacity-50">🌿</span>
+                    <span className="text-xs opacity-50">🔀</span>
                   )}
                   <span className="truncate" title={child.fullPath}>{child.name}</span>
                   {hasDivergence && (
@@ -1808,7 +1808,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 <GroupHeader
                   name="Branches"
                   groupPath="__local__"
-                  icon={<span className="text-xs">🌿</span>}
+                  icon={<span className="text-xs">🔀</span>}
                   isExpanded={localGroupExpanded}
                   onToggle={handleToggleLocalGroup}
                   visibilityMap={visibilityMap}

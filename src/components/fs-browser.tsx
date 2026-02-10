@@ -107,7 +107,7 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath }:
                             onClick={() => handleNavigate(item.path)}
                         >
                             <div className="flex items-center gap-3 truncate">
-                                <span className="text-lg">{item.isRepo ? '🌿' : '📁'}</span>
+                                <span className="text-lg">{item.isRepo ? '🔀' : '📁'}</span>
                                 <span className={cn("text-sm font-mono", item.isRepo && "font-medium")}>{item.name}</span>
                             </div>
                             

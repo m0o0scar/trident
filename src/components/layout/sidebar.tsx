@@ -149,7 +149,7 @@ export function Sidebar({ className }: SidebarProps) {
                 onClick={toggleCollapsed} 
                 title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"} 
               >
-                {isCollapsed ? '➡️' : '⬅️'}
+                {isCollapsed ? '➕' : '➖'}
               </button>
             </div>
           </div>
@@ -172,7 +172,7 @@ export function Sidebar({ className }: SidebarProps) {
               )}
               title={isCollapsed ? "History" : undefined}
             >
-              <span className={cn("text-lg", !isCollapsed && "mr-2")}>🌿</span>
+              <span className={cn("text-lg", !isCollapsed && "mr-2")}>🔀</span>
               {!isCollapsed && "History"}
             </Link>
 
