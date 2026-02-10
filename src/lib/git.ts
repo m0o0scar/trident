@@ -532,6 +532,11 @@ export class GitService {
     
     console.log('[pullFromRemote] Starting pull:', { localBranch, remote, remoteBranch, options });
     
+    // Get current branch to see if we need to checkout
+    const branchSummary = await this.git.branchLocal();
+    const initialBranch = branchSummary.current;
+    const needsCheckout = localBranch !== initialBranch;
+
     // First, fetch from remote to get latest refs
     console.log('[pullFromRemote] Fetching from remote:', remote);
     await this.git.fetch(remote);
@@ -557,6 +562,12 @@ export class GitService {
       console.log('[pullFromRemote] Stashing changes...');
       await this.git.stash(['push', '-m', 'auto-stash before pull']);
     }
+
+    // Checkout the target branch if it's not the current one
+    if (needsCheckout) {
+      console.log(`[pullFromRemote] Checking out branch ${localBranch}...`);
+      await this.git.checkout(localBranch);
+    }
     
     try {
       if (rebase) {
@@ -571,6 +582,12 @@ export class GitService {
         console.log('[pullFromRemote] Merge completed');
       }
       
+      // If we switched branches, try to switch back
+      if (needsCheckout) {
+        console.log(`[pullFromRemote] Returning to original branch ${initialBranch}...`);
+        await this.git.checkout(initialBranch);
+      }
+
       // Pop stashed changes if we stashed them
       if (hasChanges) {
         try {
@@ -585,25 +602,46 @@ export class GitService {
     } catch (e) {
       console.error('[pullFromRemote] Error:', e);
       
-      // Abort the operation if it failed
-      try {
-        if (rebase) {
-          await this.git.rebase(['--abort']);
-        } else {
-          await this.git.merge(['--abort']);
+      // If we are in a conflicted state, we DON'T checkout back to the initial branch
+      // as the user needs to resolve conflicts on the localBranch.
+      // However, we should still try to inform them.
+
+      const isConflict = (e as any).message?.toLowerCase().includes('conflict') || 
+                        (e as any).stdout?.toLowerCase().includes('conflict') ||
+                        (e as any).stderr?.toLowerCase().includes('conflict');
+
+      if (!isConflict) {
+        // If it wasn't a conflict, try to abort and return to initial state
+        try {
+          if (rebase) {
+            await this.git.rebase(['--abort']);
+          } else {
+            await this.git.merge(['--abort']);
+          }
+        } catch {
+          // Abort might fail
         }
-      } catch {
-        // Abort might fail if there's nothing to abort
+
+        if (needsCheckout) {
+          try {
+            await this.git.checkout(initialBranch);
+          } catch {
+            // Checkout back might fail
+          }
+        }
+
+        if (hasChanges) {
+          try {
+            await this.git.stash(['pop']);
+          } catch {
+            // Pop might fail
+          }
+        }
+      } else {
+        // It IS a conflict. We stay on localBranch.
+        // We cannot pop the stash here because it will definitely conflict further or fail.
       }
       
-      // Try to restore stashed changes on error
-      if (hasChanges) {
-        try {
-          await this.git.stash(['pop']);
-        } catch {
-          // Ignore stash pop errors during error handling
-        }
-      }
       throw e;
     }
   }
@@ -735,6 +773,11 @@ export class GitService {
     
     console.log('[pushToRemote] Starting push:', { localBranch, remote, remoteBranch, options: logOptions });
     
+    // Get current branch to see if we need to checkout
+    const branchSummary = await this.git.branchLocal();
+    const initialBranch = branchSummary.current;
+    const needsCheckout = localBranch !== initialBranch;
+
     // Check if we have uncommitted changes
     const status = await this.git.status();
     const hasChanges = status.files.length > 0;
@@ -744,6 +787,12 @@ export class GitService {
       // Stash changes before push (including any rebase/merge operations)
       console.log('[pushToRemote] Stashing changes...');
       await this.git.stash(['push', '-m', 'auto-stash before push']);
+    }
+
+    // Checkout the target branch if it's not the current one
+    if (needsCheckout) {
+      console.log(`[pushToRemote] Checking out branch ${localBranch}...`);
+      await this.git.checkout(localBranch);
     }
     
     try {
@@ -825,45 +874,44 @@ export class GitService {
       // Build push options
       const pushOptions: string[] = [];
       
-      if (forcePush || (squash && remoteBranchExists)) {
-        // If we squashed, we rewrote history relative to what might be on remote (if we didn't rebase perfectly or if we are overwriting),
-        // but actually, if we rebased onto remoteFull, then reset --soft remoteFull, then committed...
-        // We are now 1 commit ahead of remoteFull.
-        // So it SHOULD be a fast-forward push.
-        // UNLESS remote moved since our fetch?
-        // But generally, squash implies we are replacing our history with a single commit.
-        // If we are just appending to remote, fast-forward is fine.
-        // BUT, if we had *multiple* commits that were *already* on remote?
-        // No, we rebased onto remoteFull.
-        // So we incorporated all remote changes.
-        // So our new commit is child of remoteFull.
-        // So fast-forward should work.
-        // However, if the user intended to squash commits that were *already pushed* (e.g. fixing up a PR),
-        // they would need force push.
-        // If rebaseFirst is true, we rebased on remote.
-        // If remote has A->B. Local has A->B->C->D.
-        // Rebase: Local A->B->C->D.
-        // Reset soft to B (remoteFull).
-        // Commit: A->B->E (where E contains C+D).
-        // Push E. E's parent is B. Remote is at B.
-        // Fast-forward A->B->E.
-        // This works!
-        // BUT, what if local was A->B->C (pushed) -> D (local).
-        // Remote is at C.
-        // Fetch: remote is C.
-        // Rebase onto C: Local is A->B->C->D.
-        // Reset soft to C.
-        // Commit E (contains D). Parent C.
-        // Push E. Fast-forward to C->E.
-        // Wait, where did C go? C is on remote.
-        // So we squashed D into E?
-        // Yes. C remains individual.
-        // This squashes *local* commits (ahead of remote).
-        // It does NOT squash commits that are already on remote.
-        // This matches "squash all the local commits into one".
-        // Perfect.
-        // So no implicit force push needed.
-      }
+      // If we squashed, we rewrote history relative to what might be on remote (if we didn't rebase perfectly or if we are overwriting),
+      // but actually, if we rebased onto remoteFull, then reset --soft remoteFull, then committed...
+      // We are now 1 commit ahead of remoteFull.
+      // So it SHOULD be a fast-forward push.
+      // UNLESS remote moved since our fetch?
+      // But generally, squash implies we are replacing our history with a single commit.
+      // If we are just appending to remote, fast-forward is fine.
+      // BUT, if we had *multiple* commits that were *already* on remote?
+      // No, we rebased onto remoteFull.
+      // So we incorporated all remote changes.
+      // So our new commit is child of remoteFull.
+      // So fast-forward should work.
+      // However, if the user intended to squash commits that were *already pushed* (e.g. fixing up a PR),
+      // they would need force push.
+      // If rebaseFirst is true, we rebased on remote.
+      // If remote has A->B. Local has A->B->C->D.
+      // Rebase: Local A->B->C->D.
+      // Reset soft to B (remoteFull).
+      // Commit: A->B->E (where E contains C+D).
+      // Push E. E's parent is B. Remote is at B.
+      // Fast-forward A->B->E.
+      // This works!
+      // BUT, what if local was A->B->C (pushed) -> D (local).
+      // Remote is at C.
+      // Fetch: remote is C.
+      // Rebase onto C: Local is A->B->C->D.
+      // Reset soft to C.
+      // Commit E (contains D). Parent C.
+      // Push E. Fast-forward to C->E.
+      // Wait, where did C go? C is on remote.
+      // So we squashed D into E?
+      // Yes. C remains individual.
+      // This squashes *local* commits (ahead of remote).
+      // It does NOT squash commits that are already on remote.
+      // This matches "squash all the local commits into one".
+      // Perfect.
+      // So no implicit force push needed.
+      
       if (forcePush) {
           pushOptions.push('--force');
       }
@@ -883,6 +931,12 @@ export class GitService {
       const pushResult = await this.git.push(targetRemote, `${localBranch}:${remoteBranch}`, pushOptions);
       console.log('[pushToRemote] Push completed successfully, result:', pushResult);
       
+      // If we switched branches, try to switch back
+      if (needsCheckout) {
+        console.log(`[pushToRemote] Returning to original branch ${initialBranch}...`);
+        await this.git.checkout(initialBranch);
+      }
+
       // Pop stashed changes if we stashed them
       if (hasChanges) {
         try {
@@ -897,14 +951,29 @@ export class GitService {
       console.log('[pushToRemote] Operation completed successfully');
     } catch (e) {
       console.error('[pushToRemote] Error:', e);
-      // Try to restore stashed changes on error
-      if (hasChanges) {
-        try {
-          await this.git.stash(['pop']);
-        } catch {
-          // Ignore stash pop errors during error handling
+      
+      const isConflict = (e as any).message?.toLowerCase().includes('conflict') || 
+                        (e as any).stdout?.toLowerCase().includes('conflict') ||
+                        (e as any).stderr?.toLowerCase().includes('conflict');
+
+      if (!isConflict) {
+        if (needsCheckout) {
+          try {
+            await this.git.checkout(initialBranch);
+          } catch {
+            // Ignore
+          }
+        }
+
+        if (hasChanges) {
+          try {
+            await this.git.stash(['pop']);
+          } catch {
+            // Ignore
+          }
         }
       }
+      
       throw e;
     }
   }
