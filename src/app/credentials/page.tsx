@@ -3,9 +3,49 @@
 import { useState } from 'react';
 import { useCredentials, useCreateCredential, useUpdateCredential, useDeleteCredential } from '@/hooks/use-credentials';
 import type { Credential, GitLabCredential } from '@/hooks/use-credentials';
+import Image from 'next/image';
 import Link from 'next/link';
+import {
+  ArrowLeftIcon,
+  CalendarDaysIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  KeyIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  TrashIcon,
+  UserIcon,
+} from '@heroicons/react/24/outline';
 
 type CredentialFormType = 'github' | 'gitlab' | null;
+type ProviderType = 'github' | 'gitlab';
+
+const PROVIDER_ICON_URLS: Record<ProviderType, string> = {
+  github: 'https://www.google.com/s2/favicons?domain=github.com&sz=64',
+  gitlab: 'https://www.google.com/s2/favicons?domain=gitlab.com&sz=64',
+};
+
+function ProviderIcon({
+  type,
+  size,
+  className = '',
+}: {
+  type: ProviderType;
+  size: number;
+  className?: string;
+}) {
+  const label = type === 'github' ? 'GitHub' : 'GitLab';
+  return (
+    <Image
+      src={PROVIDER_ICON_URLS[type]}
+      alt={`${label} icon`}
+      width={size}
+      height={size}
+      className={className}
+      unoptimized
+    />
+  );
+}
 
 export default function CredentialsPage() {
   const { data: credentials, isLoading, error } = useCredentials();
@@ -83,7 +123,7 @@ export default function CredentialsPage() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <Link href="/" className="btn btn-ghost btn-square">
-              ⬅️
+              <ArrowLeftIcon className="h-5 w-5" />
             </Link>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Credentials</h1>
@@ -102,8 +142,8 @@ export default function CredentialsPage() {
           >
             <div className="card-body p-6">
               <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-base-200 rounded-lg text-2xl">
-                  🐙
+                <div className="p-2 bg-base-200 rounded-lg">
+                  <ProviderIcon type="github" size={24} className="h-6 w-6 rounded-sm" />
                 </div>
                 <div>
                   <h3 className="card-title text-base">GitHub</h3>
@@ -113,7 +153,8 @@ export default function CredentialsPage() {
                 </div>
               </div>
               <button className="btn btn-sm w-full gap-2">
-                ➕ Add GitHub
+                <PlusIcon className="h-4 w-4" />
+                Add GitHub
               </button>
             </div>
           </div>
@@ -124,8 +165,8 @@ export default function CredentialsPage() {
           >
             <div className="card-body p-6">
               <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-base-200 rounded-lg text-2xl">
-                  🦊
+                <div className="p-2 bg-base-200 rounded-lg">
+                  <ProviderIcon type="gitlab" size={24} className="h-6 w-6 rounded-sm" />
                 </div>
                 <div>
                   <h3 className="card-title text-base">GitLab</h3>
@@ -133,7 +174,8 @@ export default function CredentialsPage() {
                 </div>
               </div>
               <button className="btn btn-sm w-full gap-2">
-                ➕ Add GitLab Server
+                <PlusIcon className="h-4 w-4" />
+                Add GitLab Server
               </button>
             </div>
           </div>
@@ -156,7 +198,7 @@ export default function CredentialsPage() {
             </div>
           ) : credentials?.length === 0 ? (
             <div className="p-12 text-center opacity-50">
-              <span className="text-4xl">🔑</span>
+              <KeyIcon className="h-10 w-10 mx-auto" />
               <p className="font-bold mt-2">No credentials saved yet.</p>
               <p className="text-xs mt-1">Add your first credential using the cards above.</p>
             </div>
@@ -180,7 +222,17 @@ export default function CredentialsPage() {
         <dialog className="modal modal-open">
             <div className="modal-box">
                 <h3 className="font-bold text-lg flex items-center gap-2">
-                    {formType === 'github' ? '🐙 GitHub Credential' : '🦊 GitLab Credential'}
+                    {formType === 'github' ? (
+                      <>
+                        <ProviderIcon type="github" size={20} className="h-5 w-5 rounded-sm" />
+                        GitHub Credential
+                      </>
+                    ) : (
+                      <>
+                        <ProviderIcon type="gitlab" size={20} className="h-5 w-5 rounded-sm" />
+                        GitLab Credential
+                      </>
+                    )}
                 </h3>
                 <p className="py-4 text-sm opacity-70">
                     {editingCredential
@@ -210,7 +262,8 @@ export default function CredentialsPage() {
                         <div className="form-control w-full">
                             <label className="label"><span className="label-text">Server URL</span></label>
                             <div className="p-3 bg-base-200 rounded-lg text-sm font-mono flex items-center gap-2 min-w-0 break-all">
-                                🖥️ {(editingCredential as GitLabCredential).serverUrl}
+                                <ProviderIcon type="gitlab" size={16} className="h-4 w-4 shrink-0 rounded-sm" />
+                                {(editingCredential as GitLabCredential).serverUrl}
                             </div>
                         </div>
                     )}
@@ -231,7 +284,7 @@ export default function CredentialsPage() {
                                 className="absolute right-2 top-2 btn btn-ghost btn-xs btn-square"
                                 onClick={() => setShowToken(!showToken)}
                             >
-                                {showToken ? '🙈' : '👁️'}
+                                {showToken ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
                             </button>
                         </div>
                         <label className="label">
@@ -316,8 +369,12 @@ function CredentialItem({
   return (
     <div className="px-6 py-4 flex items-center justify-between hover:bg-base-200/30 transition-colors">
       <div className="flex items-center gap-4">
-        <div className="p-2 bg-base-200 rounded-lg text-xl">
-          {isGitLab ? '🦊' : '🐙'}
+        <div className="p-2 bg-base-200 rounded-lg">
+          {isGitLab ? (
+            <ProviderIcon type="gitlab" size={20} className="h-5 w-5 rounded-sm" />
+          ) : (
+            <ProviderIcon type="github" size={20} className="h-5 w-5 rounded-sm" />
+          )}
         </div>
         <div>
           <div className="flex items-center gap-2">
@@ -330,24 +387,26 @@ function CredentialItem({
           </div>
           <div className="flex items-center gap-3 text-xs opacity-70 mt-1">
             <span className="flex items-center gap-1">
-              👤 {credential.username}
+              <UserIcon className="h-3.5 w-3.5" />
+              {credential.username}
             </span>
             <span className="flex items-center gap-1">
-              📅 {new Date(credential.updatedAt).toLocaleDateString()}
+              <CalendarDaysIcon className="h-3.5 w-3.5" />
+              {new Date(credential.updatedAt).toLocaleDateString()}
             </span>
           </div>
         </div>
       </div>
       <div className="flex items-center gap-1">
         <button className="btn btn-ghost btn-sm btn-square" onClick={onEdit} title="Edit">
-          ✏️
+          <PencilSquareIcon className="h-4 w-4" />
         </button>
         <button
           className="btn btn-ghost btn-sm btn-square text-error hover:bg-error/10"
           onClick={onDelete}
           title="Delete"
         >
-          🗑️
+          <TrashIcon className="h-4 w-4" />
         </button>
       </div>
     </div>

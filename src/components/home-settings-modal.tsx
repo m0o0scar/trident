@@ -154,9 +154,11 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
                   </button>
                 </div>
                 {localDefaultFolder && (
-                  <label className="label">
-                    <span className="label-text-alt link link-hover text-primary" onClick={handleReset}>Reset to default (home folder)</span>
-                  </label>
+                  <div className="mt-2">
+                    <button type="button" className="link link-hover text-primary text-xs" onClick={handleReset}>
+                      Reset to default (home folder)
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -180,6 +182,7 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
         onOpenChange={setFolderBrowserOpen}
         onSelect={handleFolderSelect}
         initialPath={localDefaultFolder || settings?.resolvedDefaultFolder}
+        title="Select default root folder"
       />
     </>
   );

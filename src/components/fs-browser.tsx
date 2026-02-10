@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { ArrowUturnUpIcon, BookmarkIcon, FolderIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface FSItem {
   name: string;
@@ -20,9 +21,10 @@ interface FileSystemBrowserProps {
   onOpenChange: (open: boolean) => void;
   onSelect: (path: string) => void;
   initialPath?: string;
+  title?: string;
 }
 
-export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath }: FileSystemBrowserProps) {
+export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, title = 'Select Repository' }: FileSystemBrowserProps) {
   const [currentPath, setCurrentPath] = useState<string>('');
   const [data, setData] = useState<FSResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -70,12 +72,14 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath }:
       <div className="modal-box w-11/12 max-w-2xl h-[80vh] flex flex-col p-0 overflow-hidden bg-base-100">
         <div className="p-4 border-b border-base-300 flex justify-between items-center bg-base-200/50">
           <div className="overflow-hidden">
-              <h3 className="font-bold text-lg">Select Repository</h3>
+              <h3 className="font-bold text-lg">{title}</h3>
               <div className="text-xs opacity-70 font-mono truncate pt-1" title={currentPath}>
                 {currentPath || 'Loading...'}
               </div>
           </div>
-          <button className="btn btn-sm btn-circle btn-ghost" onClick={() => onOpenChange(false)}>✕</button>
+          <button className="btn btn-sm btn-circle btn-ghost" onClick={() => onOpenChange(false)}>
+            <XMarkIcon className="h-4 w-4" />
+          </button>
         </div>
 
         <div className="flex-1 overflow-hidden relative bg-base-100">
@@ -92,7 +96,7 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath }:
                             className="flex items-center gap-3 px-4 py-3 hover:bg-base-200 cursor-pointer opacity-70 transition-colors"
                             onClick={() => handleNavigate(data.parent)}
                         >
-                            <span className="text-lg">⬆️</span>
+                            <ArrowUturnUpIcon className="h-5 w-5" />
                             <span className="text-sm">..</span>
                         </div>
                     )}
@@ -107,7 +111,7 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath }:
                             onClick={() => handleNavigate(item.path)}
                         >
                             <div className="flex items-center gap-3 truncate">
-                                <span className="text-lg">{item.isRepo ? '🔀' : '📁'}</span>
+                                {item.isRepo ? <BookmarkIcon className="h-5 w-5" /> : <FolderIcon className="h-5 w-5" />}
                                 <span className={cn("text-sm font-mono", item.isRepo && "font-medium")}>{item.name}</span>
                             </div>
                             

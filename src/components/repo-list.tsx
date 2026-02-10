@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { FileSystemBrowser } from './fs-browser';
 import { toast } from '@/hooks/use-toast';
 import { HomeSettingsModal } from './home-settings-modal';
-import { ArrowRightIcon, Cog6ToothIcon, FolderOpenIcon, KeyIcon, PlusCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { ArrowRightIcon, BookmarkIcon, Cog6ToothIcon, KeyIcon, PlusCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 export function RepoList() {
     const { data: repos, isLoading } = useRepositories();
@@ -135,7 +135,7 @@ export function RepoList() {
                             >
                                 <td>
                                     <div className="flex items-center gap-3">
-                                        <FolderOpenIcon className="h-5 w-5 opacity-70 group-hover:text-primary transition-colors" />
+                                        <BookmarkIcon className="h-5 w-5 opacity-70 group-hover:text-primary transition-colors" />
                                         <span className="font-bold text-sm">{repo.name}</span>
                                     </div>
                                 </td>

@@ -15,6 +15,15 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'www.google.com',
+        pathname: '/s2/favicons',
+      },
+    ],
+  },
   serverExternalPackages: ['keytar'],
 };
 
