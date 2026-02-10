@@ -24,27 +24,6 @@ function isBinaryContent(content: string): boolean {
     return sample.length > 0 && (nonPrintable / sample.length) > 0.1;
 }
 
-function ContextMenu({ children, items }: { children: React.ReactNode, items: { label: React.ReactNode, onClick: () => void, danger?: boolean, icon?: React.ReactNode }[] }) {
-    return (
-        <div className="dropdown dropdown-bottom dropdown-end w-full group">
-            <div tabIndex={0} role="button" className="w-full text-left" onClick={(e) => e.stopPropagation()}>{children}</div>
-            <ul tabIndex={0} className="dropdown-content z-[10] menu p-2 shadow-lg bg-base-100 rounded-box w-52 border border-base-300">
-                {items.map((item, idx) => (
-                    <li key={idx}>
-                        <button onClick={(e) => { e.stopPropagation(); item.onClick();
-                            // Close dropdown by blurring
-                            (document.activeElement as HTMLElement)?.blur();
-                        }} className={item.danger ? "text-error" : ""}>
-                            {item.icon && <span className="mr-2">{item.icon}</span>}
-                            {item.label}
-                        </button>
-                    </li>
-                ))}
-            </ul>
-        </div>
-    )
-}
-
 function StashDiffView({ repoPath, stashIndex, filePath }: { repoPath: string; stashIndex: number; filePath: string }) {
     const { data, isLoading } = useStashFileDiff(repoPath, stashIndex, filePath);
     const { resolvedTheme } = useTheme();
@@ -280,7 +259,7 @@ function StashesContent() {
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto overflow-x-hidden">
                     {!stashes || stashes.length === 0 ? (
                         <div className="flex-1 flex flex-col items-center justify-center opacity-50 h-64">
                             <div className="p-8 rounded-full bg-base-200 mb-4 text-4xl">
@@ -296,53 +275,49 @@ function StashesContent() {
                                 const isSelected = selectedStashIndex === stash.index;
 
                                 return (
-                                    <ContextMenu
-                                        key={stash.hash}
-                                        items={[
-                                            { label: 'Apply (keep stash)', icon: <span>▶️</span>, onClick: () => handleApply(stash.index) },
-                                            { label: 'Pop (apply and delete)', icon: <span>💥</span>, onClick: () => handlePop(stash.index) },
-                                            { label: 'Delete', icon: <span>🗑️</span>, danger: true, onClick: () => handleDrop(stash.index) }
-                                        ]}
-                                    >
-                                            <div className="mb-1">
-                                                <div
-                                                    className={cn(
-                                                        "p-2 rounded-md cursor-pointer transition-colors",
-                                                        isSelected ? "bg-base-200" : "hover:bg-base-200/50"
-                                                    )}
-                                                    onClick={() => toggleStashExpanded(stash.index)}
-                                                >
-                                                    <div className="flex items-start gap-2">
-                                                        <div className="mt-0.5 opacity-50 text-xs">
+                                    <div key={stash.hash} className="mb-1">
+                                        <div
+                                            className={cn(
+                                                "p-2 rounded-md cursor-pointer transition-colors",
+                                                isSelected ? "bg-base-200" : "hover:bg-base-200/50"
+                                            )}
+                                            onClick={() => toggleStashExpanded(stash.index)}
+                                        >
+                                            <div className="flex flex-col gap-1">
+                                                {/* Row 1: ID and Buttons */}
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="opacity-50 text-[10px]">
                                                             {isExpanded ? '▼' : '▶'}
                                                         </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2 mb-0.5">
-                                                                <span className="text-[10px] font-mono bg-base-300 px-1 py-0.5 rounded opacity-70">
-                                                                    stash@{'{' + stash.index + '}'}
-                                                                </span>
-                                                                <span className="text-[10px] opacity-50">
-                                                                    {formatDate(stash.date)}
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-xs font-bold truncate opacity-90" title={stash.message}>
-                                                                {stash.message}
-                                                            </p>
+                                                        <span className="text-[10px] font-mono bg-base-300 px-1 py-0.5 rounded opacity-70">
+                                                            stash@{'{' + stash.index + '}'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1 shrink-0">
+                                                        <div className="tooltip tooltip-left before:whitespace-normal before:max-w-[120px]" data-tip="Apply stash (keep)">
+                                                            <button
+                                                                className="btn btn-ghost btn-xs btn-square"
+                                                                onClick={(e) => { e.stopPropagation(); handleApply(stash.index); }}
+                                                                disabled={action.isPending}
+                                                            >
+                                                                ▶️
+                                                            </button>
                                                         </div>
-                                                        <div className="flex items-center gap-1 shrink-0">
+                                                        <div className="tooltip tooltip-left before:whitespace-normal before:max-w-[120px]" data-tip="Pop stash (apply and delete)">
                                                             <button
                                                                 className="btn btn-ghost btn-xs btn-square"
                                                                 onClick={(e) => { e.stopPropagation(); handlePop(stash.index); }}
                                                                 disabled={action.isPending}
-                                                                title="Pop stash"
                                                             >
                                                                 💥
                                                             </button>
+                                                        </div>
+                                                        <div className="tooltip tooltip-left before:whitespace-normal before:max-w-[120px]" data-tip="Delete stash">
                                                             <button
                                                                 className="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10"
                                                                 onClick={(e) => { e.stopPropagation(); handleDrop(stash.index); }}
                                                                 disabled={action.isPending}
-                                                                title="Delete stash"
                                                             >
                                                                 🗑️
                                                             </button>
@@ -350,40 +325,53 @@ function StashesContent() {
                                                     </div>
                                                 </div>
 
-                                                {/* Files list when expanded */}
-                                                {isExpanded && isSelected && (
-                                                    <div className="ml-6 mt-1 space-y-0.5">
-                                                        {filesLoading ? (
-                                                            <div className="flex items-center gap-2 px-2 py-1 text-xs opacity-50">
-                                                                <span className="loading loading-spinner loading-xs"></span>
-                                                                Loading files...
-                                                            </div>
-                                                        ) : stashFiles && stashFiles.length > 0 ? (
-                                                            stashFiles.map((file) => (
-                                                                <div
-                                                                    key={file.path}
-                                                                    className={cn(
-                                                                        "flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-colors text-xs",
-                                                                        selectedFile === file.path ? "bg-primary/10 text-primary font-bold" : "hover:bg-base-200/50"
-                                                                    )}
-                                                                    onClick={(e) => { e.stopPropagation(); setSelectedFile(file.path); }}
-                                                                >
-                                                                    <span className="opacity-50">📄</span>
-                                                                    <span className="font-mono truncate flex-1" title={file.path}>{file.path}</span>
-                                                                    <span className={cn("text-[10px] uppercase font-bold", getStatusColor(file.status))} title={getStatusLabel(file.status)}>
-                                                                        {file.status}
-                                                                    </span>
-                                                                </div>
-                                                            ))
-                                                        ) : (
-                                                            <div className="px-2 py-1 text-xs opacity-50 italic">
-                                                                No files in stash
-                                                            </div>
-                                                        )}
+                                                {/* Row 2: Message */}
+                                                <div className="tooltip tooltip-bottom before:whitespace-normal before:max-w-[200px] w-full block text-left" data-tip={stash.message}>
+                                                    <p className="text-xs font-bold truncate opacity-90 w-full">
+                                                        {stash.message}
+                                                    </p>
+                                                </div>
+
+                                                {/* Row 3: Metadata */}
+                                                <div className="text-[10px] opacity-50">
+                                                    {formatDate(stash.date)}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Files list when expanded */}
+                                        {isExpanded && isSelected && (
+                                            <div className="ml-6 mt-1 space-y-0.5">
+                                                {filesLoading ? (
+                                                    <div className="flex items-center gap-2 px-2 py-1 text-xs opacity-50">
+                                                        <span className="loading loading-spinner loading-xs"></span>
+                                                        Loading files...
+                                                    </div>
+                                                ) : stashFiles && stashFiles.length > 0 ? (
+                                                    stashFiles.map((file) => (
+                                                        <div
+                                                            key={file.path}
+                                                            className={cn(
+                                                                "flex items-center gap-2 px-2 py-1 rounded cursor-pointer transition-colors text-xs",
+                                                                selectedFile === file.path ? "bg-primary/10 text-primary font-bold" : "hover:bg-base-200/50"
+                                                            )}
+                                                            onClick={(e) => { e.stopPropagation(); setSelectedFile(file.path); }}
+                                                        >
+                                                            <span className="opacity-50">📄</span>
+                                                            <span className="font-mono truncate flex-1" title={file.path}>{file.path}</span>
+                                                            <span className={cn("text-[10px] uppercase font-bold", getStatusColor(file.status))} title={getStatusLabel(file.status)}>
+                                                                {file.status}
+                                                            </span>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="px-2 py-1 text-xs opacity-50 italic">
+                                                        No files in stash
                                                     </div>
                                                 )}
                                             </div>
-                                    </ContextMenu>
+                                        )}
+                                    </div>
                                 );
                             })}
                         </div>
