@@ -12,6 +12,8 @@ export async function GET(request: Request) {
   const repoPath = searchParams.get('path');
   const filePath = searchParams.get('file');
   const commitHash = searchParams.get('commit');
+  const fromHash = searchParams.get('from');
+  const toHash = searchParams.get('to');
 
   if (!repoPath) {
     return NextResponse.json({ error: 'Repo path is required' }, { status: 400 });
@@ -35,6 +37,19 @@ export async function GET(request: Request) {
       
       // Otherwise, get the list of files changed in the commit
       const { files, diff } = await git.getCommitDiff(commitHash);
+      return NextResponse.json({ files, diff });
+    }
+
+    // If range hashes are provided, get range diff
+    if (fromHash && toHash) {
+      // If file path is also provided, get diff for that specific file in the range
+      if (filePath) {
+        const { before, after, diff } = await git.getRangeFileDiff(fromHash, toHash, filePath);
+        return NextResponse.json({ left: before, right: after, diff });
+      }
+
+      // Otherwise, get the list of files changed in the range
+      const { files, diff } = await git.getRangeDiff(fromHash, toHash);
       return NextResponse.json({ files, diff });
     }
 
