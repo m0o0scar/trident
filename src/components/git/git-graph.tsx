@@ -214,7 +214,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                 cx={node.x * LANE_WIDTH + LANE_WIDTH / 2}
                                 cy={node.y * ROW_HEIGHT + ROW_HEIGHT / 2}
                                 r={DOT_SIZE}
-                                fill="oklch(var(--b1))"
+                                fill={node.color}
                                 stroke={node.color}
                                 strokeWidth={STROKE_WIDTH}
                             />
