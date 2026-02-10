@@ -209,7 +209,7 @@ export default function CredentialsPage() {
                     {formType === 'gitlab' && editingCredential && (
                         <div className="form-control w-full">
                             <label className="label"><span className="label-text">Server URL</span></label>
-                            <div className="p-3 bg-base-200 rounded-lg text-sm font-mono flex items-center gap-2">
+                            <div className="p-3 bg-base-200 rounded-lg text-sm font-mono flex items-center gap-2 min-w-0 break-all">
                                 🖥️ {(editingCredential as GitLabCredential).serverUrl}
                             </div>
                         </div>
@@ -281,9 +281,9 @@ export default function CredentialsPage() {
         <dialog className="modal modal-open">
             <div className="modal-box">
                 <h3 className="font-bold text-lg">Delete Credential</h3>
-                <p className="py-4">
+                <p className="py-4 break-words">
                     Are you sure you want to delete this {deletingCredential?.type === 'github' ? 'GitHub' : 'GitLab'}{' '}
-                    credential for <strong>{deletingCredential?.username}</strong>? This action cannot be undone.
+                    credential for <strong className="break-all">{deletingCredential?.username}</strong>? This action cannot be undone.
                 </p>
                 <div className="modal-action">
                     <button className="btn" onClick={() => setDeletingCredential(null)}>Cancel</button>

@@ -181,8 +181,8 @@ export function RepoList() {
                 <dialog className="modal modal-open">
                     <div className="modal-box">
                         <h3 className="font-bold text-lg">Delete Repository</h3>
-                        <p className="py-4">
-                            Are you sure you want to remove <strong>{repoToDelete?.name}</strong> from the list? 
+                        <p className="py-4 break-words">
+                            Are you sure you want to remove <strong className="break-all">{repoToDelete?.name}</strong> from the list? 
                             This will only remove it from your repository list, not delete the files from your file system.
                         </p>
                         <div className="modal-action">

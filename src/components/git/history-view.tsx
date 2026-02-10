@@ -1774,15 +1774,15 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <dialog className="modal modal-open">
           <div className="modal-box">
             <h3 className="font-bold text-lg">Delete Branch</h3>
-            <p className="py-4">
-              Are you sure you want to delete the branch <span className="font-bold">{branchToDelete}</span>?
+            <p className="py-4 break-words">
+              Are you sure you want to delete the branch <span className="font-bold break-all">{branchToDelete}</span>?
               This action cannot be undone.
             </p>
             {branchToDelete && !branchToDelete.startsWith('remotes/') && branchData?.trackingInfo?.[branchToDelete] && (
                 <div className="form-control">
-                <label className="label cursor-pointer justify-start gap-2">
+                <label className="label cursor-pointer justify-start items-start gap-2 min-w-0">
                     <input type="checkbox" className="checkbox checkbox-sm" checked={deleteRemoteBranch} onChange={(e) => setDeleteRemoteBranch(e.target.checked)} disabled={isDeleting} />
-                    <span className="label-text">Delete tracking remote branch <span className="font-mono opacity-70">{branchData.trackingInfo[branchToDelete].upstream}</span></span>
+                    <span className="label-text break-words whitespace-normal">Delete tracking remote branch <span className="font-mono opacity-70 break-all">{branchData.trackingInfo[branchToDelete].upstream}</span></span>
                 </label>
                 </div>
             )}
@@ -1804,7 +1804,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <dialog className="modal modal-open">
           <div className="modal-box">
             <h3 className="font-bold text-lg">Rename Branch</h3>
-            <p className="py-4">Enter a new name for the branch <span className="font-bold">{branchToRename}</span>.</p>
+            <p className="py-4 break-words">Enter a new name for the branch <span className="font-bold break-all">{branchToRename}</span>.</p>
             <input
                 type="text"
                 className="input input-bordered w-full"
@@ -1836,9 +1836,9 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <dialog className="modal modal-open">
           <div className="modal-box">
             <h3 className="font-bold text-lg">Rebase</h3>
-            <p className="py-4">
+            <p className="py-4 break-words">
                 Copy commits from one branch to another.<br/>
-                Are you sure to rebase <span className="font-bold">{branchData?.current}</span> onto <span className="font-bold">{rebaseTargetBranch}</span>?
+                Are you sure to rebase <span className="font-bold break-all">{branchData?.current}</span> onto <span className="font-bold break-all">{rebaseTargetBranch}</span>?
             </p>
             <div className="form-control">
                 <label className="label cursor-pointer justify-start gap-2">
@@ -1869,9 +1869,9 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <dialog className="modal modal-open">
             <div className="modal-box">
                 <h3 className="font-bold text-lg">Merge</h3>
-                <p className="py-4">
+                <p className="py-4 break-words">
                     Merge branch into another one.<br/>
-                    Are you sure to merge <span className="font-bold">{branchData?.current}</span> into <span className="font-bold">{mergeTargetBranch}</span>?
+                    Are you sure to merge <span className="font-bold break-all">{branchData?.current}</span> into <span className="font-bold break-all">{mergeTargetBranch}</span>?
                 </p>
                 <div className="form-control">
                     <label className="label cursor-pointer justify-start gap-2">
@@ -1918,7 +1918,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <dialog className="modal modal-open">
             <div className="modal-box">
                 <h3 className="font-bold text-lg">Push to Remote</h3>
-                <p className="py-4">Push <span className="font-bold">{pushBranch}</span> to a remote repository.</p>
+                <p className="py-4 break-words">Push <span className="font-bold break-all">{pushBranch}</span> to a remote repository.</p>
 
                 {pushError && pushRemotes.length === 0 ? (
                     <div className="alert alert-error">
@@ -2008,7 +2008,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <dialog className="modal modal-open">
             <div className="modal-box">
                 <h3 className="font-bold text-lg">Pull from Remote</h3>
-                <p className="py-4">Pull changes from a remote branch into <span className="font-bold">{pullBranch}</span>.</p>
+                <p className="py-4 break-words">Pull changes from a remote branch into <span className="font-bold break-all">{pullBranch}</span>.</p>
 
                 {pullError && pullRemotes.length === 0 ? (
                     <div className="alert alert-error"><span>{pullError}</span></div>
@@ -2097,7 +2097,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <dialog className="modal modal-open">
             <div className="modal-box">
                 <h3 className="font-bold text-lg">Checkout to Local Branch</h3>
-                <p className="py-4">Create a local branch from <span className="font-bold">{checkoutRemoteBranch?.replace(/^remotes\//, '')}</span> and set up tracking.</p>
+                <p className="py-4 break-words">Create a local branch from <span className="font-bold break-all">{checkoutRemoteBranch?.replace(/^remotes\//, '')}</span> and set up tracking.</p>
                 <div className="form-control w-full">
                     <label className="label"><span className="label-text">Local Branch Name</span></label>
                     <input
