@@ -1116,7 +1116,6 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     
     const commitHash = branchData.branchCommits[branch];
     if (!commitHash) return;
-    setIsBranchPopoverOpen(false);
     
     // Check if commit is already in view
     const commitExists = log?.all?.some(c => c.hash === commitHash);
