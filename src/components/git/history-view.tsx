@@ -695,6 +695,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [checkoutLocalBranchName, setCheckoutLocalBranchName] = useState('');
   const [isCheckingOutToLocal, setIsCheckingOutToLocal] = useState(false);
 
+  // Reset to commit dialog state
+  const [isResetOpen, setIsResetOpen] = useState(false);
+  const [resetCommitHash, setResetCommitHash] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
+
   // Ref for GitGraph to scroll to commits
   const gitGraphRef = useRef<GitGraphHandle>(null);
   
@@ -1595,14 +1600,25 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   };
 
   const handleResetToCommit = async (commitHash: string) => {
+    setResetCommitHash(commitHash);
+    setIsResetOpen(true);
+  };
+
+  const handleConfirmReset = async () => {
+    if (!resetCommitHash) return;
+    setIsResetting(true);
     try {
       await runGitAction({
         repoPath,
         action: 'reset',
-        data: { commitHash, mode: 'hard' }
+        data: { commitHash: resetCommitHash, mode: 'hard' }
       });
+      setIsResetOpen(false);
+      setResetCommitHash(null);
     } catch (e) {
       console.error(e);
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -1800,6 +1816,29 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           </div>
         </div>
       </div>
+
+      {isResetOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Reset to Commit</h3>
+            <p className="py-4 break-words">
+              Are you sure you want to hard reset the current branch to commit <span className="font-mono bg-base-200 px-1 rounded">{resetCommitHash?.substring(0, 7)}</span>?
+              <br/>
+              <span className="text-error font-bold">Warning: This will discard all local changes and commits after this point. This action cannot be undone.</span>
+            </p>
+            <div className="modal-action">
+              <button className="btn" onClick={() => setIsResetOpen(false)} disabled={isResetting}>Cancel</button>
+              <button className="btn btn-error" onClick={handleConfirmReset} disabled={isResetting}>
+                {isResetting && <span className="loading loading-spinner loading-xs"></span>}
+                Reset
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={() => setIsResetOpen(false)}>close</button>
+          </form>
+        </dialog>
+      )}
 
       {isDeleteOpen && (
         <dialog className="modal modal-open">
