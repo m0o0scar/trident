@@ -625,6 +625,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const { data: statusData } = useGitStatus(repoPath);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
 
+  // Clear selected commit and close commit details panel when repository changes
+  useEffect(() => {
+    setSelectedHash(null);
+  }, [repoPath]);
+
   const { mutateAsync: runGitAction } = useGitAction();
   const [iscreateBranchOpen, setIsCreateBranchOpen] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
