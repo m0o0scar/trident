@@ -377,6 +377,78 @@ export class GitService {
     }
   }
 
+  async reword(commitHash: string, newMessage: string, branch?: string): Promise<void> {
+    const branchSummary = await this.git.branchLocal();
+    const currentBranch = branchSummary.current;
+    const targetBranch = branch || currentBranch;
+    const needsCheckout = targetBranch !== currentBranch;
+
+    // Check if we have uncommitted changes
+    const status = await this.git.status();
+    const hasChanges = status.files.length > 0;
+
+    if (hasChanges) {
+      // Stash changes before checkout
+      await this.git.stash(['push', '-m', 'auto-stash before reword']);
+    }
+
+    // Checkout the target branch if it's not the current one
+    if (needsCheckout) {
+      await this.git.checkout(targetBranch);
+    }
+
+    try {
+      // Verify that the commit to be reworded is the latest commit (HEAD)
+      const headCommit = await this.git.revparse(['HEAD']);
+      // We compare full hashes or short hashes? simple-git revparse returns full hash.
+      // commitHash might be short or full. Let's resolve commitHash to full hash first.
+      const resolvedCommitHash = await this.git.revparse([commitHash]);
+
+      if (headCommit.trim() !== resolvedCommitHash.trim()) {
+        throw new Error(`Commit ${commitHash} is not the latest commit on branch ${targetBranch}. Only the latest commit can be reworded.`);
+      }
+
+      // Reword the commit
+      // We use raw command to ensure we don't accidentally include other options or files,
+      // and because simple-git's commit(message, options) signature can be tricky with overloading.
+      // Also, since we stashed everything, the index is clean, so --amend will only change the message.
+      await this.git.raw(['commit', '--amend', '-m', newMessage]);
+
+      // If we switched branches, switch back
+      if (needsCheckout) {
+        await this.git.checkout(currentBranch);
+      }
+
+      // Pop stashed changes if we stashed them
+      if (hasChanges) {
+        try {
+          await this.git.stash(['pop']);
+        } catch {
+          // Stash pop might fail if there are conflicts
+          console.warn('Failed to pop stash after reword');
+        }
+      }
+    } catch (e) {
+      // If error occurs, try to restore state
+      if (needsCheckout) {
+        try {
+          await this.git.checkout(currentBranch);
+        } catch {
+            // Ignore
+        }
+      }
+
+      if (hasChanges) {
+        try {
+          await this.git.stash(['pop']);
+        } catch {
+            // Ignore
+        }
+      }
+      throw e;
+    }
+  }
+
   async getCommitDiff(commitHash: string): Promise<{ files: { path: string; additions: number; deletions: number; status: string }[]; diff: string }> {
     // Get the list of files changed in this commit with stats
     // Use -m --first-parent to handle merge commits properly:

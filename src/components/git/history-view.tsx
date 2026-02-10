@@ -719,6 +719,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [resetCommitHash, setResetCommitHash] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
 
+  const [isRewordOpen, setIsRewordOpen] = useState(false);
+  const [commitToReword, setCommitToReword] = useState<{ hash: string; message: string; branch: string } | null>(null);
+  const [newMessage, setNewMessage] = useState('');
+  const [isRewording, setIsRewording] = useState(false);
+
   // Ref for GitGraph to scroll to commits
   const gitGraphRef = useRef<GitGraphHandle>(null);
   
@@ -1670,6 +1675,35 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   };
 
+  const confirmRewordCommit = (hash: string, message: string, branch: string) => {
+    setCommitToReword({ hash, message, branch });
+    setNewMessage(message);
+    setIsRewordOpen(true);
+  };
+
+  const handleReword = async () => {
+    if (!commitToReword || !newMessage) return;
+    setIsRewording(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'reword',
+        data: {
+          commitHash: commitToReword.hash,
+          message: newMessage,
+          branch: commitToReword.branch,
+        }
+      });
+      setIsRewordOpen(false);
+      setCommitToReword(null);
+      setNewMessage('');
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRewording(false);
+    }
+  };
+
   const confirmCherryPickCommit = (commitHash: string, commitMessage: string) => {
     setCommitToCherryPick({ hash: commitHash, message: commitMessage });
     setIsCherryPickOpen(true);
@@ -1921,6 +1955,39 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           </div>
           <form method="dialog" className="modal-backdrop">
             <button onClick={() => setIsResetOpen(false)}>close</button>
+          </form>
+        </dialog>
+      )}
+
+      {isRewordOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Reword Commit</h3>
+            <p className="py-4 break-words">
+              Reword commit <span className="font-mono bg-base-200 px-1 rounded">{commitToReword?.hash.substring(0, 7)}</span> on branch <span className="font-bold">{commitToReword?.branch}</span>.
+            </p>
+            <textarea
+                className="textarea textarea-bordered w-full h-32 font-mono text-sm"
+                value={newMessage}
+                onChange={e => setNewMessage(e.target.value)}
+                placeholder="New commit message"
+                disabled={isRewording}
+            />
+            {commitToReword?.branch !== branchData?.current && (
+                <div className="alert alert-warning text-xs mt-2 py-2">
+                    <span>This will briefly checkout <b>{commitToReword?.branch}</b> to amend the commit.</span>
+                </div>
+            )}
+            <div className="modal-action">
+              <button className="btn" onClick={() => setIsRewordOpen(false)} disabled={isRewording}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleReword} disabled={!newMessage || isRewording}>
+                {isRewording && <span className="loading loading-spinner loading-xs"></span>}
+                Reword
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={() => setIsRewordOpen(false)}>close</button>
           </form>
         </dialog>
       )}
@@ -2411,6 +2478,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               }}
               onResetToCommit={handleResetToCommit}
               onCherryPickCommit={confirmCherryPickCommit}
+              onRewordCommit={confirmRewordCommit}
+              localBranches={branchData?.branches || []}
               onEndReached={() => {
                 if (!isFetching && log.all.length >= limit) {
                   setLimit(l => l + 50);

@@ -63,24 +63,28 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     onSelectCommit?: (hash: string, e: React.MouseEvent) => void,
     onResetToCommit?: (hash: string) => void,
     onCherryPickCommit?: (hash: string, message: string) => void,
+    onRewordCommit?: (hash: string, message: string, branch: string) => void,
     selectedHashes?: string[],
     // Deprecated, use selectedHashes
     selectedHash?: string,
     onEndReached?: () => void,
     isLoadingMore?: boolean,
     currentBranch?: string,
-    hiddenBranches?: Set<string>
+    hiddenBranches?: Set<string>,
+    localBranches?: string[]
 }>(function GitGraph({
     commits,
     onSelectCommit,
     onResetToCommit,
     onCherryPickCommit,
+    onRewordCommit,
     selectedHashes,
     selectedHash,
     onEndReached,
     isLoadingMore,
     currentBranch,
-    hiddenBranches
+    hiddenBranches,
+    localBranches = []
 }, ref) {
     const isSelected = (hash: string) => {
         if (selectedHashes) return selectedHashes.includes(hash);
@@ -247,6 +251,32 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                     label: "Cherry-pick commit",
                                     onClick: () => onCherryPickCommit(node.hash, node.message),
                                 });
+                            }
+
+                            if (onRewordCommit && localBranches && localBranches.length > 0) {
+                                const refs = node.refs ? node.refs.split(',').map(r => r.trim()) : [];
+                                let targetBranch: string | null = null;
+
+                                for (const ref of refs) {
+                                    // Handle "HEAD -> branch" format
+                                    const cleanRef = ref.replace(/^HEAD\s*->\s*/, '');
+
+                                    // Check if it is in localBranches
+                                    if (localBranches.includes(cleanRef)) {
+                                        targetBranch = cleanRef;
+                                        // Prioritize current branch if found
+                                        if (currentBranch && cleanRef === currentBranch) {
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (targetBranch) {
+                                    menuItems.push({
+                                        label: "Reword commit",
+                                        onClick: () => onRewordCommit(node.hash, node.message, targetBranch!),
+                                    });
+                                }
                             }
 
                             return (
