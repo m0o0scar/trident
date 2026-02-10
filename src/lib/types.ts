@@ -2,6 +2,7 @@
 export interface Repository {
   path: string;
   name: string;
+  lastOpenedAt?: string;
   credentialId?: string | null;
   expandedFolders?: string[];
   visibilityMap?: Record<string, 'visible' | 'hidden'>;

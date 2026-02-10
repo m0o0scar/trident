@@ -17,6 +17,7 @@ const updateRepoSchema = z.object({
   path: z.string().min(1),
   updates: z.object({
     name: z.string().optional(),
+    lastOpenedAt: z.string().optional(),
     credentialId: z.string().optional().nullable(),
     expandedFolders: z.array(z.string()).optional(),
     visibilityMap: z.record(z.string(), z.enum(['visible', 'hidden'])).optional(),
@@ -43,7 +44,6 @@ export async function PUT(request: Request) {
   try {
     const body = await request.json();
     const { path, updates } = updateRepoSchema.parse(body);
-    // @ts-ignore
     const repo = updateRepository(path, updates);
     return NextResponse.json(repo);
   } catch (error) {

@@ -1,5 +1,6 @@
 import { Sidebar } from '@/components/layout/sidebar';
 import { Suspense } from 'react';
+import { WorkspaceRepoOpenTracker } from '@/components/workspace-repo-open-tracker';
 
 export default function WorkspaceLayout({
     children,
@@ -8,6 +9,9 @@ export default function WorkspaceLayout({
 }) {
     return (
         <div className="flex min-h-screen max-h-screen bg-base-100">
+            <Suspense fallback={null}>
+                <WorkspaceRepoOpenTracker />
+            </Suspense>
             <Suspense fallback={<div className="w-64 border-r border-base-300 min-h-screen bg-base-200/30 flex items-center justify-center"><span className="loading loading-spinner"></span></div>}>
                 <Sidebar />
             </Suspense>
