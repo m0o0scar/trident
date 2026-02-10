@@ -1,6 +1,6 @@
 'use client';
 
-import { useGitLog, useGitBranches, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, BranchTrackingInfo, useRepository, useUpdateRepository, useSettings, useUpdateSettings } from '@/hooks/use-git';
+import { useGitLog, useGitBranches, useGitStatus, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, BranchTrackingInfo, useRepository, useUpdateRepository, useSettings, useUpdateSettings } from '@/hooks/use-git';
 import { Repository } from '@/lib/types';
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -624,6 +624,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [limit, setLimit] = useState(100);
   const { data: log, isLoading, isError, error, refetch, isFetching } = useGitLog(repoPath, limit);
   const { data: branchData, isLoading: isBranchesLoading } = useGitBranches(repoPath);
+  const { data: statusData } = useGitStatus(repoPath);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
 
   const { mutateAsync: runGitAction } = useGitAction();
@@ -1691,7 +1692,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   };
 
-  const currentBranchLabel = branchData?.current || (isBranchesLoading ? 'Loading branches...' : 'Detached HEAD');
+  const localChangesCount = statusData?.files?.length;
+  const currentBranchName = branchData?.current || (isBranchesLoading ? 'Loading branches...' : 'Detached HEAD');
+  const currentBranchLabel = branchData?.current && typeof localChangesCount === 'number' && localChangesCount > 0
+    ? `${branchData.current} (${localChangesCount})`
+    : currentBranchName;
 
   const branchTreePopoverContent = (
     <div className="w-[22rem] max-w-[calc(100vw-2rem)] flex flex-col border border-base-300 bg-base-100 rounded-box shadow-xl overflow-hidden">
