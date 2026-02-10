@@ -2276,7 +2276,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <h1 className="font-bold text-lg">History</h1>
             <div className="relative" ref={branchPopoverRef}>
               <button
-                className="btn btn-sm btn-outline gap-2 max-w-[24rem]"
+                className="btn btn-sm gap-2 max-w-[24rem]"
                 onClick={() => setIsBranchPopoverOpen(prev => !prev)}
                 title={currentBranchLabel}
               >
