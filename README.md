@@ -13,6 +13,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - **Stash Support** - Stash, reapply, and delete stashed changes
 - **Diff Viewer** - Syntax-highlighted diff view for reviewing changes
 - **Commit History** - Browse commit history with infinite scroll and branch filtering
+- **Command Palette** - Quick access to common actions via Cmd/Ctrl+K
 - **Settings** - Configure default repository folder and preferences
 - **Dark/Light Mode** - Theme toggle for comfortable viewing
 
@@ -49,6 +50,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] Rename branch
 - [x] Merge (Squash, Fast-forward options)
 - [x] Rebase (with auto-stash support)
+- [x] Squash changes (Pre-push)
 
 ### Remote Operations
 - [x] List remotes
@@ -62,12 +64,16 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] Filter history by branch visibility
 - [x] View commit details (Message, Author, Date)
 - [x] View commit diffs (Side-by-side / Inline)
+- [x] Context menus for commits and branches
 
 ### Settings & Configuration
 - [x] Default root folder for repository browsing
 - [x] Dark/Light mode toggle
+- [x] Persist UI state (Sidebar, Panels, Filters)
 
 ### Advanced / Other
+- [x] Command Palette (Cmd+K)
+- [x] Error reporting & copy
 - [ ] Cherry-pick commits
 - [ ] Revert commits
 - [ ] Tags management
@@ -81,11 +87,11 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 
 - **Framework:** [Next.js](https://nextjs.org/) 16 (App Router)
 - **Language:** TypeScript
-- **UI Components:** [Radix UI](https://www.radix-ui.com/)
+- **UI Components:** [DaisyUI](https://daisyui.com/)
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/) 4
 - **State Management:** [TanStack Query](https://tanstack.com/query)
 - **Git Operations:** [simple-git](https://github.com/steveukx/git-js)
-- **Diff Rendering:** [react-diff-viewer](https://github.com/praneshr/react-diff-viewer)
+- **Diff Rendering:** [@alexbruf/react-diff-viewer](https://www.npmjs.com/package/@alexbruf/react-diff-viewer)
 - **Theming:** [next-themes](https://github.com/pacocoursey/next-themes)
 - **Validation:** [Zod](https://zod.dev/)
 
