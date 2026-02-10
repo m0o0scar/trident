@@ -17,50 +17,6 @@ export function useSettings() {
   });
 }
 
-export function useRangeDiff(repoPath: string | null, fromHash: string | null, toHash: string | null) {
-  return useQuery<{ files: CommitFile[]; diff: string }>({
-    queryKey: ['git', repoPath, 'range-diff', fromHash, toHash],
-    queryFn: async () => {
-      if (!repoPath || !fromHash || !toHash) return null;
-      const res = await fetch(`${API_BASE}/git/diff?path=${encodeURIComponent(repoPath)}&from=${encodeURIComponent(fromHash)}&to=${encodeURIComponent(toHash)}`);
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        const err = new Error(errorData.error || 'Failed to fetch range diff');
-        (err as any).status = res.status;
-        throw err;
-      }
-      return res.json();
-    },
-    enabled: !!repoPath && !!fromHash && !!toHash,
-    retry: (failureCount, error: any) => {
-      if (error.status === 404 || error.status === 400) return false;
-      return failureCount < 3;
-    },
-  });
-}
-
-export function useRangeFileDiff(repoPath: string | null, fromHash: string | null, toHash: string | null, filePath: string | null) {
-  return useQuery<{ left: string; right: string; diff: string }>({
-    queryKey: ['git', repoPath, 'range-file-diff', fromHash, toHash, filePath],
-    queryFn: async () => {
-      if (!repoPath || !fromHash || !toHash || !filePath) return null;
-      const res = await fetch(`${API_BASE}/git/diff?path=${encodeURIComponent(repoPath)}&from=${encodeURIComponent(fromHash)}&to=${encodeURIComponent(toHash)}&file=${encodeURIComponent(filePath)}`);
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        const err = new Error(errorData.error || 'Failed to fetch range file diff');
-        (err as any).status = res.status;
-        throw err;
-      }
-      return res.json();
-    },
-    enabled: !!repoPath && !!fromHash && !!toHash && !!filePath,
-    retry: (failureCount, error: any) => {
-      if (error.status === 404 || error.status === 400) return false;
-      return failureCount < 3;
-    },
-  });
-}
-
 export function useUpdateSettings() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -382,7 +338,7 @@ export function useStashFileDiff(repoPath: string | null, stashIndex: number | n
 }
 
 // Actions
-export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'reset' | 'cherry-pick' | 'rebase' | 'merge' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop';
+export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'reset' | 'cherry-pick' | 'rebase' | 'merge' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop' | 'reword';
 
 // Map action types to human-readable operation names
 const actionOperationNames: Record<GitActionType, string> = {
@@ -411,6 +367,7 @@ const actionOperationNames: Record<GitActionType, string> = {
   'stash-apply': 'Apply Stash',
   'stash-drop': 'Drop Stash',
   'stash-pop': 'Pop Stash',
+  'reword': 'Reword Commit',
 };
 
 interface GitActionPayload {

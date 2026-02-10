@@ -60,33 +60,29 @@ export interface GitGraphHandle {
 
 export const GitGraph = forwardRef<GitGraphHandle, {
     commits: Commit[],
-    onSelectCommit?: (hash: string, e: React.MouseEvent) => void,
+    onSelectCommit?: (hash: string) => void,
     onResetToCommit?: (hash: string) => void,
     onCherryPickCommit?: (hash: string, message: string) => void,
-    selectedHashes?: string[],
-    // Deprecated, use selectedHashes
+    onRewordCommit?: (hash: string, message: string, branch: string) => void,
     selectedHash?: string,
     onEndReached?: () => void,
     isLoadingMore?: boolean,
     currentBranch?: string,
-    hiddenBranches?: Set<string>
+    hiddenBranches?: Set<string>,
+    localBranches?: string[]
 }>(function GitGraph({
     commits,
     onSelectCommit,
     onResetToCommit,
     onCherryPickCommit,
-    selectedHashes,
+    onRewordCommit,
     selectedHash,
     onEndReached,
     isLoadingMore,
     currentBranch,
-    hiddenBranches
+    hiddenBranches,
+    localBranches = []
 }, ref) {
-    const isSelected = (hash: string) => {
-        if (selectedHashes) return selectedHashes.includes(hash);
-        if (selectedHash) return selectedHash === hash;
-        return false;
-    };
     const nodes = useMemo(() => generateGraphData(commits), [commits]);
     const scrollRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -249,15 +245,42 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                 });
                             }
 
+                            if (onRewordCommit && localBranches && localBranches.length > 0) {
+                                // Clean up refs: remove parentheses and split
+                                const refs = node.refs ? node.refs.replace(/[()]/g, '').split(',').map(r => r.trim()) : [];
+                                let targetBranch: string | null = null;
+
+                                for (const ref of refs) {
+                                    // Handle "HEAD -> branch" format
+                                    const cleanRef = ref.replace(/^HEAD\s*->\s*/, '');
+
+                                    // Check if it is in localBranches
+                                    if (localBranches.includes(cleanRef)) {
+                                        targetBranch = cleanRef;
+                                        // Prioritize current branch if found
+                                        if (currentBranch && cleanRef === currentBranch) {
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                if (targetBranch) {
+                                    menuItems.push({
+                                        label: "Reword commit",
+                                        onClick: () => onRewordCommit(node.hash, node.message, targetBranch!),
+                                    });
+                                }
+                            }
+
                             return (
                             <ContextMenu key={node.hash} items={menuItems}>
                                 <div
                                     className={cn(
                                         "flex items-center hover:bg-base-200 border-b border-base-200 last:border-0 cursor-pointer transition-colors text-xs",
-                                        isSelected(node.hash) && "bg-primary/10"
+                                        selectedHash === node.hash && "bg-primary/10"
                                     )}
                                     style={{ height: ROW_HEIGHT }}
-                                    onClick={(e) => onSelectCommit?.(node.hash, e)}
+                                    onClick={() => onSelectCommit?.(node.hash)}
                                 >
                                     {/* Spacing for Graph */}
                                     <div style={{ width: width, flexShrink: 0 }} />
@@ -301,7 +324,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                                     </span>
                                                 );
                                             })}
-                                            <span className={cn("truncate min-w-0 max-w-[600px]", isSelected(node.hash) ? "font-semibold" : "")} title={node.message}>
+                                            <span className={cn("truncate min-w-0 max-w-[600px]", selectedHash === node.hash ? "font-semibold" : "")} title={node.message}>
                                                 <HighlightedText text={node.message} searchQuery={searchQuery} />
                                             </span>
                                         </div>

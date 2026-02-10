@@ -377,6 +377,78 @@ export class GitService {
     }
   }
 
+  async reword(commitHash: string, newMessage: string, branch?: string): Promise<void> {
+    const branchSummary = await this.git.branchLocal();
+    const currentBranch = branchSummary.current;
+    const targetBranch = branch || currentBranch;
+    const needsCheckout = targetBranch !== currentBranch;
+
+    // Check if we have uncommitted changes
+    const status = await this.git.status();
+    const hasChanges = status.files.length > 0;
+
+    if (hasChanges) {
+      // Stash changes before checkout
+      await this.git.stash(['push', '-m', 'auto-stash before reword']);
+    }
+
+    // Checkout the target branch if it's not the current one
+    if (needsCheckout) {
+      await this.git.checkout(targetBranch);
+    }
+
+    try {
+      // Verify that the commit to be reworded is the latest commit (HEAD)
+      const headCommit = await this.git.revparse(['HEAD']);
+      // We compare full hashes or short hashes? simple-git revparse returns full hash.
+      // commitHash might be short or full. Let's resolve commitHash to full hash first.
+      const resolvedCommitHash = await this.git.revparse([commitHash]);
+
+      if (headCommit.trim() !== resolvedCommitHash.trim()) {
+        throw new Error(`Commit ${commitHash} is not the latest commit on branch ${targetBranch}. Only the latest commit can be reworded.`);
+      }
+
+      // Reword the commit
+      // We use raw command to ensure we don't accidentally include other options or files,
+      // and because simple-git's commit(message, options) signature can be tricky with overloading.
+      // Also, since we stashed everything, the index is clean, so --amend will only change the message.
+      await this.git.raw(['commit', '--amend', '-m', newMessage]);
+
+      // If we switched branches, switch back
+      if (needsCheckout) {
+        await this.git.checkout(currentBranch);
+      }
+
+      // Pop stashed changes if we stashed them
+      if (hasChanges) {
+        try {
+          await this.git.stash(['pop']);
+        } catch {
+          // Stash pop might fail if there are conflicts
+          console.warn('Failed to pop stash after reword');
+        }
+      }
+    } catch (e) {
+      // If error occurs, try to restore state
+      if (needsCheckout) {
+        try {
+          await this.git.checkout(currentBranch);
+        } catch {
+            // Ignore
+        }
+      }
+
+      if (hasChanges) {
+        try {
+          await this.git.stash(['pop']);
+        } catch {
+            // Ignore
+        }
+      }
+      throw e;
+    }
+  }
+
   async getCommitDiff(commitHash: string): Promise<{ files: { path: string; additions: number; deletions: number; status: string }[]; diff: string }> {
     // Get the list of files changed in this commit with stats
     // Use -m --first-parent to handle merge commits properly:
@@ -424,53 +496,6 @@ export class GitService {
         console.warn('Failed to get commit file diff:', e);
     }
     
-    return { before, after, diff };
-  }
-
-  async getRangeDiff(fromHash: string, toHash: string): Promise<{ files: { path: string; additions: number; deletions: number; status: string }[]; diff: string }> {
-    // get list of files changed between two commits
-    // git diff --name-status from..to
-    const diffStat = await this.git.raw(['diff', '--name-status', `${fromHash}..${toHash}`]);
-    const files = diffStat.trim().split('\n').filter(Boolean).map(line => {
-      const [status, ...pathParts] = line.split('\t');
-      const path = pathParts.join('\t');
-      return { path, status, additions: 0, deletions: 0 };
-    });
-
-    // get the full diff between two commits
-    // git diff from..to
-    const diff = await this.git.raw(['diff', `${fromHash}..${toHash}`]);
-
-    return { files, diff };
-  }
-
-  async getRangeFileDiff(fromHash: string, toHash: string, filePath: string): Promise<{ before: string; after: string; diff: string }> {
-    // Get file content at fromHash
-    let before = '';
-    try {
-      before = await this.git.show([`${fromHash}:${filePath}`]);
-    } catch {
-      // File didn't exist at fromHash
-      before = '';
-    }
-
-    // Get file content at toHash
-    let after = '';
-    try {
-      after = await this.git.show([`${toHash}:${filePath}`]);
-    } catch {
-      // File deleted at toHash
-      after = '';
-    }
-
-    // Get the diff string
-    let diff = '';
-    try {
-      diff = await this.git.raw(['diff', `${fromHash}..${toHash}`, '--', filePath]);
-    } catch (e) {
-      console.warn('Failed to get range file diff:', e);
-    }
-
     return { before, after, diff };
   }
 
@@ -891,8 +916,12 @@ export class GitService {
         console.log('[pushToRemote] Remote branch does not exist:', remoteFull);
       }
       
-      // Only rebase/merge if the remote branch exists
-      if (remoteBranchExists) {
+      // Force push should overwrite remote history with local state.
+      // Do not integrate remote commits first, otherwise remote history is preserved.
+      const shouldIntegrateRemote = remoteBranchExists && !forcePush;
+
+      // Only rebase/merge if the remote branch exists and force push is not requested
+      if (shouldIntegrateRemote) {
         if (rebaseFirst) {
           // Remote branch exists, rebase onto it
           console.log('[pushToRemote] Rebasing onto:', remoteFull);
@@ -916,6 +945,8 @@ export class GitService {
             await this.git.commit(message);
             console.log('[pushToRemote] Squash completed');
         }
+      } else if (remoteBranchExists && forcePush) {
+          console.log('[pushToRemote] Force push requested; skipping pre-push rebase/merge to avoid preserving remote history');
       } else if (squash) {
           console.warn('[pushToRemote] Cannot squash: remote branch does not exist');
           // We could throw here, or just continue without squashing.

@@ -8,7 +8,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'reset', 'cherry-pick', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'reset', 'cherry-pick', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -144,6 +144,11 @@ export async function POST(request: Request) {
         if (!data?.ontoBranch) throw new Error('Target branch is required for rebase');
         await git.rebase(data.ontoBranch, data.stashChanges ?? true);
         break;
+      case 'reword':
+        if (!data?.commitHash) throw new Error('Commit hash is required for reword');
+        if (!data?.message) throw new Error('New message is required for reword');
+        await git.reword(data.commitHash, data.message, data.branch);
+        break;
       case 'merge':
         if (!data?.targetBranch) throw new Error('Target branch is required for merge');
         await git.merge(data.targetBranch, {
@@ -174,7 +179,7 @@ export async function POST(request: Request) {
         
         console.log('[API] Calling git.pushToRemote...');
         await git.pushToRemote(data.localBranch, data.remote, data.remoteBranch, {
-          rebaseFirst: data.rebaseFirst ?? true,
+          rebaseFirst: data.rebaseFirst ?? !(data.forcePush ?? false),
           forcePush: data.forcePush ?? false,
           setUpstream: data.setUpstream ?? false,
           squash: data.squash ?? false,
