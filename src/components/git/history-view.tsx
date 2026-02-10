@@ -4,12 +4,11 @@ import { useGitLog, useGitBranches, useGitStatus, useGitAction, useCommitDiff, u
 import { Repository } from '@/lib/types';
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import ReactDiffViewer from '@alexbruf/react-diff-viewer';
-import '@alexbruf/react-diff-viewer/index.css';
 import { useTheme } from 'next-themes';
 import { cn, sanitizeBranchName, isFileBinary } from '@/lib/utils';
 import { ContextMenu } from '@/components/context-menu';
 import { ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, Bars3CenterLeftIcon, ChevronDownIcon, EyeIcon, EyeSlashIcon, FolderIcon, FunnelIcon, GlobeAltIcon, PlusCircleIcon } from '@heroicons/react/24/outline';
+import { GroupedDiffViewer } from './grouped-diff-viewer';
 
 
 // Visibility state for branches/folders
@@ -112,12 +111,11 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
 
   return (
     <div className="overflow-auto h-full">
-      <ReactDiffViewer
+      <GroupedDiffViewer
         oldValue={data.left || ''}
         newValue={data.right || ''}
         splitView={splitView}
         useDarkTheme={resolvedTheme === 'dark'}
-        disableWordDiff={true}
       />
     </div>
   );

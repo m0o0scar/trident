@@ -1,11 +1,10 @@
 'use client';
 
 import { useGitDiff } from '@/hooks/use-git';
-import ReactDiffViewer from '@alexbruf/react-diff-viewer';
-import '@alexbruf/react-diff-viewer/index.css';
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { isFileBinary } from '@/lib/utils';
+import { GroupedDiffViewer } from './grouped-diff-viewer';
 
 export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: string }) {
   const { data, isLoading } = useGitDiff(repoPath, filePath);
@@ -121,12 +120,11 @@ export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: s
             </button>
           </div>
         ) : (
-          <ReactDiffViewer
+          <GroupedDiffViewer
             oldValue={data.left || ''}
             newValue={data.right || ''}
             splitView={splitView}
             useDarkTheme={resolvedTheme === 'dark'}
-            disableWordDiff={true}
           />
         )}
       </div>

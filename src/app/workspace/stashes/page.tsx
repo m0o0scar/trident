@@ -5,10 +5,9 @@ import { Suspense, useState, useEffect } from 'react';
 import { useWorkspaceTitle } from '@/hooks/use-workspace-title';
 import { useGitStashes, useGitAction, useStashFiles, useStashFileDiff } from '@/hooks/use-git';
 import { cn } from '@/lib/utils';
-import ReactDiffViewer from '@alexbruf/react-diff-viewer';
-import '@alexbruf/react-diff-viewer/index.css';
 import { useTheme } from 'next-themes';
 import { ArrowPathIcon, ArrowUturnUpIcon, PlayIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { GroupedDiffViewer } from '@/components/git/grouped-diff-viewer';
 
 // Check if content appears to be binary
 function isBinaryContent(content: string): boolean {
@@ -129,12 +128,11 @@ function StashDiffView({ repoPath, stashIndex, filePath }: { repoPath: string; s
                         </button>
                     </div>
                 ) : (
-                    <ReactDiffViewer
+                    <GroupedDiffViewer
                         oldValue={data.left || ''}
                         newValue={data.right || ''}
                         splitView={splitView}
                         useDarkTheme={resolvedTheme === 'dark'}
-                        disableWordDiff={true}
                     />
                 )}
             </div>
