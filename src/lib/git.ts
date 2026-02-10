@@ -499,53 +499,6 @@ export class GitService {
     return { before, after, diff };
   }
 
-  async getRangeDiff(fromHash: string, toHash: string): Promise<{ files: { path: string; additions: number; deletions: number; status: string }[]; diff: string }> {
-    // get list of files changed between two commits
-    // git diff --name-status from..to
-    const diffStat = await this.git.raw(['diff', '--name-status', `${fromHash}..${toHash}`]);
-    const files = diffStat.trim().split('\n').filter(Boolean).map(line => {
-      const [status, ...pathParts] = line.split('\t');
-      const path = pathParts.join('\t');
-      return { path, status, additions: 0, deletions: 0 };
-    });
-
-    // get the full diff between two commits
-    // git diff from..to
-    const diff = await this.git.raw(['diff', `${fromHash}..${toHash}`]);
-
-    return { files, diff };
-  }
-
-  async getRangeFileDiff(fromHash: string, toHash: string, filePath: string): Promise<{ before: string; after: string; diff: string }> {
-    // Get file content at fromHash
-    let before = '';
-    try {
-      before = await this.git.show([`${fromHash}:${filePath}`]);
-    } catch {
-      // File didn't exist at fromHash
-      before = '';
-    }
-
-    // Get file content at toHash
-    let after = '';
-    try {
-      after = await this.git.show([`${toHash}:${filePath}`]);
-    } catch {
-      // File deleted at toHash
-      after = '';
-    }
-
-    // Get the diff string
-    let diff = '';
-    try {
-      diff = await this.git.raw(['diff', `${fromHash}..${toHash}`, '--', filePath]);
-    } catch (e) {
-      console.warn('Failed to get range file diff:', e);
-    }
-
-    return { before, after, diff };
-  }
-
   async merge(
     targetBranch: string,
     options: {
