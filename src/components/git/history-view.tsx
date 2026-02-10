@@ -652,6 +652,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [branchToRename, setBranchToRename] = useState<string | null>(null);
   const [remoteBranchToRename, setRemoteBranchToRename] = useState<{ remote: string; branch: string } | null>(null);
   const [newBranchNameForRename, setNewBranchNameForRename] = useState('');
+  const [renameTrackingRemoteBranch, setRenameTrackingRemoteBranch] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
 
   const [isRebaseOpen, setIsRebaseOpen] = useState(false);
@@ -1211,6 +1212,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setRemoteBranchToRename(null);
     // Pre-fill with current branch name
     setNewBranchNameForRename(branch);
+    setRenameTrackingRemoteBranch(false);
     setIsRenameOpen(true);
   }
 
@@ -1225,6 +1227,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setBranchToRename(fullRemoteBranch);
     setRemoteBranchToRename({ remote, branch });
     setNewBranchNameForRename(branch);
+    setRenameTrackingRemoteBranch(false);
     setIsRenameOpen(true);
   }
 
@@ -1239,6 +1242,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       setBranchToRename(null);
       setRemoteBranchToRename(null);
       setNewBranchNameForRename('');
+      setRenameTrackingRemoteBranch(false);
       return;
     }
     setIsRenaming(true);
@@ -1257,13 +1261,18 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         await runGitAction({
           repoPath,
           action: 'rename-branch',
-          data: { oldName: branchToRename, newName: newBranchNameForRename }
+          data: {
+            oldName: branchToRename,
+            newName: newBranchNameForRename,
+            renameTrackingRemote: renameTrackingRemoteBranch,
+          }
         });
       }
       setIsRenameOpen(false);
       setBranchToRename(null);
       setRemoteBranchToRename(null);
       setNewBranchNameForRename('');
+      setRenameTrackingRemoteBranch(false);
     } catch (e) {
       console.error(e);
     } finally {
@@ -1770,6 +1779,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   const currentBranch = branchData?.current;
   const trackingInfoByBranch = branchData?.trackingInfo;
+  const trackingInfoForRename = useMemo(() => {
+    if (!branchToRename || remoteBranchToRename) return null;
+    return trackingInfoByBranch?.[branchToRename] ?? null;
+  }, [branchToRename, remoteBranchToRename, trackingInfoByBranch]);
   const localChangesCount = statusData?.files?.length;
   const currentBranchName = currentBranch || (isBranchesLoading ? 'Loading branches...' : 'Detached HEAD');
   const currentBranchLabel = currentBranch && typeof localChangesCount === 'number' && localChangesCount > 0
@@ -2114,6 +2127,22 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                     }
                 }}
             />
+            {!remoteBranchToRename && trackingInfoForRename?.upstream && (
+              <div className="form-control mt-2">
+                <label className="label cursor-pointer justify-start items-start gap-2 min-w-0">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm"
+                    checked={renameTrackingRemoteBranch}
+                    onChange={(e) => setRenameTrackingRemoteBranch(e.target.checked)}
+                    disabled={isRenaming}
+                  />
+                  <span className="label-text break-words whitespace-normal">
+                    Also rename tracking remote branch <span className="font-mono opacity-70 break-all">{trackingInfoForRename.upstream}</span>
+                  </span>
+                </label>
+              </div>
+            )}
             <div className="modal-action">
               <button
                 className="btn"
@@ -2122,6 +2151,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   setBranchToRename(null);
                   setRemoteBranchToRename(null);
                   setNewBranchNameForRename('');
+                  setRenameTrackingRemoteBranch(false);
                 }}
                 disabled={isRenaming}
               >
@@ -2150,6 +2180,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 setBranchToRename(null);
                 setRemoteBranchToRename(null);
                 setNewBranchNameForRename('');
+                setRenameTrackingRemoteBranch(false);
               }}
             >
               close

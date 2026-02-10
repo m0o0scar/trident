@@ -130,7 +130,18 @@ export async function POST(request: Request) {
       case 'rename-branch':
         if (!data?.oldName) throw new Error('Old branch name is required to rename branch');
         if (!data?.newName) throw new Error('New branch name is required to rename branch');
-        await git.renameBranch(data.oldName, data.newName);
+        if (data?.renameTrackingRemote) {
+          const tracking = await git.getTrackingBranch(data.oldName);
+          const renameTrackingCreds = tracking
+            ? await resolveCredentials(repoPath, git, tracking.remote)
+            : undefined;
+          await git.renameBranch(data.oldName, data.newName, {
+            renameTrackingRemote: true,
+            credentials: renameTrackingCreds,
+          });
+        } else {
+          await git.renameBranch(data.oldName, data.newName);
+        }
         break;
       case 'rename-remote-branch':
         if (!data?.remote) throw new Error('Remote name is required to rename remote branch');

@@ -330,8 +330,36 @@ export class GitService {
     }
   }
 
-  async renameBranch(oldName: string, newName: string): Promise<void> {
+  async renameBranch(
+    oldName: string,
+    newName: string,
+    options: {
+      renameTrackingRemote?: boolean;
+      credentials?: { username: string; token: string };
+    } = {}
+  ): Promise<void> {
+    const { renameTrackingRemote = false, credentials } = options;
+    const trackingBeforeRename = renameTrackingRemote
+      ? await this.getTrackingBranch(oldName)
+      : null;
+
     await this.git.branch(['-m', oldName, newName]);
+
+    if (!renameTrackingRemote || !trackingBeforeRename) return;
+
+    await this.renameRemoteBranch(
+      trackingBeforeRename.remote,
+      trackingBeforeRename.branch,
+      newName,
+      credentials
+    );
+
+    // Keep the renamed local branch tracking the renamed remote branch.
+    try {
+      await this.git.branch(['--set-upstream-to', `${trackingBeforeRename.remote}/${newName}`, newName]);
+    } catch (e) {
+      console.debug(`[renameBranch] Could not set upstream for ${newName} to ${trackingBeforeRename.remote}/${newName}:`, e);
+    }
   }
 
   async renameRemoteBranch(
@@ -360,12 +388,13 @@ export class GitService {
       }
     }
 
-    // Create the new remote branch from the old one, then delete the old remote branch.
-    await this.git.push([targetRemote, `${oldName}:refs/heads/${newName}`]);
+    // Create the new remote branch from the old remote-tracking ref, then delete the old remote branch.
+    // Using the remote-tracking ref avoids requiring a same-named local branch to exist.
+    const oldTrackingRef = `refs/remotes/${remote}/${oldName}`;
+    await this.git.push([targetRemote, `${oldTrackingRef}:refs/heads/${newName}`]);
     await this.git.push([targetRemote, '--delete', oldName]);
 
     // Update remote-tracking refs locally so the branches tree reflects the rename immediately.
-    const oldTrackingRef = `refs/remotes/${remote}/${oldName}`;
     const newTrackingRef = `refs/remotes/${remote}/${newName}`;
     try {
       const oldTrackingHash = (await this.git.revparse([oldTrackingRef])).trim();
