@@ -411,6 +411,7 @@ function BranchTreeItem({
   onCreateBranch,
   onDeleteBranch,
   onRenameBranch,
+  onRenameRemoteBranch,
   onRebase,
   onMerge,
   onPushToRemote,
@@ -433,6 +434,7 @@ function BranchTreeItem({
   onCreateBranch: () => void;
   onDeleteBranch: (branch: string) => void;
   onRenameBranch: (branch: string) => void;
+  onRenameRemoteBranch: (branch: string) => void;
   onRebase: (targetBranch: string) => void;
   onMerge: (targetBranch: string) => void;
   onPushToRemote: (branch: string) => void;
@@ -513,6 +515,7 @@ function BranchTreeItem({
                   onCreateBranch={onCreateBranch}
                   onDeleteBranch={onDeleteBranch}
                   onRenameBranch={onRenameBranch}
+                  onRenameRemoteBranch={onRenameRemoteBranch}
                   onRebase={onRebase}
                   onMerge={onMerge}
                   onPushToRemote={onPushToRemote}
@@ -537,14 +540,15 @@ function BranchTreeItem({
 
         const menuItems = [];
         if (!isCurrent && !isRemote) menuItems.push({ label: "Checkout", onClick: () => onCheckout(child.fullPath!) });
-        if (isRemote) menuItems.push({ label: "Checkout to local...", onClick: () => onCheckoutToLocal(child.fullPath!) });
-        menuItems.push({ label: "Create Branch...", onClick: onCreateBranch });
-        if (!isRemote) menuItems.push({ label: "Rename Branch...", onClick: () => onRenameBranch(child.fullPath!) });
-        if (!isRemote) menuItems.push({ label: "Push to Remote...", onClick: () => onPushToRemote(child.fullPath!) });
-        if (!isRemote) menuItems.push({ label: "Pull from Remote...", onClick: () => onPullFromRemote(child.fullPath!) });
+        if (isRemote) menuItems.push({ label: "Checkout to local", onClick: () => onCheckoutToLocal(child.fullPath!) });
+        menuItems.push({ label: "Create Branch", onClick: onCreateBranch });
+        if (!isRemote) menuItems.push({ label: "Rename Branch", onClick: () => onRenameBranch(child.fullPath!) });
+        if (isRemote) menuItems.push({ label: "Rename branch", onClick: () => onRenameRemoteBranch(child.fullPath!) });
+        if (!isRemote) menuItems.push({ label: "Push to Remote", onClick: () => onPushToRemote(child.fullPath!) });
+        if (!isRemote) menuItems.push({ label: "Pull from Remote", onClick: () => onPullFromRemote(child.fullPath!) });
         if (!isCurrent) menuItems.push({ label: `Rebase ${currentBranch} onto ${child.name}`, onClick: () => onRebase(child.fullPath!) });
         if (!isCurrent) menuItems.push({ label: `Merge ${child.name} into ${currentBranch}`, onClick: () => onMerge(child.fullPath!) });
-        if (!isCurrent) menuItems.push({ label: isRemote ? "Delete Remote Branch..." : "Delete Branch...", onClick: () => onDeleteBranch(child.fullPath!), danger: true });
+        if (!isCurrent) menuItems.push({ label: isRemote ? "Delete Remote Branch" : "Delete Branch", onClick: () => onDeleteBranch(child.fullPath!), danger: true });
 
 
         return (
@@ -646,6 +650,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [branchToRename, setBranchToRename] = useState<string | null>(null);
+  const [remoteBranchToRename, setRemoteBranchToRename] = useState<{ remote: string; branch: string } | null>(null);
   const [newBranchNameForRename, setNewBranchNameForRename] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
 
@@ -1203,26 +1208,61 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   const confirmRenameBranch = (branch: string) => {
     setBranchToRename(branch);
+    setRemoteBranchToRename(null);
     // Pre-fill with current branch name
+    setNewBranchNameForRename(branch);
+    setIsRenameOpen(true);
+  }
+
+  const confirmRenameRemoteBranch = (fullRemoteBranch: string) => {
+    const parts = fullRemoteBranch.split('/');
+    if (parts.length < 3 || parts[0] !== 'remotes') return;
+
+    const remote = parts[1];
+    const branch = parts.slice(2).join('/');
+    if (!remote || !branch) return;
+
+    setBranchToRename(fullRemoteBranch);
+    setRemoteBranchToRename({ remote, branch });
     setNewBranchNameForRename(branch);
     setIsRenameOpen(true);
   }
 
   const handleRenameBranch = async () => {
     if (!branchToRename || !newBranchNameForRename) return;
-    if (branchToRename === newBranchNameForRename) {
+    const isSameName = remoteBranchToRename
+      ? remoteBranchToRename.branch === newBranchNameForRename
+      : branchToRename === newBranchNameForRename;
+
+    if (isSameName) {
       setIsRenameOpen(false);
+      setBranchToRename(null);
+      setRemoteBranchToRename(null);
+      setNewBranchNameForRename('');
       return;
     }
     setIsRenaming(true);
     try {
-      await runGitAction({
-        repoPath,
-        action: 'rename-branch',
-        data: { oldName: branchToRename, newName: newBranchNameForRename }
-      });
+      if (remoteBranchToRename) {
+        await runGitAction({
+          repoPath,
+          action: 'rename-remote-branch',
+          data: {
+            remote: remoteBranchToRename.remote,
+            oldName: remoteBranchToRename.branch,
+            newName: newBranchNameForRename,
+          }
+        });
+      } else {
+        await runGitAction({
+          repoPath,
+          action: 'rename-branch',
+          data: { oldName: branchToRename, newName: newBranchNameForRename }
+        });
+      }
       setIsRenameOpen(false);
       setBranchToRename(null);
+      setRemoteBranchToRename(null);
       setNewBranchNameForRename('');
     } catch (e) {
       console.error(e);
@@ -1811,6 +1851,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   onCreateBranch={() => setIsCreateBranchOpen(true)}
                   onDeleteBranch={confirmDeleteBranch}
                   onRenameBranch={confirmRenameBranch}
+                  onRenameRemoteBranch={confirmRenameRemoteBranch}
                   onRebase={confirmRebase}
                   onMerge={confirmMerge}
                   onPushToRemote={confirmPushToRemote}
@@ -1874,6 +1915,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                         onCreateBranch={() => setIsCreateBranchOpen(true)}
                         onDeleteBranch={confirmDeleteBranch}
                         onRenameBranch={confirmRenameBranch}
+                        onRenameRemoteBranch={confirmRenameRemoteBranch}
                         onRebase={confirmRebase}
                         onMerge={confirmMerge}
                         onPushToRemote={confirmPushToRemote}
@@ -2051,8 +2093,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       {isRenameOpen && (
         <dialog className="modal modal-open">
           <div className="modal-box">
-            <h3 className="font-bold text-lg">Rename Branch</h3>
-            <p className="py-4 break-words">Enter a new name for the branch <span className="font-bold break-all">{branchToRename}</span>.</p>
+            <h3 className="font-bold text-lg">{remoteBranchToRename ? 'Rename Remote Branch' : 'Rename Branch'}</h3>
+            <p className="py-4 break-words">
+              Enter a new name for the branch <span className="font-bold break-all">{branchToRename}</span>. Press <kbd className="kbd kbd-sm">Cmd</kbd>+<kbd className="kbd kbd-sm">Enter</kbd> to confirm.
+            </p>
             <input
                 type="text"
                 className="input input-bordered w-full"
@@ -2061,21 +2105,55 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 placeholder="New branch name"
                 disabled={isRenaming}
                 onKeyDown={e => {
-                    if (e.key === 'Enter' && newBranchNameForRename && newBranchNameForRename !== branchToRename && !isRenaming) {
+                    const shortcutPressed = e.key === 'Enter' && (e.metaKey || e.ctrlKey);
+                    const sameName = remoteBranchToRename
+                      ? newBranchNameForRename === remoteBranchToRename.branch
+                      : newBranchNameForRename === branchToRename;
+                    if (shortcutPressed && newBranchNameForRename && !sameName && !isRenaming) {
                         handleRenameBranch();
                     }
                 }}
             />
             <div className="modal-action">
-              <button className="btn" onClick={() => setIsRenameOpen(false)} disabled={isRenaming}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleRenameBranch} disabled={!newBranchNameForRename || newBranchNameForRename === branchToRename || isRenaming}>
+              <button
+                className="btn"
+                onClick={() => {
+                  setIsRenameOpen(false);
+                  setBranchToRename(null);
+                  setRemoteBranchToRename(null);
+                  setNewBranchNameForRename('');
+                }}
+                disabled={isRenaming}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleRenameBranch}
+                disabled={
+                  !newBranchNameForRename ||
+                  (remoteBranchToRename
+                    ? newBranchNameForRename === remoteBranchToRename.branch
+                    : newBranchNameForRename === branchToRename) ||
+                  isRenaming
+                }
+              >
                 {isRenaming && <span className="loading loading-spinner loading-xs"></span>}
                 Rename
               </button>
             </div>
           </div>
           <form method="dialog" className="modal-backdrop">
-            <button onClick={() => setIsRenameOpen(false)}>close</button>
+            <button
+              onClick={() => {
+                setIsRenameOpen(false);
+                setBranchToRename(null);
+                setRemoteBranchToRename(null);
+                setNewBranchNameForRename('');
+              }}
+            >
+              close
+            </button>
           </form>
         </dialog>
       )}

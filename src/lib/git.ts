@@ -334,6 +334,53 @@ export class GitService {
     await this.git.branch(['-m', oldName, newName]);
   }
 
+  async renameRemoteBranch(
+    remote: string,
+    oldName: string,
+    newName: string,
+    credentials?: { username: string; token: string }
+  ): Promise<void> {
+    if (oldName === newName) return;
+
+    let targetRemote = remote;
+
+    if (credentials) {
+      const remoteUrl = await this.getRemoteUrl(remote);
+      if (remoteUrl) {
+        try {
+          const urlObj = new URL(remoteUrl);
+          urlObj.username = credentials.username;
+          urlObj.password = credentials.token;
+          targetRemote = urlObj.toString();
+        } catch (e) {
+          console.warn('[renameRemoteBranch] Failed to construct authenticated URL, falling back to remote name', e);
+        }
+      } else {
+        console.warn(`[renameRemoteBranch] Could not resolve URL for remote '${remote}', falling back to remote name`);
+      }
+    }
+
+    // Create the new remote branch from the old one, then delete the old remote branch.
+    await this.git.push([targetRemote, `${oldName}:refs/heads/${newName}`]);
+    await this.git.push([targetRemote, '--delete', oldName]);
+
+    // Update remote-tracking refs locally so the branches tree reflects the rename immediately.
+    const oldTrackingRef = `refs/remotes/${remote}/${oldName}`;
+    const newTrackingRef = `refs/remotes/${remote}/${newName}`;
+    try {
+      const oldTrackingHash = (await this.git.revparse([oldTrackingRef])).trim();
+      await this.git.raw(['update-ref', newTrackingRef, oldTrackingHash]);
+    } catch (e) {
+      console.debug(`[renameRemoteBranch] Could not update local tracking ref ${newTrackingRef}:`, e);
+    }
+
+    try {
+      await this.git.branch(['-r', '-D', `${remote}/${oldName}`]);
+    } catch (e) {
+      console.debug(`[renameRemoteBranch] Could not delete old local remote-tracking branch ${remote}/${oldName}:`, e);
+    }
+  }
+
   async reset(commitHash: string, mode: 'hard' | 'soft' | 'mixed' = 'hard'): Promise<void> {
     await this.git.reset([`--${mode}`, commitHash]);
   }

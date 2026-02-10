@@ -8,7 +8,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'reset', 'cherry-pick', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rename-remote-branch', 'reset', 'cherry-pick', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -131,6 +131,14 @@ export async function POST(request: Request) {
         if (!data?.oldName) throw new Error('Old branch name is required to rename branch');
         if (!data?.newName) throw new Error('New branch name is required to rename branch');
         await git.renameBranch(data.oldName, data.newName);
+        break;
+      case 'rename-remote-branch':
+        if (!data?.remote) throw new Error('Remote name is required to rename remote branch');
+        if (!data?.oldName) throw new Error('Old branch name is required to rename remote branch');
+        if (!data?.newName) throw new Error('New branch name is required to rename remote branch');
+
+        const renameCreds = await resolveCredentials(repoPath, git, data.remote);
+        await git.renameRemoteBranch(data.remote, data.oldName, data.newName, renameCreds);
         break;
       case 'reset':
         if (!data?.commitHash) throw new Error('Commit hash is required for reset');
