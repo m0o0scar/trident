@@ -5,17 +5,6 @@ import { useCredentials, useCreateCredential, useUpdateCredential, useDeleteCred
 import type { Credential, GitLabCredential } from '@/hooks/use-credentials';
 import Image from 'next/image';
 import Link from 'next/link';
-import {
-  ArrowLeftIcon,
-  CalendarDaysIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  KeyIcon,
-  PencilSquareIcon,
-  PlusIcon,
-  TrashIcon,
-  UserIcon,
-} from '@heroicons/react/24/outline';
 
 type CredentialFormType = 'github' | 'gitlab' | null;
 type ProviderType = 'github' | 'gitlab';
@@ -123,7 +112,7 @@ export default function CredentialsPage() {
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <Link href="/" className="btn btn-ghost btn-square">
-              <ArrowLeftIcon className="h-5 w-5" />
+              <i className="iconoir-arrow-left text-[20px]" aria-hidden="true" />
             </Link>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">Credentials</h1>
@@ -153,7 +142,7 @@ export default function CredentialsPage() {
                 </div>
               </div>
               <button className="btn btn-sm w-full gap-2">
-                <PlusIcon className="h-4 w-4" />
+                <i className="iconoir-plus text-[16px]" aria-hidden="true" />
                 Add GitHub
               </button>
             </div>
@@ -174,7 +163,7 @@ export default function CredentialsPage() {
                 </div>
               </div>
               <button className="btn btn-sm w-full gap-2">
-                <PlusIcon className="h-4 w-4" />
+                <i className="iconoir-plus text-[16px]" aria-hidden="true" />
                 Add GitLab Server
               </button>
             </div>
@@ -198,7 +187,7 @@ export default function CredentialsPage() {
             </div>
           ) : credentials?.length === 0 ? (
             <div className="p-12 text-center opacity-50">
-              <KeyIcon className="h-10 w-10 mx-auto" />
+              <i className="iconoir-key text-[40px] mx-auto" aria-hidden="true" />
               <p className="font-bold mt-2">No credentials saved yet.</p>
               <p className="text-xs mt-1">Add your first credential using the cards above.</p>
             </div>
@@ -286,7 +275,7 @@ export default function CredentialsPage() {
                                 className="absolute right-2 top-2 btn btn-ghost btn-xs btn-square"
                                 onClick={() => setShowToken(!showToken)}
                             >
-                                {showToken ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                                {showToken ? <i className="iconoir-eye-closed text-[16px]" aria-hidden="true" /> : <i className="iconoir-eye text-[16px]" aria-hidden="true" />}
                             </button>
                         </div>
                         <label className="label">
@@ -389,11 +378,11 @@ function CredentialItem({
           </div>
           <div className="flex items-center gap-3 text-xs opacity-70 mt-1">
             <span className="flex items-center gap-1">
-              <UserIcon className="h-3.5 w-3.5" />
+              <i className="iconoir-user text-[14px]" aria-hidden="true" />
               {credential.username}
             </span>
             <span className="flex items-center gap-1">
-              <CalendarDaysIcon className="h-3.5 w-3.5" />
+              <i className="iconoir-calendar text-[14px]" aria-hidden="true" />
               {new Date(credential.updatedAt).toLocaleDateString()}
             </span>
           </div>
@@ -401,14 +390,14 @@ function CredentialItem({
       </div>
       <div className="flex items-center gap-1">
         <button className="btn btn-ghost btn-sm btn-square" onClick={onEdit} title="Edit">
-          <PencilSquareIcon className="h-4 w-4" />
+          <i className="iconoir-edit-pencil text-[16px]" aria-hidden="true" />
         </button>
         <button
           className="btn btn-ghost btn-sm btn-square text-error hover:bg-error/10"
           onClick={onDelete}
           title="Delete"
         >
-          <TrashIcon className="h-4 w-4" />
+          <i className="iconoir-trash text-[16px]" aria-hidden="true" />
         </button>
       </div>
     </div>

@@ -6,7 +6,6 @@ import { HomeSettingsModal } from '@/components/home-settings-modal';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import { useGitStatus, useUpdateSettings } from '@/hooks/use-git';
-import { Bars3CenterLeftIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ClockIcon, Cog6ToothIcon, Cog8ToothIcon, InboxArrowDownIcon } from '@heroicons/react/24/outline';
 
 const SIDEBAR_COLLAPSED_KEY = 'workspace-sidebar-collapsed';
 const SIDEBAR_WIDTH_EXPANDED = 256; // w-64
@@ -136,7 +135,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
                 onClick={toggleCollapsed} 
                 title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"} 
               >
-                {isCollapsed ? <ChevronDoubleRightIcon className="h-4 w-4" /> : <ChevronDoubleLeftIcon className="h-4 w-4" />}
+                {isCollapsed ? <i className="iconoir-fast-arrow-right text-[16px]" aria-hidden="true" /> : <i className="iconoir-fast-arrow-left text-[16px]" aria-hidden="true" />}
               </button>
             </div>
           </div>
@@ -159,7 +158,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
               )}
               title={isCollapsed ? "History" : undefined}
             >
-              <Bars3CenterLeftIcon className={cn("h-5 w-5", !isCollapsed && "mr-2")} />
+              <i className={cn("iconoir-git-fork text-[20px]", !isCollapsed && "mr-2")} aria-hidden="true" />
               {!isCollapsed && "History"}
             </Link>
 
@@ -173,7 +172,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
               title={isCollapsed ? `Changes${changesCount > 0 ? ` (${changesCount})` : ''}` : undefined}
             >
               <div className={cn("relative flex items-center", !isCollapsed && "mr-2")}>
-                  <ClockIcon className="h-5 w-5" />
+                  <i className="iconoir-clock text-[20px]" aria-hidden="true" />
                   {isCollapsed && changesCount > 0 && (
                     <span className="absolute -top-1 -right-1 badge badge-primary badge-xs scale-75">
                       {changesCount > 99 ? '99+' : changesCount}
@@ -197,7 +196,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
               )}
               title={isCollapsed ? "Stashes" : undefined}
             >
-              <InboxArrowDownIcon className={cn("h-5 w-5", !isCollapsed && "mr-2")} />
+              <i className={cn("iconoir-download-square text-[20px]", !isCollapsed && "mr-2")} aria-hidden="true" />
               {!isCollapsed && "Stashes"}
             </Link>
 
@@ -210,7 +209,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
               )}
               title={isCollapsed ? "Settings" : undefined}
             >
-              <Cog8ToothIcon className={cn("h-5 w-5", !isCollapsed && "mr-2")} />
+              <i className={cn("iconoir-settings text-[20px]", !isCollapsed && "mr-2")} aria-hidden="true" />
               {!isCollapsed && "Settings"}
             </Link>
           </div>
@@ -224,7 +223,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
             onClick={() => setSettingsOpen(true)}
             title={isCollapsed ? "Settings" : undefined}
           >
-            <Cog6ToothIcon className="h-5 w-5" />
+            <i className="iconoir-settings text-[20px]" aria-hidden="true" />
           </button>
           {!isCollapsed && <span className="text-xs opacity-70">Settings</span>}
         </div>

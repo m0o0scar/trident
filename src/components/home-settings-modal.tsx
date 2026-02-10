@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { FileSystemBrowser } from './fs-browser';
-import { ComputerDesktopIcon, FolderOpenIcon, MoonIcon, SunIcon } from '@heroicons/react/24/outline';
 
 interface Settings {
   defaultRootFolder: string | null;
@@ -111,7 +110,7 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
                     onClick={() => setTheme('system')}
                     disabled={!mounted}
                   >
-                    <ComputerDesktopIcon className="h-5 w-5 mr-2" />
+                    <i className="iconoir-computer text-[20px] mr-2" aria-hidden="true" />
                     System
                   </button>
                   <button
@@ -119,7 +118,7 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
                     onClick={() => setTheme('light')}
                     disabled={!mounted}
                   >
-                    <SunIcon className="h-5 w-5 mr-2" />
+                    <i className="iconoir-sun-light text-[20px] mr-2" aria-hidden="true" />
                     Light
                   </button>
                   <button
@@ -127,7 +126,7 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
                     onClick={() => setTheme('dark')}
                     disabled={!mounted}
                   >
-                    <MoonIcon className="h-5 w-5 mr-2" />
+                    <i className="iconoir-moon-sat text-[20px] mr-2" aria-hidden="true" />
                     Dark
                   </button>
                 </div>
@@ -151,7 +150,7 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
                     autoFocus
                   />
                   <button className="btn btn-square" onClick={() => setFolderBrowserOpen(true)} title="Browse folders">
-                    <FolderOpenIcon className="h-5 w-5" />
+                    <i className="iconoir-folder text-[20px]" aria-hidden="true" />
                   </button>
                 </div>
                 {localDefaultFolder && (

@@ -6,7 +6,6 @@ import { useWorkspaceTitle } from '@/hooks/use-workspace-title';
 import { useGitStashes, useGitAction, useStashFiles, useStashFileDiff } from '@/hooks/use-git';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
-import { ArrowPathIcon, ArrowUturnUpIcon, PlayIcon, TrashIcon } from '@heroicons/react/24/outline';
 import { GroupedDiffViewer } from '@/components/git/grouped-diff-viewer';
 
 // Check if content appears to be binary
@@ -116,7 +115,7 @@ function StashDiffView({ repoPath, stashIndex, filePath }: { repoPath: string; s
             <div className="flex-1 overflow-auto diff-viewer-wrapper">
                 {isLargeDiff && !renderAnyway ? (
                     <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-4">
-                        <span className="text-4xl text-warning">⚠️</span>
+                        <i className="iconoir-warning-triangle text-[32px] text-warning" aria-hidden="true" />
                         <div className="space-y-2">
                             <h3 className="font-bold text-lg">Large Diff Detected</h3>
                             <p className="opacity-70">
@@ -171,7 +170,7 @@ function StashesContent() {
                 <p className="text-error font-medium">Error Loading Stashes</p>
                 <p className="text-sm opacity-70">{(error as Error)?.message || 'An unknown error occurred'}</p>
                 <button onClick={() => refetch()} className="btn btn-outline btn-sm">
-                    <ArrowPathIcon className="h-4 w-4 mr-1" />
+                    <i className="iconoir-refresh-circle text-[16px] mr-1" aria-hidden="true" />
                     Try Again
                 </button>
             </div>
@@ -255,7 +254,7 @@ function StashesContent() {
                 <div className="h-[57px] px-4 border-b border-base-300 flex items-center justify-between bg-base-100">
                     <h1 className="font-bold text-lg">Stashes</h1>
                     <button className="btn btn-ghost btn-sm btn-square" onClick={() => refetch()} disabled={action.isPending} title="Refresh">
-                        {action.isPending ? <span className="loading loading-spinner loading-xs"></span> : <ArrowPathIcon className="h-4 w-4" />}
+                        {action.isPending ? <span className="loading loading-spinner loading-xs"></span> : <i className="iconoir-refresh-circle text-[16px]" aria-hidden="true" />}
                     </button>
                 </div>
 
@@ -301,7 +300,7 @@ function StashesContent() {
                                                                 onClick={(e) => { e.stopPropagation(); handleApply(stash.index); }}
                                                                 disabled={action.isPending}
                                                             >
-                                                                <PlayIcon className="h-4 w-4" />
+                                                                <i className="iconoir-play text-[16px]" aria-hidden="true" />
                                                             </button>
                                                         </div>
                                                         <div className="tooltip tooltip-left before:whitespace-normal before:max-w-[120px]" data-tip="Pop stash (apply and delete)">
@@ -310,7 +309,7 @@ function StashesContent() {
                                                                 onClick={(e) => { e.stopPropagation(); handlePop(stash.index); }}
                                                                 disabled={action.isPending}
                                                             >
-                                                                <ArrowUturnUpIcon className="h-4 w-4" />
+                                                                <i className="iconoir-u-turn-arrow-left text-[16px]" aria-hidden="true" />
                                                             </button>
                                                         </div>
                                                         <div className="tooltip tooltip-left before:whitespace-normal before:max-w-[120px]" data-tip="Delete stash">
@@ -319,7 +318,7 @@ function StashesContent() {
                                                                 onClick={(e) => { e.stopPropagation(); handleDrop(stash.index); }}
                                                                 disabled={action.isPending}
                                                             >
-                                                                <TrashIcon className="h-4 w-4" />
+                                                                <i className="iconoir-trash text-[16px]" aria-hidden="true" />
                                                             </button>
                                                         </div>
                                                     </div>
@@ -357,7 +356,7 @@ function StashesContent() {
                                                             )}
                                                             onClick={(e) => { e.stopPropagation(); setSelectedFile(file.path); }}
                                                         >
-                                                            <span className="opacity-50">📄</span>
+                                                            <i className="iconoir-page text-[14px] opacity-50" aria-hidden="true" />
                                                             <span className="font-mono truncate flex-1" title={file.path}>{file.path}</span>
                                                             <span className={cn("text-[10px] uppercase font-bold", getStatusColor(file.status))} title={getStatusLabel(file.status)}>
                                                                 {file.status}

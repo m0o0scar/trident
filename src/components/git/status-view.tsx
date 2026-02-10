@@ -4,7 +4,6 @@ import { useGitStatus, useGitAction } from '@/hooks/use-git';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { DiffView } from './diff-view';
-import { ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, InboxArrowDownIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 export function StatusView({ repoPath }: { repoPath: string }) {
     const { data: status, isLoading, isError, error, refetch } = useGitStatus(repoPath);
@@ -25,7 +24,7 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                 <p className="text-error font-bold">Error Loading Status</p>
                 <p className="text-sm opacity-70">{(error as Error)?.message || 'An unknown error occurred'}</p>
                 <button onClick={() => refetch()} className="btn btn-outline btn-sm">
-                    <ArrowPathIcon className="h-4 w-4 mr-1" />
+                    <i className="iconoir-refresh-circle text-[16px] mr-1" aria-hidden="true" />
                     Try Again
                 </button>
             </div>
@@ -100,7 +99,7 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                 <div className="h-[57px] px-4 border-b border-base-300 flex items-center justify-between bg-base-100">
                     <h1 className="font-bold text-lg">Changes</h1>
                     <button className="btn btn-ghost btn-sm btn-square" onClick={() => refetch()} disabled={action.isPending} title="Refresh">
-                        {action.isPending ? <span className="loading loading-spinner loading-xs"></span> : <ArrowPathIcon className="h-4 w-4" />}
+                        {action.isPending ? <span className="loading loading-spinner loading-xs"></span> : <i className="iconoir-refresh-circle text-[16px]" aria-hidden="true" />}
                     </button>
                 </div>
 
@@ -112,18 +111,18 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                             <div className="flex items-center gap-0.5">
                                 {changes.length === 0 && staged.length > 0 ? (
                                     <button className="btn btn-ghost btn-xs btn-square" onClick={handleUnstageAll} title="Unstage All">
-                                        <ArrowUpIcon className="h-4 w-4" />
+                                        <i className="iconoir-arrow-up text-[16px]" aria-hidden="true" />
                                     </button>
                                 ) : (
                                     <button className="btn btn-ghost btn-xs btn-square" onClick={handleStageAll} disabled={changes.length === 0} title="Stage All">
-                                        <ArrowDownIcon className="h-4 w-4" />
+                                        <i className="iconoir-arrow-down text-[16px]" aria-hidden="true" />
                                     </button>
                                 )}
                                 <button className="btn btn-ghost btn-xs btn-square" onClick={() => setStashDialogOpen(true)} disabled={changes.length === 0 && staged.length === 0} title="Stash">
-                                    <InboxArrowDownIcon className="h-4 w-4" />
+                                    <i className="iconoir-download-square text-[16px]" aria-hidden="true" />
                                 </button>
                                 <button className="btn btn-ghost btn-xs btn-square text-error hover:bg-error/10" onClick={() => setDiscardDialogOpen(true)} disabled={changes.length === 0} title="Discard All">
-                                    <TrashIcon className="h-4 w-4" />
+                                    <i className="iconoir-trash text-[16px]" aria-hidden="true" />
                                 </button>
                             </div>
                         </div>
@@ -140,7 +139,7 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                                 >
                                     <span className="truncate flex-1 font-mono text-xs" title={path}>{path}</span>
                                     <button className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 text-success hover:bg-success/10" onClick={(e) => { e.stopPropagation(); handleStage(path); }}>
-                                        ➕
+                                        <i className="iconoir-plus-circle text-[14px]" aria-hidden="true" />
                                     </button>
                                 </div>
                             ))}
@@ -167,7 +166,7 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                                 >
                                     <span className="truncate flex-1 font-mono text-xs" title={path}>{path}</span>
                                     <button className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 text-error hover:bg-error/10" onClick={(e) => { e.stopPropagation(); handleUnstage(path); }}>
-                                        ➖
+                                        <i className="iconoir-minus-circle text-[14px]" aria-hidden="true" />
                                     </button>
                                 </div>
                             ))}
@@ -200,7 +199,7 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                 ) : (
                     <div className="flex-1 flex flex-col items-center justify-center opacity-50">
                         <div className="p-8 rounded-full bg-base-200 mb-4 text-4xl">
-                             <ArrowPathIcon className="h-8 w-8" />
+                             <i className="iconoir-refresh-circle text-[32px]" aria-hidden="true" />
                         </div>
                         <p className="text-sm font-bold">Select a file to view changes</p>
                     </div>

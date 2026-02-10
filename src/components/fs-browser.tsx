@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
-import { ArrowUturnUpIcon, BookmarkIcon, FolderIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface FSItem {
   name: string;
@@ -78,7 +77,7 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, t
               </div>
           </div>
           <button className="btn btn-sm btn-circle btn-ghost" onClick={() => onOpenChange(false)}>
-            <XMarkIcon className="h-4 w-4" />
+            <i className="iconoir-xmark text-[16px]" aria-hidden="true" />
           </button>
         </div>
 
@@ -96,7 +95,7 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, t
                             className="flex items-center gap-3 px-4 py-3 hover:bg-base-200 cursor-pointer opacity-70 transition-colors"
                             onClick={() => handleNavigate(data.parent)}
                         >
-                            <ArrowUturnUpIcon className="h-5 w-5" />
+                            <i className="iconoir-u-turn-arrow-left text-[20px]" aria-hidden="true" />
                             <span className="text-sm">..</span>
                         </div>
                     )}
@@ -111,7 +110,7 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, t
                             onClick={() => handleNavigate(item.path)}
                         >
                             <div className="flex items-center gap-3 truncate">
-                                {item.isRepo ? <BookmarkIcon className="h-5 w-5" /> : <FolderIcon className="h-5 w-5" />}
+                                {item.isRepo ? <i className="iconoir-bookmark text-[20px]" aria-hidden="true" /> : <i className="iconoir-folder text-[20px]" aria-hidden="true" />}
                                 <span className={cn("text-sm font-mono", item.isRepo && "font-medium")}>{item.name}</span>
                             </div>
                             

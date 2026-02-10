@@ -108,7 +108,7 @@ export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: s
       <div className="flex-1 overflow-auto diff-viewer-wrapper">
         {isLargeDiff && !renderAnyway ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-4">
-            <div className="text-5xl text-warning">⚠️</div>
+            <i className="iconoir-warning-triangle text-[40px] text-warning" aria-hidden="true" />
             <div className="space-y-2">
               <h3 className="font-bold text-lg">Large Diff Detected</h3>
               <p className="opacity-70">

@@ -7,7 +7,6 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { cn, sanitizeBranchName, isFileBinary } from '@/lib/utils';
 import { ContextMenu } from '@/components/context-menu';
-import { ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, Bars3CenterLeftIcon, ChevronDownIcon, EyeIcon, EyeSlashIcon, FolderIcon, FunnelIcon, GlobeAltIcon, PlusCircleIcon } from '@heroicons/react/24/outline';
 import { GroupedDiffViewer } from './grouped-diff-viewer';
 
 
@@ -36,13 +35,13 @@ function clampHistoryPanelHeight(height: number): number {
 function FileStatusIcon({ status }: { status: string }) {
   switch (status) {
     case 'A':
-      return <PlusCircleIcon className="h-4 w-4 text-success" />;
+      return <i className="iconoir-plus-circle text-[16px] text-success" aria-hidden="true" />;
     case 'D':
-      return <span className="text-error">➖</span>;
+      return <i className="iconoir-minus-circle text-[16px] text-error" aria-hidden="true" />;
     case 'M':
-      return <span className="text-warning">📝</span>;
+      return <i className="iconoir-edit-pencil text-[16px] text-warning" aria-hidden="true" />;
     default:
-      return <span className="opacity-50">📄</span>;
+      return <i className="iconoir-page text-[16px] opacity-50" aria-hidden="true" />;
   }
 }
 
@@ -95,7 +94,7 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
   if (isLargeDiff && !renderAnyway) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-8">
-        <span className="text-4xl text-warning">⚠️</span>
+        <i className="iconoir-warning-triangle text-[32px] text-warning" aria-hidden="true" />
         <div className="space-y-2">
           <h3 className="font-bold text-lg">Large Diff Detected</h3>
           <p className="opacity-70">
@@ -395,7 +394,7 @@ function VisibilityToggle({
       onClick={onClick}
       title={title}
     >
-      {type === 'visible' ? <EyeIcon className="h-3.5 w-3.5" /> : <EyeSlashIcon className="h-3.5 w-3.5" />}
+      {type === 'visible' ? <i className="iconoir-eye text-[14px]" aria-hidden="true" /> : <i className="iconoir-eye-closed text-[14px]" aria-hidden="true" />}
     </button>
   );
 }
@@ -484,7 +483,7 @@ function BranchTreeItem({
               >
                 <div className="flex items-center gap-1 flex-1 min-w-0" onClick={() => onToggleFolder(itemPath)}>
                   <span className="text-xs opacity-70">{isExpanded ? '▼' : '▶'}</span>
-                  <FolderIcon className="h-4 w-4 shrink-0" />
+                  <i className="iconoir-folder text-[16px] shrink-0" aria-hidden="true" />
                   <span className="truncate min-w-0 flex-1">{child.name}</span>
                 </div>
                 <div className="flex items-center gap-0.5 ml-auto">
@@ -570,9 +569,9 @@ function BranchTreeItem({
                       <span className="w-2 h-2 rounded-full bg-primary" />
                     </span>
                   ) : isRemote ? (
-                    <GlobeAltIcon className="h-3.5 w-3.5 opacity-50 shrink-0" />
+                    <i className="iconoir-globe text-[14px] opacity-50 shrink-0" aria-hidden="true" />
                   ) : (
-                    <Bars3CenterLeftIcon className="h-3.5 w-3.5 opacity-50 shrink-0" />
+                    <i className="iconoir-git-branch text-[14px] opacity-50 shrink-0" aria-hidden="true" />
                   )}
                   <span className="truncate min-w-0 flex-1" title={child.fullPath}>{child.name}</span>
                   {hasDivergence && (
@@ -582,13 +581,13 @@ function BranchTreeItem({
                     >
                       {branchTracking.ahead > 0 && (
                         <span className="flex items-center gap-0.5 text-xs">
-                          <ArrowUpIcon className="h-3 w-3" />
+                          <i className="iconoir-arrow-up text-[12px]" aria-hidden="true" />
                           <span>{branchTracking.ahead}</span>
                         </span>
                       )}
                       {branchTracking.behind > 0 && (
                         <span className="flex items-center gap-0.5 text-xs">
-                          <ArrowDownIcon className="h-3 w-3" />
+                          <i className="iconoir-arrow-down text-[12px]" aria-hidden="true" />
                           <span>{branchTracking.behind}</span>
                         </span>
                       )}
@@ -1829,13 +1828,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 className="btn btn-ghost btn-xs btn-square"
                 onClick={handleClearAllFilters}
               >
-                <FunnelIcon className="h-4 w-4" />
+                <i className="iconoir-filter text-[16px]" aria-hidden="true" />
               </button>
             </div>
           )}
           <div className="tooltip tooltip-left z-20" data-tip="Create Branch">
             <button className="btn btn-ghost btn-xs btn-square" onClick={() => setIsCreateBranchOpen(true)}>
-              <PlusCircleIcon className="h-4 w-4" />
+              <i className="iconoir-plus-circle text-[16px]" aria-hidden="true" />
             </button>
           </div>
         </div>
@@ -1847,7 +1846,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               <GroupHeader
                 name="Branches"
                 groupPath="__local__"
-                icon={<Bars3CenterLeftIcon className="h-3.5 w-3.5" />}
+                icon={<i className="iconoir-git-branch text-[14px]" aria-hidden="true" />}
                 isExpanded={localGroupExpanded}
                 onToggle={handleToggleLocalGroup}
                 visibilityMap={visibilityMap}
@@ -1886,7 +1885,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 <GroupHeader
                   name="Remotes"
                   groupPath="__remotes__"
-                  icon={<GlobeAltIcon className="h-3.5 w-3.5" />}
+                  icon={<i className="iconoir-globe text-[14px]" aria-hidden="true" />}
                   isExpanded={remotesGroupExpanded}
                   onToggle={handleToggleRemotesGroup}
                   visibilityMap={visibilityMap}
@@ -1909,7 +1908,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                       <GroupHeader
                         name={remoteName}
                         groupPath={remoteGroupPath}
-                        icon={<GlobeAltIcon className="h-3.5 w-3.5 opacity-50" />}
+                        icon={<i className="iconoir-globe text-[14px] opacity-50" aria-hidden="true" />}
                         isExpanded={isRemoteExpanded}
                         onToggle={() => toggleFolder(remoteGroupPath)}
                         visibilityMap={visibilityMap}
@@ -1962,7 +1961,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <p className="text-error font-medium">Error Loading History</p>
         <p className="text-sm opacity-70">{(error as Error)?.message || 'An unknown error occurred'}</p>
         <button onClick={() => refetch()} className="btn btn-outline btn-sm">
-            <ArrowPathIcon className="h-4 w-4 mr-1" />
+            <i className="iconoir-refresh-circle text-[16px] mr-1" aria-hidden="true" />
             Try Again
         </button>
       </div>
@@ -2501,7 +2500,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 title={currentBranchLabel}
               >
                 <span className="truncate">{currentBranchLabel}</span>
-                <ChevronDownIcon className={cn("h-4 w-4 shrink-0 transition-transform", isBranchPopoverOpen && "rotate-180")} />
+                <i className={cn("iconoir-nav-arrow-down text-[16px] shrink-0 transition-transform", isBranchPopoverOpen && "rotate-180")} aria-hidden="true" />
               </button>
               {isBranchPopoverOpen && (
                 <div className="absolute left-0 top-full mt-2 z-50">
@@ -2519,7 +2518,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 {pullLoadingRemotes ? (
                   <span className="loading loading-spinner loading-xs"></span>
                 ) : (
-                  <ArrowDownIcon className="h-4 w-4" />
+                  <i className="iconoir-arrow-down text-[16px]" aria-hidden="true" />
                 )}
                 Pull
               </button>
@@ -2532,7 +2531,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 {pushLoadingRemotes ? (
                   <span className="loading loading-spinner loading-xs"></span>
                 ) : (
-                  <ArrowUpIcon className="h-4 w-4" />
+                  <i className="iconoir-arrow-up text-[16px]" aria-hidden="true" />
                 )}
                 Push
               </button>
