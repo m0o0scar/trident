@@ -2241,12 +2241,6 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       <div className="flex-1 flex flex-col min-w-0 bg-base-100">
         <div className="h-[57px] flex items-center justify-between px-6 border-b border-base-300 shrink-0">
           <h1 className="font-bold text-lg">History</h1>
-          <div className="text-xs opacity-50 font-mono">
-            {filteredCommits.length !== log.all.length 
-              ? `${filteredCommits.length} / ${log.all.length} commits` 
-              : `${log.all.length} commits`
-            } {isFetching && <span className="loading loading-spinner loading-xs ml-2"></span>}
-          </div>
         </div>
 
         <div className="flex-1 overflow-hidden relative">
