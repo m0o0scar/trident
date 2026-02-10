@@ -24,6 +24,13 @@ interface BranchTreeNode {
   children: Map<string, BranchTreeNode>;
 }
 
+const MIN_HISTORY_PANEL_HEIGHT = 100;
+const MAX_HISTORY_PANEL_HEIGHT = 900;
+
+function clampHistoryPanelHeight(height: number): number {
+  return Math.min(Math.max(height, MIN_HISTORY_PANEL_HEIGHT), MAX_HISTORY_PANEL_HEIGHT);
+}
+
 
 // File status icon component
 function FileStatusIcon({ status }: { status: string }) {
@@ -690,12 +697,9 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   // State for pending scroll to branch commit
   const [pendingScrollCommit, setPendingScrollCommit] = useState<string | null>(null);
 
-  // Bottom panel tab state
-  const [activeTab, setActiveTab] = useState<'message' | 'changes'>('message');
-  
   // Resizable bottom panel state - load from global settings or fallback to localStorage
   const panelHeightStorageKey = 'git-web:history-panel-height';
-  const [panelHeight, setPanelHeight] = useState(200);
+  const [panelHeight, setPanelHeight] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
   
@@ -705,13 +709,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   // Load panel height from settings or localStorage
   useEffect(() => {
     if (settings?.historyPanelHeight) {
-      setPanelHeight(settings.historyPanelHeight);
+      setPanelHeight(clampHistoryPanelHeight(settings.historyPanelHeight));
     } else {
       try {
         const stored = localStorage.getItem(panelHeightStorageKey);
         if (stored) {
           const parsed = parseInt(stored, 10);
-          if (!isNaN(parsed) && parsed >= 100 && parsed <= 600) {
+          if (!isNaN(parsed) && parsed >= MIN_HISTORY_PANEL_HEIGHT && parsed <= MAX_HISTORY_PANEL_HEIGHT) {
             setPanelHeight(parsed);
           }
         }
@@ -751,7 +755,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     const handleMouseMove = (e: MouseEvent) => {
       if (!resizeRef.current) return;
       const delta = resizeRef.current.startY - e.clientY;
-      const newHeight = Math.min(Math.max(resizeRef.current.startHeight + delta, 100), 600);
+      const newHeight = clampHistoryPanelHeight(resizeRef.current.startHeight + delta);
       setPanelHeight(newHeight);
       userHasResized.current = true;
     };
@@ -2181,7 +2185,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               <div className="w-8 h-1 rounded-full bg-base-300 group-hover:bg-base-content/20 transition-colors" />
             </div>
 
-            {/* Header with commit info and tabs */}
+            {/* Header with commit info */}
             <div className="flex flex-row items-center py-2 px-4 border-b border-base-300 bg-base-100 shrink-0 justify-between gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <span className="text-sm font-bold truncate">
@@ -2193,28 +2197,6 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button
-                  className={cn(
-                    "px-3 py-1 text-xs font-bold rounded-md transition-colors cursor-pointer",
-                    activeTab === 'message' 
-                      ? "bg-base-200 text-base-content"
-                      : "text-base-content/50 hover:text-base-content hover:bg-base-200/50"
-                  )}
-                  onClick={() => setActiveTab('message')}
-                >
-                  Message
-                </button>
-                <button
-                  className={cn(
-                    "px-3 py-1 text-xs font-bold rounded-md transition-colors cursor-pointer",
-                    activeTab === 'changes' 
-                      ? "bg-base-200 text-base-content"
-                      : "text-base-content/50 hover:text-base-content hover:bg-base-200/50"
-                  )}
-                  onClick={() => setActiveTab('changes')}
-                >
-                  Changes
-                </button>
-                <button
                   className="ml-2 btn btn-ghost btn-xs btn-square"
                   onClick={() => setSelectedHash(null)}
                   title="Close"
@@ -2224,19 +2206,26 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               </div>
             </div>
 
-            {/* Tab content */}
-            <div className="flex-1 overflow-hidden bg-base-100">
-              {activeTab === 'message' ? (
-                <div className="h-full overflow-auto">
-                  <div className="p-4">
-                    <div className="text-xs opacity-70 whitespace-pre-wrap font-mono">
-                      {log.all.find(c => c.hash === selectedHash)?.body || 'No additional message'}
-                    </div>
+            {/* Combined commit message and changes content */}
+            <div className="flex-1 overflow-hidden bg-base-100 flex flex-col">
+              <div className="border-b border-base-300 bg-base-100 shrink-0 h-24 flex flex-col">
+                <div className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60">
+                  Message
+                </div>
+                <div className="px-4 pb-3 overflow-auto flex-1 min-h-0">
+                  <div className="text-xs opacity-70 whitespace-pre-wrap font-mono">
+                    {log.all.find(c => c.hash === selectedHash)?.body || 'No additional message'}
                   </div>
                 </div>
-              ) : (
-                <CommitChangesView repoPath={repoPath} commitHash={selectedHash} />
-              )}
+              </div>
+              <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+                <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60 border-b border-base-300 bg-base-100 shrink-0">
+                  Changes
+                </div>
+                <div className="flex-1 min-h-0">
+                  <CommitChangesView repoPath={repoPath} commitHash={selectedHash} />
+                </div>
+              </div>
             </div>
           </div>
         )}
