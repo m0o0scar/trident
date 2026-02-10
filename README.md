@@ -51,6 +51,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] Merge (Squash, Fast-forward options)
 - [x] Rebase (with auto-stash support)
 - [x] Squash changes (Pre-push)
+- [x] Reset branch to specific commit
 
 ### Remote Operations
 - [x] List remotes
@@ -74,7 +75,8 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 ### Advanced / Other
 - [x] Command Palette (Cmd+K)
 - [x] Error reporting & copy
-- [ ] Cherry-pick commits
+- [x] Cherry-pick a single commit
+- [ ] Cherry-pick multiple commits
 - [ ] Revert commits
 - [ ] Tags management
 - [ ] Submodules support
