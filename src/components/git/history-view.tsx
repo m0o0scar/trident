@@ -1952,6 +1952,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 className="textarea textarea-bordered w-full h-32 font-mono text-sm"
                 value={newMessage}
                 onChange={e => setNewMessage(e.target.value)}
+                onKeyDown={e => {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && newMessage && !isRewording) {
+                    e.preventDefault();
+                    handleReword();
+                  }
+                }}
                 placeholder="New commit message"
                 disabled={isRewording}
             />
