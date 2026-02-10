@@ -253,6 +253,7 @@ export default function CredentialsPage() {
                                 onChange={(e) => setServerUrl(e.target.value)}
                                 required
                                 className="input input-bordered w-full"
+                                autoFocus
                             />
                             <label className="label"><span className="label-text-alt opacity-70">Enter the full URL of your GitLab server</span></label>
                         </div>
@@ -278,6 +279,7 @@ export default function CredentialsPage() {
                                 onChange={(e) => setToken(e.target.value)}
                                 className="input input-bordered w-full pr-10"
                                 required
+                                autoFocus={!(formType === 'gitlab' && !editingCredential)}
                             />
                             <button
                                 type="button"

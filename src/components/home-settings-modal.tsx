@@ -148,6 +148,7 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
                     className="input input-bordered w-full font-mono text-sm"
                     value={localDefaultFolder}
                     onChange={(e) => setLocalDefaultFolder(e.target.value)}
+                    autoFocus
                   />
                   <button className="btn btn-square" onClick={() => setFolderBrowserOpen(true)} title="Browse folders">
                     <FolderOpenIcon className="h-5 w-5" />

@@ -2007,6 +2007,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 className="textarea textarea-bordered w-full h-32 font-mono text-sm"
                 value={newMessage}
                 onChange={e => setNewMessage(e.target.value)}
+                autoFocus
                 onKeyDown={e => {
                   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && newMessage && !isRewording) {
                     e.preventDefault();
@@ -2117,6 +2118,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 onChange={e => setNewBranchNameForRename(sanitizeBranchName(e.target.value))}
                 placeholder="New branch name"
                 disabled={isRenaming}
+                autoFocus
                 onKeyDown={e => {
                     const shortcutPressed = e.key === 'Enter' && (e.metaKey || e.ctrlKey);
                     const sameName = remoteBranchToRename
@@ -2249,6 +2251,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                         value={mergeSquashMessage}
                         onChange={(e) => setMergeSquashMessage(e.target.value)}
                         disabled={isMerging}
+                        autoFocus
                     />
                 )}
                 <div className="form-control">
@@ -2335,7 +2338,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                             </label>
                         </div>
                         {pushSquash && (
-                            <textarea className="textarea textarea-bordered w-full" placeholder="Commit message for squash" value={pushSquashMessage} onChange={(e) => setPushSquashMessage(e.target.value)} disabled={isPushing} />
+                            <textarea className="textarea textarea-bordered w-full" placeholder="Commit message for squash" value={pushSquashMessage} onChange={(e) => setPushSquashMessage(e.target.value)} disabled={isPushing} autoFocus />
                         )}
 
                         {pushError && (
@@ -2431,6 +2434,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                     onChange={e => setNewBranchName(sanitizeBranchName(e.target.value))}
                     placeholder="Branch name"
                     disabled={isCreating}
+                    autoFocus
                     onKeyDown={e => {
                         if (e.key === 'Enter' && newBranchName && !isCreating) {
                             handleCreateBranch();
@@ -2464,6 +2468,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                         onChange={e => setCheckoutLocalBranchName(sanitizeBranchName(e.target.value))}
                         placeholder="Local branch name"
                         disabled={isCheckingOutToLocal}
+                        autoFocus
                         onKeyDown={e => {
                             if (e.key === 'Enter' && checkoutLocalBranchName && !isCheckingOutToLocal) {
                                 handleCheckoutToLocal();

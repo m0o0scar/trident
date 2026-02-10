@@ -219,6 +219,7 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                                 placeholder="Stash message (optional)"
                                 value={stashMessage}
                                 onChange={(e) => setStashMessage(e.target.value)}
+                                autoFocus
                                 onKeyDown={(e) => {
                                     if (e.key === 'Enter') {
                                         e.preventDefault();
