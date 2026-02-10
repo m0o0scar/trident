@@ -152,7 +152,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
         <div className="flex flex-col h-full bg-base-100 overflow-hidden font-mono text-sm select-none">
             {/* Search Input - Sticky on top */}
             {isSearchOpen && (
-                <div className="sticky top-0 z-20 bg-base-100 border-b border-base-300 px-2 py-2 flex items-center gap-2">
+                <div className="sticky top-0 z-30 bg-base-100 border-b border-base-300 px-2 py-2 flex items-center gap-2">
                     <span className="opacity-50">🔍</span>
                     <input
                         ref={searchInputRef}
@@ -163,13 +163,14 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                         className="input input-bordered input-sm flex-1 text-sm"
                         autoFocus
                     />
-                    <button
-                        onClick={handleCloseSearch}
-                        className="btn btn-ghost btn-sm btn-square"
-                        title="Close search (Esc)"
-                    >
-                        ✖️
-                    </button>
+                    <div className="tooltip tooltip-left z-50" data-tip="Close search (Esc)">
+                        <button
+                            onClick={handleCloseSearch}
+                            className="btn btn-ghost btn-sm btn-square"
+                        >
+                            ✖️
+                        </button>
+                    </div>
                 </div>
             )}
             

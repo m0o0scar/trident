@@ -1639,21 +1639,24 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     <div className="flex h-full overflow-hidden">
       {/* Branch Sidebar */}
       <div className="w-64 flex flex-col border-r border-base-300 bg-base-200/30">
-        <div className="p-4 border-b border-base-300 flex items-center justify-between bg-base-100 h-[57px]">
+        <div className="p-4 border-b border-base-300 flex items-center justify-between bg-base-100 h-[57px] z-10">
           <h1 className="font-bold text-lg">Branches</h1>
           <div className="flex items-center gap-1">
             {hasVisibilityFilters && (
-              <button
-                className="btn btn-ghost btn-xs btn-square"
-                onClick={handleClearAllFilters} 
-                title="Clear all filters"
-              >
-                ✖️
-              </button>
+              <div className="tooltip tooltip-left z-20" data-tip="Clear filters">
+                <button
+                  className="btn btn-ghost btn-xs btn-square"
+                  onClick={handleClearAllFilters} 
+                >
+                  ✖️
+                </button>
+              </div>
             )}
-            <button className="btn btn-ghost btn-xs btn-square" onClick={() => setIsCreateBranchOpen(true)} title="Create Branch">
-              ➕
-            </button>
+            <div className="tooltip tooltip-left z-20" data-tip="Create Branch">
+              <button className="btn btn-ghost btn-xs btn-square" onClick={() => setIsCreateBranchOpen(true)}>
+                ➕
+              </button>
+            </div>
           </div>
         </div>
         <div className="flex-1 overflow-auto">
