@@ -916,8 +916,12 @@ export class GitService {
         console.log('[pushToRemote] Remote branch does not exist:', remoteFull);
       }
       
-      // Only rebase/merge if the remote branch exists
-      if (remoteBranchExists) {
+      // Force push should overwrite remote history with local state.
+      // Do not integrate remote commits first, otherwise remote history is preserved.
+      const shouldIntegrateRemote = remoteBranchExists && !forcePush;
+
+      // Only rebase/merge if the remote branch exists and force push is not requested
+      if (shouldIntegrateRemote) {
         if (rebaseFirst) {
           // Remote branch exists, rebase onto it
           console.log('[pushToRemote] Rebasing onto:', remoteFull);
@@ -941,6 +945,8 @@ export class GitService {
             await this.git.commit(message);
             console.log('[pushToRemote] Squash completed');
         }
+      } else if (remoteBranchExists && forcePush) {
+          console.log('[pushToRemote] Force push requested; skipping pre-push rebase/merge to avoid preserving remote history');
       } else if (squash) {
           console.warn('[pushToRemote] Cannot squash: remote branch does not exist');
           // We could throw here, or just continue without squashing.

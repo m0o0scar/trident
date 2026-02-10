@@ -1415,7 +1415,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           localBranch: pushBranch,
           remote: pushSelectedRemote,
           remoteBranch: pushSelectedRemoteBranch,
-          rebaseFirst: pushRebaseFirst,
+          rebaseFirst: pushForcePush ? false : pushRebaseFirst,
           forcePush: pushForcePush,
           setUpstream: needsSetUpstream,
           squash: pushSquash,
@@ -2201,7 +2201,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
                         <div className="form-control">
                             <label className="label cursor-pointer justify-start gap-2">
-                                <input type="checkbox" className="checkbox checkbox-sm" checked={pushRebaseFirst} onChange={(e) => setPushRebaseFirst(e.target.checked)} disabled={isPushing} />
+                                <input type="checkbox" className="checkbox checkbox-sm" checked={pushRebaseFirst} onChange={(e) => setPushRebaseFirst(e.target.checked)} disabled={isPushing || pushForcePush} />
                                 <span className="label-text">Rebase onto remote branch before pushing</span>
                             </label>
                         </div>

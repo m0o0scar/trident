@@ -179,7 +179,7 @@ export async function POST(request: Request) {
         
         console.log('[API] Calling git.pushToRemote...');
         await git.pushToRemote(data.localBranch, data.remote, data.remoteBranch, {
-          rebaseFirst: data.rebaseFirst ?? true,
+          rebaseFirst: data.rebaseFirst ?? !(data.forcePush ?? false),
           forcePush: data.forcePush ?? false,
           setUpstream: data.setUpstream ?? false,
           squash: data.squash ?? false,
