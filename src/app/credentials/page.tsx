@@ -114,7 +114,7 @@ export default function CredentialsPage() {
                   </p>
                 </div>
               </div>
-              <button className="btn btn-outline btn-sm w-full gap-2">
+              <button className="btn btn-sm w-full gap-2">
                 ➕ Add GitHub
               </button>
             </div>
@@ -134,7 +134,7 @@ export default function CredentialsPage() {
                   <p className="text-xs opacity-70">Server URL + Personal Access Token</p>
                 </div>
               </div>
-              <button className="btn btn-outline btn-sm w-full gap-2">
+              <button className="btn btn-sm w-full gap-2">
                 ➕ Add GitLab Server
               </button>
             </div>
