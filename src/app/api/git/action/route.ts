@@ -8,7 +8,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'reset', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -131,6 +131,10 @@ export async function POST(request: Request) {
         if (!data?.oldName) throw new Error('Old branch name is required to rename branch');
         if (!data?.newName) throw new Error('New branch name is required to rename branch');
         await git.renameBranch(data.oldName, data.newName);
+        break;
+      case 'reset':
+        if (!data?.commitHash) throw new Error('Commit hash is required for reset');
+        await git.reset(data.commitHash, data.mode ?? 'hard');
         break;
       case 'rebase':
         if (!data?.ontoBranch) throw new Error('Target branch is required for rebase');

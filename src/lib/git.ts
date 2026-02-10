@@ -334,6 +334,10 @@ export class GitService {
     await this.git.branch(['-m', oldName, newName]);
   }
 
+  async reset(commitHash: string, mode: 'hard' | 'soft' | 'mixed' = 'hard'): Promise<void> {
+    await this.git.reset([`--${mode}`, commitHash]);
+  }
+
   async rebase(ontoBranch: string, stashChanges: boolean = true): Promise<void> {
     if (stashChanges) {
       // Stash any local changes before rebasing

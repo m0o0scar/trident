@@ -4,6 +4,8 @@ import { useMemo, useRef, useState, useLayoutEffect, useImperativeHandle, forwar
 import { Commit } from '@/lib/types';
 import { generateGraphData } from '@/lib/graph-utils';
 import { cn } from '@/lib/utils';
+import { ContextMenu } from '@/components/context-menu';
+
 
 const ROW_HEIGHT = 24; // Compact rows like Fork
 const LANE_WIDTH = 12;
@@ -59,6 +61,7 @@ export interface GitGraphHandle {
 export const GitGraph = forwardRef<GitGraphHandle, {
     commits: Commit[],
     onSelectCommit?: (hash: string) => void,
+    onResetToCommit?: (hash: string) => void,
     selectedHash?: string,
     onEndReached?: () => void,
     isLoadingMore?: boolean,
@@ -67,6 +70,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
 }>(function GitGraph({
     commits,
     onSelectCommit,
+    onResetToCommit,
     selectedHash,
     onEndReached,
     isLoadingMore,
@@ -224,75 +228,77 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                     {/* List Rows */}
                     <div style={{ width: '100%' }}>
                         {nodes.map((node, idx) => (
-                            <div
-                                key={node.hash}
-                                className={cn(
-                                    "flex items-center hover:bg-base-200 border-b border-base-200 last:border-0 cursor-pointer transition-colors text-xs",
-                                    selectedHash === node.hash && "bg-primary/10"
-                                )}
-                                style={{ height: ROW_HEIGHT }}
-                                onClick={() => onSelectCommit?.(node.hash)}
-                            >
-                                {/* Spacing for Graph */}
-                                <div style={{ width: width, flexShrink: 0 }} />
+                            <ContextMenu key={node.hash} items={[
+                                { label: "Reset to here", onClick: () => onResetToCommit?.(node.hash) }
+                            ]}>
+                                <div
+                                    className={cn(
+                                        "flex items-center hover:bg-base-200 border-b border-base-200 last:border-0 cursor-pointer transition-colors text-xs",
+                                        selectedHash === node.hash && "bg-primary/10"
+                                    )}
+                                    style={{ height: ROW_HEIGHT }}
+                                    onClick={() => onSelectCommit?.(node.hash)}
+                                >
+                                    {/* Spacing for Graph */}
+                                    <div style={{ width: width, flexShrink: 0 }} />
 
-                                {/* Content */}
-                                <div className="flex flex-1 gap-4 overflow-hidden pr-4 items-center">
-                                    <div className="flex-1 truncate flex items-center gap-2">
-                                        {/* Refs Pills */}
-                                        {node.refs && node.refs.split(', ').map((refName, idx) => {
-                                            // remove potential leading and trailing brackets
-                                            let displayName = refName.replace(/^\s*\(|\)\s*$/g, '');
-                                            // Clean up "HEAD -> " prefix for display but keep for checking
-                                            const cleanDisplayName = displayName.replace(/^HEAD\s*->\s*/, '');
-                                            
-                                            // Skip hidden branches
-                                            if (hiddenBranches && (
-                                                hiddenBranches.has(cleanDisplayName) ||
-                                                hiddenBranches.has(`remotes/${cleanDisplayName}`)
-                                            )) {
-                                                return null;
-                                            }
-                                            
-                                            // Check if this is the current branch by checking if it contains "HEAD -> branchName"
-                                            const isCurrent = currentBranch && (
-                                                displayName === currentBranch || 
-                                                displayName === `HEAD -> ${currentBranch}` ||
-                                                displayName.includes(`HEAD -> ${currentBranch}`)
-                                            );
-                                            return (
-                                                <span key={idx}
-                                                    className={cn(
-                                                        "text-[10px] px-1.5 rounded-full border border-current whitespace-nowrap shrink-0",
-                                                        isCurrent && "font-bold text-base-content"
-                                                    )}
-                                                    style={{
-                                                        color: isCurrent ? undefined : node.color,
-                                                        backgroundColor: `${node.color}15` // 10% opacity
-                                                    }}
-                                                    title={cleanDisplayName}
-                                                >
-                                                    <HighlightedText text={cleanDisplayName} searchQuery={searchQuery} />
-                                                </span>
-                                            );
-                                        })}
-                                        <span className={cn("truncate min-w-0 max-w-[600px]", selectedHash === node.hash ? "font-semibold" : "")} title={node.message}>
-                                            <HighlightedText text={node.message} searchQuery={searchQuery} />
-                                        </span>
-                                    </div>
-                                    <div className="w-32 truncate opacity-70 text-right">
-                                        <HighlightedText text={node.author_name} searchQuery={searchQuery} />
-                                    </div>
-                                    <div className="w-20 truncate opacity-50 font-mono text-right">
-                                        <HighlightedText text={node.hash.substring(0, 7)} searchQuery={searchQuery} />
-                                    </div>
-                                    <div className="w-32 truncate opacity-70 text-right">
-                                        {new Date(node.date).toLocaleString(undefined, {
-                                            month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
-                                        })}
+                                    {/* Content */}
+                                    <div className="flex flex-1 gap-4 overflow-hidden pr-4 items-center">
+                                        <div className="flex-1 truncate flex items-center gap-2">
+                                            {/* Refs Pills */}
+                                                                                    {node.refs && node.refs.split(', ').map((refName, idx) => {
+                                                                                        // remove potential leading and trailing brackets
+                                                                                        const displayName = refName.replace(/^\s*\(|\)\s*$/g, '');
+                                                                                        // Clean up "HEAD -> " prefix for display but keep for checking
+                                                                                        const cleanDisplayName = displayName.replace(/^HEAD\s*->\s*/, '');                                                
+                                                // Skip hidden branches
+                                                if (hiddenBranches && (
+                                                    hiddenBranches.has(cleanDisplayName) ||
+                                                    hiddenBranches.has(`remotes/${cleanDisplayName}`)
+                                                )) {
+                                                    return null;
+                                                }
+                                                
+                                                // Check if this is the current branch by checking if it contains "HEAD -> branchName"
+                                                const isCurrent = currentBranch && (
+                                                    displayName === currentBranch || 
+                                                    displayName === `HEAD -> ${currentBranch}` ||
+                                                    displayName.includes(`HEAD -> ${currentBranch}`)
+                                                );
+                                                return (
+                                                    <span key={idx}
+                                                        className={cn(
+                                                            "text-[10px] px-1.5 rounded-full border border-current whitespace-nowrap shrink-0",
+                                                            isCurrent && "font-bold text-base-content"
+                                                        )}
+                                                        style={{
+                                                            color: isCurrent ? undefined : node.color,
+                                                            backgroundColor: `${node.color}15` // 10% opacity
+                                                        }}
+                                                        title={cleanDisplayName}
+                                                    >
+                                                        <HighlightedText text={cleanDisplayName} searchQuery={searchQuery} />
+                                                    </span>
+                                                );
+                                            })}
+                                            <span className={cn("truncate min-w-0 max-w-[600px]", selectedHash === node.hash ? "font-semibold" : "")} title={node.message}>
+                                                <HighlightedText text={node.message} searchQuery={searchQuery} />
+                                            </span>
+                                        </div>
+                                        <div className="w-32 truncate opacity-70 text-right">
+                                            <HighlightedText text={node.author_name} searchQuery={searchQuery} />
+                                        </div>
+                                        <div className="w-20 truncate opacity-50 font-mono text-right">
+                                            <HighlightedText text={node.hash.substring(0, 7)} searchQuery={searchQuery} />
+                                        </div>
+                                        <div className="w-32 truncate opacity-70 text-right">
+                                            {new Date(node.date).toLocaleString(undefined, {
+                                                month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
+                                            })}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
+                            </ContextMenu>
                         ))}
                         
                         {/* Loading More Indicator */}
