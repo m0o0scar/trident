@@ -97,11 +97,11 @@ export function RepoList() {
                     <button className="btn btn-square btn-ghost" onClick={() => setSettingsOpen(true)} title="Settings">
                         ⚙️
                     </button>
-                    <Link href="/credentials" className="btn btn-outline gap-2">
+                    <Link href="/credentials" className="btn gap-2">
                         🔑
                         Credentials
                     </Link>
-                    <button onClick={() => setBrowserOpen(true)} className="btn btn-primary gap-2">
+                    <button onClick={() => setBrowserOpen(true)} className="btn btn-accent gap-2">
                         ➕
                         Add Repository
                     </button>
