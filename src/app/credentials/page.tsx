@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useCredentials, useCreateCredential, useUpdateCredential, useDeleteCredential } from '@/hooks/use-credentials';
 import type { Credential, GitLabCredential } from '@/hooks/use-credentials';
-import { ThemeToggle } from '@/components/theme-toggle';
 import Link from 'next/link';
 
 type CredentialFormType = 'github' | 'gitlab' | null;
@@ -93,7 +92,6 @@ export default function CredentialsPage() {
               </p>
             </div>
           </div>
-          <ThemeToggle />
         </div>
 
         {/* Add Credential Buttons */}

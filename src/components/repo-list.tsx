@@ -4,7 +4,6 @@ import { useRepositories, useAddRepository, useDeleteRepository } from '@/hooks/
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { FileSystemBrowser } from './fs-browser';
 import { toast } from '@/hooks/use-toast';
 import { HomeSettingsModal } from './home-settings-modal';
@@ -93,7 +92,6 @@ export function RepoList() {
                     <p className="text-sm opacity-70 mt-1">Manage your git repositories.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <ThemeToggle />
                     <button className="btn btn-square btn-ghost" onClick={() => setSettingsOpen(true)} title="Settings">
                         ⚙️
                     </button>

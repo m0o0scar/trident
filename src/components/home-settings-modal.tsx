@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import { FileSystemBrowser } from './fs-browser';
 
 interface Settings {
@@ -15,11 +16,17 @@ interface HomeSettingsModalProps {
 }
 
 export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: HomeSettingsModalProps) {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
   const [localDefaultFolder, setLocalDefaultFolder] = useState<string>('');
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const loadSettings = async () => {
     setIsLoading(true);
@@ -88,7 +95,45 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
               <span className="loading loading-spinner loading-md"></span>
             </div>
           ) : (
-             <div className="form-control w-full">
+            <div className="space-y-6">
+              {/* Theme Selection */}
+              <div className="form-control w-full">
+                <label className="label">
+                  <span className="label-text">Color Theme</span>
+                </label>
+                <div className="text-xs opacity-70 mb-2">
+                  Choose your preferred color theme for the application.
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    className={`btn flex-1 ${theme === 'system' ? 'btn-primary' : ''}`}
+                    onClick={() => setTheme('system')}
+                    disabled={!mounted}
+                  >
+                    <span className="text-lg mr-2">💻</span>
+                    System
+                  </button>
+                  <button
+                    className={`btn flex-1 ${theme === 'light' ? 'btn-primary' : ''}`}
+                    onClick={() => setTheme('light')}
+                    disabled={!mounted}
+                  >
+                    <span className="text-lg mr-2">☀️</span>
+                    Light
+                  </button>
+                  <button
+                    className={`btn flex-1 ${theme === 'dark' ? 'btn-primary' : ''}`}
+                    onClick={() => setTheme('dark')}
+                    disabled={!mounted}
+                  >
+                    <span className="text-lg mr-2">🌒</span>
+                    Dark
+                  </button>
+                </div>
+              </div>
+
+              {/* Default Root Folder */}
+              <div className="form-control w-full">
                 <label className="label">
                   <span className="label-text">Default Root Folder</span>
                 </label>
@@ -112,14 +157,15 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
                     <span className="label-text-alt link link-hover text-primary" onClick={handleReset}>Reset to default (home folder)</span>
                   </label>
                 )}
-             </div>
+              </div>
+            </div>
           )}
 
           <div className="modal-action">
-             <button className="btn" onClick={() => onOpenChange(false)}>Cancel</button>
+             <button className="btn" onClick={() => onOpenChange(false)}>Close</button>
              <button className="btn btn-primary" onClick={handleSave} disabled={isSaving || isLoading}>
                {isSaving && <span className="loading loading-spinner loading-xs"></span>}
-               Save
+               Save Folder Settings
              </button>
           </div>
         </div>

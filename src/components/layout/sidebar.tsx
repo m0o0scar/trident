@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
-import { ThemeToggle } from '@/components/theme-toggle';
+import { HomeSettingsModal } from '@/components/home-settings-modal';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useGitStatus, useSettings, useUpdateSettings } from '@/hooks/use-git';
@@ -24,6 +24,7 @@ export function Sidebar({ className }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
   const [enableTransition, setEnableTransition] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   const { data: settings } = useSettings();
@@ -232,10 +233,21 @@ export function Sidebar({ className }: SidebarProps) {
 
       <div className={cn("absolute bottom-4 left-0 w-full", isCollapsed ? "px-2" : "px-6")}>
         <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-2")}>
-          <ThemeToggle />
-          {!isCollapsed && <span className="text-xs opacity-70">Theme</span>}
+          <button
+            className="btn btn-ghost btn-sm btn-square"
+            onClick={() => setSettingsOpen(true)}
+            title={isCollapsed ? "Settings" : undefined}
+          >
+            ⚙️
+          </button>
+          {!isCollapsed && <span className="text-xs opacity-70">Settings</span>}
         </div>
       </div>
+
+      <HomeSettingsModal
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+      />
     </div>
   );
 }
