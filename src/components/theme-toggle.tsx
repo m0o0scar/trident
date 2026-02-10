@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useTheme } from "next-themes"
+import { ComputerDesktopIcon, MoonIcon, SunIcon } from "@heroicons/react/24/outline"
 
 export function ThemeToggle() {
     const { theme, setTheme } = useTheme()
@@ -14,7 +15,7 @@ export function ThemeToggle() {
     if (!mounted) {
         return (
             <button className="btn btn-ghost btn-sm btn-square">
-                ☀️
+                <SunIcon className="h-5 w-5" />
                 <span className="sr-only">Toggle theme</span>
             </button>
         )
@@ -28,9 +29,9 @@ export function ThemeToggle() {
 
     return (
         <button className="btn btn-ghost btn-sm btn-square" onClick={toggleTheme} title={`Current theme: ${theme}`}>
-            {theme === 'system' && <span className="text-lg">💻</span>}
-            {theme === 'light' && <span className="text-lg">☀️</span>}
-            {theme === 'dark' && <span className="text-lg">🌙</span>}
+            {theme === 'system' && <ComputerDesktopIcon className="h-5 w-5" />}
+            {theme === 'light' && <SunIcon className="h-5 w-5" />}
+            {theme === 'dark' && <MoonIcon className="h-5 w-5" />}
             <span className="sr-only">Toggle theme</span>
         </button>
     )

@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import ReactDiffViewer from '@alexbruf/react-diff-viewer';
 import '@alexbruf/react-diff-viewer/index.css';
 import { useTheme } from 'next-themes';
+import { ArrowPathIcon, ArrowUturnUpIcon, PlayIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 // Check if content appears to be binary
 function isBinaryContent(content: string): boolean {
@@ -172,7 +173,8 @@ function StashesContent() {
                 <p className="text-error font-medium">Error Loading Stashes</p>
                 <p className="text-sm opacity-70">{(error as Error)?.message || 'An unknown error occurred'}</p>
                 <button onClick={() => refetch()} className="btn btn-outline btn-sm">
-                    🔄 Try Again
+                    <ArrowPathIcon className="h-4 w-4 mr-1" />
+                    Try Again
                 </button>
             </div>
         );
@@ -255,7 +257,7 @@ function StashesContent() {
                 <div className="h-[57px] px-4 border-b border-base-300 flex items-center justify-between bg-base-100">
                     <h1 className="font-bold text-lg">Stashes</h1>
                     <button className="btn btn-ghost btn-sm btn-square" onClick={() => refetch()} disabled={action.isPending} title="Refresh">
-                        {action.isPending ? <span className="loading loading-spinner loading-xs"></span> : <span>🔄</span>}
+                        {action.isPending ? <span className="loading loading-spinner loading-xs"></span> : <ArrowPathIcon className="h-4 w-4" />}
                     </button>
                 </div>
 
@@ -301,7 +303,7 @@ function StashesContent() {
                                                                 onClick={(e) => { e.stopPropagation(); handleApply(stash.index); }}
                                                                 disabled={action.isPending}
                                                             >
-                                                                ▶️
+                                                                <PlayIcon className="h-4 w-4" />
                                                             </button>
                                                         </div>
                                                         <div className="tooltip tooltip-left before:whitespace-normal before:max-w-[120px]" data-tip="Pop stash (apply and delete)">
@@ -310,7 +312,7 @@ function StashesContent() {
                                                                 onClick={(e) => { e.stopPropagation(); handlePop(stash.index); }}
                                                                 disabled={action.isPending}
                                                             >
-                                                                💥
+                                                                <ArrowUturnUpIcon className="h-4 w-4" />
                                                             </button>
                                                         </div>
                                                         <div className="tooltip tooltip-left before:whitespace-normal before:max-w-[120px]" data-tip="Delete stash">
@@ -319,7 +321,7 @@ function StashesContent() {
                                                                 onClick={(e) => { e.stopPropagation(); handleDrop(stash.index); }}
                                                                 disabled={action.isPending}
                                                             >
-                                                                🗑️
+                                                                <TrashIcon className="h-4 w-4" />
                                                             </button>
                                                         </div>
                                                     </div>

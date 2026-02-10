@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { FileSystemBrowser } from './fs-browser';
+import { ComputerDesktopIcon, FolderOpenIcon, MoonIcon, SunIcon } from '@heroicons/react/24/outline';
 
 interface Settings {
   defaultRootFolder: string | null;
@@ -110,7 +111,7 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
                     onClick={() => setTheme('system')}
                     disabled={!mounted}
                   >
-                    <span className="text-lg mr-2">💻</span>
+                    <ComputerDesktopIcon className="h-5 w-5 mr-2" />
                     System
                   </button>
                   <button
@@ -118,7 +119,7 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
                     onClick={() => setTheme('light')}
                     disabled={!mounted}
                   >
-                    <span className="text-lg mr-2">☀️</span>
+                    <SunIcon className="h-5 w-5 mr-2" />
                     Light
                   </button>
                   <button
@@ -126,7 +127,7 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
                     onClick={() => setTheme('dark')}
                     disabled={!mounted}
                   >
-                    <span className="text-lg mr-2">🌒</span>
+                    <MoonIcon className="h-5 w-5 mr-2" />
                     Dark
                   </button>
                 </div>
@@ -149,7 +150,7 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
                     onChange={(e) => setLocalDefaultFolder(e.target.value)}
                   />
                   <button className="btn btn-square" onClick={() => setFolderBrowserOpen(true)} title="Browse folders">
-                    📂
+                    <FolderOpenIcon className="h-5 w-5" />
                   </button>
                 </div>
                 {localDefaultFolder && (

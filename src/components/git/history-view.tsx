@@ -9,6 +9,7 @@ import '@alexbruf/react-diff-viewer/index.css';
 import { useTheme } from 'next-themes';
 import { cn, sanitizeBranchName, isFileBinary } from '@/lib/utils';
 import { ContextMenu } from '@/components/context-menu';
+import { ArrowDownIcon, ArrowPathIcon, ArrowUpIcon, Bars3CenterLeftIcon, EyeIcon, EyeSlashIcon, FolderIcon, FunnelIcon, GlobeAltIcon, PlusCircleIcon } from '@heroicons/react/24/outline';
 
 
 // Visibility state for branches/folders
@@ -36,7 +37,7 @@ function clampHistoryPanelHeight(height: number): number {
 function FileStatusIcon({ status }: { status: string }) {
   switch (status) {
     case 'A':
-      return <span className="text-success">➕</span>;
+      return <PlusCircleIcon className="h-4 w-4 text-success" />;
     case 'D':
       return <span className="text-error">➖</span>;
     case 'M':
@@ -343,8 +344,8 @@ function GroupHeader({
     >
       <div className="flex items-center gap-1.5 flex-1 min-w-0" onClick={onToggle}>
         <span className="text-xs opacity-70">{isExpanded ? '▼' : '▶'}</span>
-        {icon}
-        <span className="truncate">{name}</span>
+        <span className="shrink-0">{icon}</span>
+        <span className="truncate min-w-0 flex-1">{name}</span>
       </div>
       <div className="flex items-center gap-0.5 ml-auto">
         <VisibilityToggle
@@ -381,7 +382,6 @@ function VisibilityToggle({
   onClick: (e: React.MouseEvent) => void;
   showOnHover: boolean;
 }) {
-  const icon = type === 'visible' ? '👁️' : '🚫';
   const title = type === 'visible' 
     ? (isActive ? 'Remove visible filter' : 'Show only this branch')
     : (isActive ? 'Remove hide filter' : 'Hide this branch');
@@ -397,7 +397,7 @@ function VisibilityToggle({
       onClick={onClick}
       title={title}
     >
-      {icon}
+      {type === 'visible' ? <EyeIcon className="h-3.5 w-3.5" /> : <EyeSlashIcon className="h-3.5 w-3.5" />}
     </button>
   );
 }
@@ -484,8 +484,8 @@ function BranchTreeItem({
               >
                 <div className="flex items-center gap-1 flex-1 min-w-0" onClick={() => onToggleFolder(itemPath)}>
                   <span className="text-xs opacity-70">{isExpanded ? '▼' : '▶'}</span>
-                  <span className="text-sm">📁</span>
-                  <span className="truncate">{child.name}</span>
+                  <FolderIcon className="h-4 w-4 shrink-0" />
+                  <span className="truncate min-w-0 flex-1">{child.name}</span>
                 </div>
                 <div className="flex items-center gap-0.5 ml-auto">
                   <VisibilityToggle
@@ -568,11 +568,11 @@ function BranchTreeItem({
                       <span className="w-2 h-2 rounded-full bg-primary" />
                     </span>
                   ) : isRemote ? (
-                    <span className="text-xs opacity-50">🌐</span>
+                    <GlobeAltIcon className="h-3.5 w-3.5 opacity-50 shrink-0" />
                   ) : (
-                    <span className="text-xs opacity-50">🔀</span>
+                    <Bars3CenterLeftIcon className="h-3.5 w-3.5 opacity-50 shrink-0" />
                   )}
-                  <span className="truncate" title={child.fullPath}>{child.name}</span>
+                  <span className="truncate min-w-0 flex-1" title={child.fullPath}>{child.name}</span>
                   {hasDivergence && (
                     <span 
                       className="flex items-center gap-1 text-xs opacity-70 shrink-0"
@@ -580,13 +580,13 @@ function BranchTreeItem({
                     >
                       {branchTracking.ahead > 0 && (
                         <span className="flex items-center gap-0.5 text-xs">
-                          <span>⬆️</span>
+                          <ArrowUpIcon className="h-3 w-3" />
                           <span>{branchTracking.ahead}</span>
                         </span>
                       )}
                       {branchTracking.behind > 0 && (
                         <span className="flex items-center gap-0.5 text-xs">
-                          <span>⬇️</span>
+                          <ArrowDownIcon className="h-3 w-3" />
                           <span>{branchTracking.behind}</span>
                         </span>
                       )}
@@ -1674,7 +1674,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <p className="text-error font-medium">Error Loading History</p>
         <p className="text-sm opacity-70">{(error as Error)?.message || 'An unknown error occurred'}</p>
         <button onClick={() => refetch()} className="btn btn-outline btn-sm">
-            🔄 Try Again
+            <ArrowPathIcon className="h-4 w-4 mr-1" />
+            Try Again
         </button>
       </div>
     );
@@ -1695,13 +1696,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   className="btn btn-ghost btn-xs btn-square"
                   onClick={handleClearAllFilters} 
                 >
-                  ✖️
+                  <FunnelIcon className="h-4 w-4" />
                 </button>
               </div>
             )}
             <div className="tooltip tooltip-left z-20" data-tip="Create Branch">
               <button className="btn btn-ghost btn-xs btn-square" onClick={() => setIsCreateBranchOpen(true)}>
-                ➕
+                <PlusCircleIcon className="h-4 w-4" />
               </button>
             </div>
           </div>
@@ -1714,7 +1715,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 <GroupHeader
                   name="Branches"
                   groupPath="__local__"
-                  icon={<span className="text-xs">🔀</span>}
+                  icon={<Bars3CenterLeftIcon className="h-3.5 w-3.5" />}
                   isExpanded={localGroupExpanded}
                   onToggle={handleToggleLocalGroup}
                   visibilityMap={visibilityMap}
@@ -1753,7 +1754,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                     <GroupHeader
                       name="Remotes"
                       groupPath="__remotes__"
-                      icon={<span className="text-xs">🌐</span>}
+                      icon={<GlobeAltIcon className="h-3.5 w-3.5" />}
                       isExpanded={remotesGroupExpanded}
                       onToggle={handleToggleRemotesGroup}
                       visibilityMap={visibilityMap}
@@ -1776,7 +1777,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                           <GroupHeader
                             name={remoteName}
                             groupPath={remoteGroupPath}
-                            icon={<span className="text-xs opacity-50">🌐</span>}
+                            icon={<GlobeAltIcon className="h-3.5 w-3.5 opacity-50" />}
                             isExpanded={isRemoteExpanded}
                             onToggle={() => toggleFolder(remoteGroupPath)}
                             visibilityMap={visibilityMap}

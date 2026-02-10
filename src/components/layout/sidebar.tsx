@@ -6,6 +6,7 @@ import { HomeSettingsModal } from '@/components/home-settings-modal';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import { useGitStatus, useUpdateSettings } from '@/hooks/use-git';
+import { Bars3CenterLeftIcon, ChevronDoubleLeftIcon, ChevronDoubleRightIcon, ClockIcon, Cog6ToothIcon, Cog8ToothIcon, InboxArrowDownIcon } from '@heroicons/react/24/outline';
 
 const SIDEBAR_COLLAPSED_KEY = 'workspace-sidebar-collapsed';
 const SIDEBAR_WIDTH_EXPANDED = 256; // w-64
@@ -135,7 +136,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
                 onClick={toggleCollapsed} 
                 title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"} 
               >
-                {isCollapsed ? '➕' : '➖'}
+                {isCollapsed ? <ChevronDoubleRightIcon className="h-4 w-4" /> : <ChevronDoubleLeftIcon className="h-4 w-4" />}
               </button>
             </div>
           </div>
@@ -158,7 +159,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
               )}
               title={isCollapsed ? "History" : undefined}
             >
-              <span className={cn("text-lg", !isCollapsed && "mr-2")}>🔀</span>
+              <Bars3CenterLeftIcon className={cn("h-5 w-5", !isCollapsed && "mr-2")} />
               {!isCollapsed && "History"}
             </Link>
 
@@ -172,7 +173,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
               title={isCollapsed ? `Changes${changesCount > 0 ? ` (${changesCount})` : ''}` : undefined}
             >
               <div className={cn("relative flex items-center", !isCollapsed && "mr-2")}>
-                  <span className="text-lg">🕒</span>
+                  <ClockIcon className="h-5 w-5" />
                   {isCollapsed && changesCount > 0 && (
                     <span className="absolute -top-1 -right-1 badge badge-primary badge-xs scale-75">
                       {changesCount > 99 ? '99+' : changesCount}
@@ -196,7 +197,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
               )}
               title={isCollapsed ? "Stashes" : undefined}
             >
-              <span className={cn("text-lg", !isCollapsed && "mr-2")}>📦</span>
+              <InboxArrowDownIcon className={cn("h-5 w-5", !isCollapsed && "mr-2")} />
               {!isCollapsed && "Stashes"}
             </Link>
 
@@ -209,7 +210,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
               )}
               title={isCollapsed ? "Settings" : undefined}
             >
-              <span className={cn("text-lg", !isCollapsed && "mr-2")}>⚙️</span>
+              <Cog8ToothIcon className={cn("h-5 w-5", !isCollapsed && "mr-2")} />
               {!isCollapsed && "Settings"}
             </Link>
           </div>
@@ -223,7 +224,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
             onClick={() => setSettingsOpen(true)}
             title={isCollapsed ? "Settings" : undefined}
           >
-            ⚙️
+            <Cog6ToothIcon className="h-5 w-5" />
           </button>
           {!isCollapsed && <span className="text-xs opacity-70">Settings</span>}
         </div>

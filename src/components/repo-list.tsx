@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { FileSystemBrowser } from './fs-browser';
 import { toast } from '@/hooks/use-toast';
 import { HomeSettingsModal } from './home-settings-modal';
+import { ArrowRightIcon, Cog6ToothIcon, FolderOpenIcon, KeyIcon, PlusCircleIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 export function RepoList() {
     const { data: repos, isLoading } = useRepositories();
@@ -93,14 +94,14 @@ export function RepoList() {
                 </div>
                 <div className="flex items-center gap-2">
                     <button className="btn btn-square btn-ghost" onClick={() => setSettingsOpen(true)} title="Settings">
-                        ⚙️
+                        <Cog6ToothIcon className="h-5 w-5" />
                     </button>
                     <Link href="/credentials" className="btn gap-2">
-                        🔑
+                        <KeyIcon className="h-5 w-5" />
                         Credentials
                     </Link>
                     <button onClick={() => setBrowserOpen(true)} className="btn btn-accent gap-2">
-                        ➕
+                        <PlusCircleIcon className="h-5 w-5" />
                         Add Repository
                     </button>
                 </div>
@@ -134,7 +135,7 @@ export function RepoList() {
                             >
                                 <td>
                                     <div className="flex items-center gap-3">
-                                        <span className="opacity-70 group-hover:text-primary transition-colors text-lg">📂</span>
+                                        <FolderOpenIcon className="h-5 w-5 opacity-70 group-hover:text-primary transition-colors" />
                                         <span className="font-bold text-sm">{repo.name}</span>
                                     </div>
                                 </td>
@@ -148,13 +149,13 @@ export function RepoList() {
                                             className="btn btn-ghost btn-sm btn-square"
                                             onClick={(e) => e.stopPropagation()}
                                         >
-                                            ➡️
+                                            <ArrowRightIcon className="h-4 w-4" />
                                         </Link>
                                         <button
                                             className="btn btn-ghost btn-sm btn-square text-error hover:bg-error/10"
                                             onClick={(e) => handleDeleteClick(e, repo)}
                                         >
-                                            🗑️
+                                            <TrashIcon className="h-4 w-4" />
                                         </button>
                                     </div>
                                 </td>
