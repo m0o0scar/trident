@@ -2155,21 +2155,21 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                     <div className="flex justify-center py-8"><span className="loading loading-spinner loading-lg"></span></div>
                 ) : (
                     <div className="flex flex-col gap-4">
-                        <div className="form-control w-full">
-                            <label className="label"><span className="label-text">Remote Repository</span></label>
-                            <select className="select select-bordered" value={pullSelectedRemote} onChange={(e) => handlePullRemoteChange(e.target.value)} disabled={isPulling}>
+                        <div className="form-control w-full flex flex-row items-center justify-between gap-4">
+                            <label className="label flex-shrink-0"><span className="label-text">Remote Repository</span></label>
+                            <select className="select select-bordered w-64" value={pullSelectedRemote} onChange={(e) => handlePullRemoteChange(e.target.value)} disabled={isPulling}>
                                 {pullRemotes.map((remote) => <option key={remote} value={remote}>{remote}</option>)}
                             </select>
                         </div>
 
-                        <div className="form-control w-full">
-                            <label className="label"><span className="label-text">Remote Branch</span></label>
+                        <div className="form-control w-full flex flex-row items-center justify-between gap-4">
+                            <label className="label flex-shrink-0"><span className="label-text">Remote Branch</span></label>
                             {pullLoadingBranches ? (
-                                <div className="flex items-center gap-2 p-3 border rounded-lg bg-base-200 opacity-70">
+                                <div className="flex items-center gap-2 p-3 border rounded-lg bg-base-200 opacity-70 w-64">
                                     <span className="loading loading-spinner loading-xs"></span> Loading branches...
                                 </div>
                             ) : (
-                                <select className="select select-bordered" value={pullSelectedRemoteBranch} onChange={(e) => setPullSelectedRemoteBranch(e.target.value)} disabled={isPulling}>
+                                <select className="select select-bordered w-64" value={pullSelectedRemoteBranch} onChange={(e) => setPullSelectedRemoteBranch(e.target.value)} disabled={isPulling}>
                                     {pullRemoteBranches.map((branch) => <option key={branch} value={branch}>{branch}{pullTrackingBranch?.remote === pullSelectedRemote && pullTrackingBranch?.branch === branch ? ' (tracking)' : ''}</option>)}
                                 </select>
                             )}
