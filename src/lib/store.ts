@@ -46,6 +46,7 @@ export function getRepositories(): Repository[] {
 
 function normalizeDisplayName(displayName?: string | null): string | null | undefined {
   if (displayName === undefined) return undefined;
+  if (displayName === null) return null;
   const normalized = displayName.trim();
   return normalized.length > 0 ? normalized : null;
 }

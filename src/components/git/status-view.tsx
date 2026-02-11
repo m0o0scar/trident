@@ -141,18 +141,19 @@ function StatusFileTreeItem({
                     );
                 }
 
-                if (!child.filePath) return null;
+                const filePath = child.filePath;
+                if (!filePath) return null;
 
                 return (
                     <div
-                        key={child.filePath}
+                        key={filePath}
                         className={cn(
                             'flex items-center justify-between gap-2 px-2 py-1.5 rounded-md cursor-pointer group hover:bg-base-300 transition-colors text-sm',
-                            selectedFile === child.filePath && 'bg-base-300 font-medium text-primary'
+                            selectedFile === filePath && 'bg-base-300 font-medium text-primary'
                         )}
                         style={{ paddingLeft: `${depth * 12 + 8}px` }}
-                        onClick={() => onSelectFile(child.filePath!)}
-                        title={child.filePath}
+                        onClick={() => onSelectFile(filePath)}
+                        title={filePath}
                     >
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                             <i className="iconoir-page text-[14px] opacity-70 shrink-0" aria-hidden="true" />
@@ -167,7 +168,7 @@ function StatusFileTreeItem({
                             )}
                             onClick={(e) => {
                                 e.stopPropagation();
-                                void onActionFile(child.filePath);
+                                void onActionFile(filePath);
                             }}
                             disabled={actionPending}
                         >

@@ -107,12 +107,12 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
                   e.preventDefault();
                   router.push('/');
                 }}
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer text-base-content"
-                title="Go to Home"
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer text-base-content overflow-hidden"
+                title={repoDisplayName ? `${repoDisplayName} - Go to Home` : "Go to Home"}
               >
-                <img src="/icon.png" alt="Trident" className="h-5 w-5" />
-                <h2 className="text-lg font-bold tracking-tight">
-                  Trident
+                <img src="/icon.png" alt="Trident" className="h-5 w-5 flex-shrink-0" />
+                <h2 className="text-lg font-bold tracking-tight truncate">
+                  {repoDisplayName || "Trident"}
                 </h2>
               </a>
             )}
@@ -128,9 +128,9 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
                   router.push('/');
                 }}
                 className="flex items-center justify-center h-8 w-8 hover:opacity-80 transition-opacity cursor-pointer"
-                title="Go to Home"
+                title={repoDisplayName ? `${repoDisplayName} - Go to Home` : "Go to Home"}
               >
-                <img src="/icon.png" alt="Trident" className="h-5 w-5" />
+                <img src="/icon.png" alt={repoDisplayName || "Trident"} className="h-5 w-5" />
               </a>
             )}
             <div className={cn("flex items-center gap-1", isCollapsed && "flex-col")}>
@@ -144,10 +144,10 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
             </div>
           </div>
 
-          {!isCollapsed && (
+          {!isCollapsed && repoPath && (
             <div className="px-4 mb-6">
-              <p className="text-xs font-mono opacity-70 break-all border border-base-300 rounded p-2 bg-base-200/50" title={repoPath}>
-                {repoDisplayName}
+              <p className="text-[10px] font-mono opacity-60 break-all border border-base-300 rounded p-2 bg-base-200/30" title={repoPath}>
+                {repoPath}
               </p>
             </div>
           )}
