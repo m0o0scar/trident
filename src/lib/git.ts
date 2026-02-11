@@ -132,6 +132,18 @@ export class GitService {
     await this.git.reset(['HEAD', ...files]);
   }
 
+  async discardUnstagedChanges(options: { includeUntracked?: boolean } = {}): Promise<void> {
+    const { includeUntracked = true } = options;
+
+    // Restore tracked working tree changes from index (keeps staged changes intact).
+    await this.git.raw(['checkout', '--', '.']);
+
+    if (includeUntracked) {
+      // Remove untracked files/directories, but keep ignored files.
+      await this.git.raw(['clean', '-fd']);
+    }
+  }
+
   // Get raw file content for diffing
   async getFileContent(path: string, ref: string = 'HEAD'): Promise<string> {
     try {

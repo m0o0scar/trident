@@ -8,7 +8,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rename-remote-branch', 'reset', 'cherry-pick', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rename-remote-branch', 'reset', 'cherry-pick', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword', 'discard']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -110,6 +110,11 @@ export async function POST(request: Request) {
       case 'unstage':
         if (!data?.files) throw new Error('Files are required for unstaging');
         await git.unstage(data.files);
+        break;
+      case 'discard':
+        await git.discardUnstagedChanges({
+          includeUntracked: data?.includeUntracked ?? true,
+        });
         break;
       case 'checkout':
         if (!data?.branch) throw new Error('Branch name is required for checkout');

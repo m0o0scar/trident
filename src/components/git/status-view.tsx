@@ -303,8 +303,7 @@ export function StatusView({ repoPath }: { repoPath: string }) {
     }
 
     const handleDiscard = async () => {
-        // Reset all changes (staged and unstaged)
-        await action.mutateAsync({ repoPath, action: 'checkout', data: { branch: '.' } });
+        await action.mutateAsync({ repoPath, action: 'discard', data: { includeUntracked: true } });
         setDiscardDialogOpen(false);
         setSelectedFile(null);
     }
@@ -494,7 +493,7 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                     <div className="modal-box">
                         <h3 className="font-bold text-lg">Discard Changes</h3>
                         <p className="py-4">
-                            Are you sure you want to discard all unstaged changes? This action cannot be undone.
+                            Are you sure you want to discard all unstaged changes and new files? This action cannot be undone.
                         </p>
                         <div className="modal-action">
                             <button className="btn" onClick={() => setDiscardDialogOpen(false)}>Cancel</button>
