@@ -8,6 +8,12 @@ import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
 
 const EMPTY_FILES: Array<{ path: string; index: string; working_dir: string }> = [];
 
+function buildCommitMessage(subject: string, body: string): string {
+    const trimmedSubject = subject.trim();
+    const normalizedBody = body.replace(/\r\n/g, '\n');
+    return normalizedBody.trim() ? `${trimmedSubject}\n\n${normalizedBody}` : trimmedSubject;
+}
+
 interface StatusFileTreeNode {
     name: string;
     path: string;
@@ -191,7 +197,8 @@ function StatusFileTreeItem({
 export function StatusView({ repoPath }: { repoPath: string }) {
     const { data: status, isLoading, isError, error, refetch } = useGitStatus(repoPath);
     const action = useGitAction();
-    const [message, setMessage] = useState('');
+    const [subject, setSubject] = useState('');
+    const [body, setBody] = useState('');
     const [selectedFile, setSelectedFile] = useState<string | null>(null);
     const [stashDialogOpen, setStashDialogOpen] = useState(false);
     const [stashMessage, setStashMessage] = useState('');
@@ -313,16 +320,22 @@ export function StatusView({ repoPath }: { repoPath: string }) {
     }
 
     const handleCommit = async () => {
-        if (!message) return;
-        await action.mutateAsync({ repoPath, action: 'commit', data: { message } });
-        setMessage('');
+        const trimmedSubject = subject.trim();
+        if (!trimmedSubject) return;
+        await action.mutateAsync({
+            repoPath,
+            action: 'commit',
+            data: { message: buildCommitMessage(trimmedSubject, body) },
+        });
+        setSubject('');
+        setBody('');
         setSelectedFile(null);
     };
 
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const handleCommitShortcut = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
             e.preventDefault();
-            if (staged.length > 0 && message && !action.isPending) {
+            if (staged.length > 0 && subject.trim() && !action.isPending) {
                 handleCommit();
             }
         }
@@ -425,14 +438,22 @@ export function StatusView({ repoPath }: { repoPath: string }) {
 
                 {/* Commit Box */}
                 <div className="p-4 border-t border-base-300 bg-base-100">
+                    <input
+                        type="text"
+                        placeholder="Commit subject..."
+                        value={subject}
+                        onChange={e => setSubject(e.target.value)}
+                        onKeyDown={handleCommitShortcut}
+                        className="input input-bordered w-full text-sm mb-2 font-sans"
+                    />
                     <textarea
-                        placeholder="Commit message..."
-                        value={message}
-                        onChange={e => setMessage(e.target.value)}
-                        onKeyDown={handleKeyDown}
+                        placeholder="Commit message body (optional)..."
+                        value={body}
+                        onChange={e => setBody(e.target.value)}
+                        onKeyDown={handleCommitShortcut}
                         className="textarea textarea-bordered w-full min-h-[80px] text-sm resize-none mb-3 font-sans"
                     />
-                    <button className="btn btn-primary w-full btn-sm" onClick={handleCommit} disabled={staged.length === 0 || !message || action.isPending}>
+                    <button className="btn btn-primary w-full btn-sm" onClick={handleCommit} disabled={staged.length === 0 || !subject.trim() || action.isPending}>
                         {action.isPending ? <span className="loading loading-spinner loading-xs mr-2"></span> : <span className="mr-2">✅</span>}
                         Commit Changes
                     </button>

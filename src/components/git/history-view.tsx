@@ -44,6 +44,12 @@ function clampHistoryPanelHeight(height: number): number {
   return Math.min(Math.max(height, MIN_HISTORY_PANEL_HEIGHT), MAX_HISTORY_PANEL_HEIGHT);
 }
 
+function buildCommitMessage(subject: string, body: string): string {
+  const trimmedSubject = subject.trim();
+  const normalizedBody = body.replace(/\r\n/g, '\n');
+  return normalizedBody.trim() ? `${trimmedSubject}\n\n${normalizedBody}` : trimmedSubject;
+}
+
 async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -1007,8 +1013,9 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [isResetting, setIsResetting] = useState(false);
 
   const [isRewordOpen, setIsRewordOpen] = useState(false);
-  const [commitToReword, setCommitToReword] = useState<{ hash: string; message: string; branch: string } | null>(null);
-  const [newMessage, setNewMessage] = useState('');
+  const [commitToReword, setCommitToReword] = useState<{ hash: string; subject: string; body: string; branch: string } | null>(null);
+  const [newMessageSubject, setNewMessageSubject] = useState('');
+  const [newMessageBody, setNewMessageBody] = useState('');
   const [isRewording, setIsRewording] = useState(false);
 
   // Ref for GitGraph to scroll to commits
@@ -1024,6 +1031,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [didCopyScriptOutput, setDidCopyScriptOutput] = useState(false);
   const isScriptExecutionRunning = scriptExecution.status === 'starting' || scriptExecution.status === 'running';
   const isScriptExecutionFinished = scriptExecution.status === 'completed' || scriptExecution.status === 'failed' || scriptExecution.status === 'canceled';
+  const closeRewordDialog = useCallback(() => {
+    setIsRewordOpen(false);
+    setCommitToReword(null);
+    setNewMessageSubject('');
+    setNewMessageBody('');
+  }, []);
 
   const closeTopPopup = useCallback(() => {
     if (isAbortCherryPickOpen) {
@@ -1074,7 +1087,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       return;
     }
     if (isRewordOpen) {
-      setIsRewordOpen(false);
+      closeRewordDialog();
       return;
     }
     if (isResetOpen) {
@@ -1104,6 +1117,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     isCherryPickOpen,
     isDeleteOpen,
     isRewordOpen,
+    closeRewordDialog,
     isResetOpen,
     isBranchPopoverOpen,
     scriptExecution.isOpen,
@@ -2433,14 +2447,15 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   };
 
-  const confirmRewordCommit = (hash: string, message: string, branch: string) => {
-    setCommitToReword({ hash, message, branch });
-    setNewMessage(message);
+  const confirmRewordCommit = (hash: string, subject: string, body: string, branch: string) => {
+    setCommitToReword({ hash, subject, body, branch });
+    setNewMessageSubject(subject);
+    setNewMessageBody(body);
     setIsRewordOpen(true);
   };
 
   const handleReword = async () => {
-    if (!commitToReword || !newMessage) return;
+    if (!commitToReword || !newMessageSubject.trim()) return;
     setIsRewording(true);
     try {
       await runGitAction({
@@ -2448,13 +2463,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         action: 'reword',
         data: {
           commitHash: commitToReword.hash,
-          message: newMessage,
+          message: buildCommitMessage(newMessageSubject, newMessageBody),
           branch: commitToReword.branch,
         }
       });
-      setIsRewordOpen(false);
-      setCommitToReword(null);
-      setNewMessage('');
+      closeRewordDialog();
     } catch (e) {
       console.error(e);
     } finally {
@@ -2900,18 +2913,32 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <p className="py-4 break-words">
               Reword commit <span className="font-mono bg-base-200 px-1 rounded">{commitToReword?.hash.substring(0, 7)}</span> on branch <span className="font-bold">{commitToReword?.branch}</span>.
             </p>
+            <input
+              type="text"
+              className="input input-bordered w-full font-mono text-sm mb-3"
+              value={newMessageSubject}
+              onChange={e => setNewMessageSubject(e.target.value)}
+              autoFocus
+              onKeyDown={e => {
+                if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && newMessageSubject.trim() && !isRewording) {
+                  e.preventDefault();
+                  handleReword();
+                }
+              }}
+              placeholder="Commit subject"
+              disabled={isRewording}
+            />
             <textarea
                 className="textarea textarea-bordered w-full h-32 font-mono text-sm"
-                value={newMessage}
-                onChange={e => setNewMessage(e.target.value)}
-                autoFocus
+                value={newMessageBody}
+                onChange={e => setNewMessageBody(e.target.value)}
                 onKeyDown={e => {
-                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && newMessage && !isRewording) {
+                  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && newMessageSubject.trim() && !isRewording) {
                     e.preventDefault();
                     handleReword();
                   }
                 }}
-                placeholder="New commit message"
+                placeholder="Commit message body (optional)"
                 disabled={isRewording}
             />
             {commitToReword?.branch !== branchData?.current && (
@@ -2920,15 +2947,15 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 </div>
             )}
             <div className="modal-action">
-              <button className="btn" onClick={() => setIsRewordOpen(false)} disabled={isRewording}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleReword} disabled={!newMessage || isRewording}>
+              <button className="btn" onClick={closeRewordDialog} disabled={isRewording}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleReword} disabled={!newMessageSubject.trim() || isRewording}>
                 {isRewording && <span className="loading loading-spinner loading-xs"></span>}
                 Reword
               </button>
             </div>
           </div>
           <form method="dialog" className="modal-backdrop">
-            <button onClick={() => setIsRewordOpen(false)}>close</button>
+            <button onClick={closeRewordDialog}>close</button>
           </form>
         </dialog>
       )}

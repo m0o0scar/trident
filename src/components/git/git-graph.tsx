@@ -64,7 +64,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     onResetToCommit?: (hash: string) => void,
     onCherryPickCommit?: (hash: string, message: string) => void,
     onCherryPickSelectedCommits?: () => void,
-    onRewordCommit?: (hash: string, message: string, branch: string) => void,
+    onRewordCommit?: (hash: string, subject: string, body: string, branch: string) => void,
     selectedHash?: string,
     selectedHashes?: Set<string>,
     onEndReached?: () => void,
@@ -281,7 +281,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                 if (targetBranch) {
                                     menuItems.push({
                                         label: "Reword commit",
-                                        onClick: () => onRewordCommit(node.hash, node.message, targetBranch!),
+                                        onClick: () => onRewordCommit(node.hash, node.message, node.body ?? '', targetBranch!),
                                     });
                                 }
                             }
