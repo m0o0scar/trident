@@ -83,8 +83,13 @@ export interface GitLog {
   latest: Commit | null;
 }
 
+export interface GitError extends Error {
+  status?: number;
+}
+
 export interface BranchTrackingInfo {
   upstream: string;
   ahead: number;
   behind: number;
 }
+
