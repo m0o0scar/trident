@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GitService } from '@/lib/git';
+import { handleGitError } from '@/lib/api-utils';
 import fs from 'node:fs/promises';
 
 export async function GET(request: Request) {
@@ -22,10 +23,6 @@ export async function GET(request: Request) {
     const status = await git.getStatus();
     return NextResponse.json(status);
   } catch (error) {
-    const message = (error as Error).message;
-    if (message.includes('not a git repository')) {
-      return NextResponse.json({ error: 'Not a git repository' }, { status: 400 });
-    }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleGitError(error);
   }
 }

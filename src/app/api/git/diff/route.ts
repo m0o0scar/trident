@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GitService } from '@/lib/git';
 import { getImageMimeType, isImageFile } from '@/lib/utils';
+import { handleGitError } from '@/lib/api-utils';
 import fs from 'node:fs';
 import pathLib from 'path';
 
@@ -98,10 +99,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ diff, left, right });
   } catch (error) {
-    const message = (error as Error).message;
-    if (message.includes('not a git repository')) {
-      return NextResponse.json({ error: 'Not a git repository' }, { status: 400 });
-    }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleGitError(error);
   }
 }
