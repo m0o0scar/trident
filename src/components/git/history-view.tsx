@@ -2402,7 +2402,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           <div className="modal-box">
             <h3 className="font-bold text-lg">Delete Branch</h3>
             <p className="py-4 break-words">
-              Are you sure you want to delete the branch <span className="font-bold break-all">{branchToDelete}</span>?
+              Are you sure you want to delete the branch <span className="font-bold break-all">{branchToDelete?.startsWith('remotes/') ? branchToDelete.slice('remotes/'.length) : branchToDelete}</span>?
               This action cannot be undone.
             </p>
             {branchToDelete && !branchToDelete.startsWith('remotes/') && branchData?.trackingInfo?.[branchToDelete] && (
