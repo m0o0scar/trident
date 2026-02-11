@@ -331,7 +331,7 @@ export function useStashFileDiff(repoPath: string | null, stashIndex: number | n
 }
 
 // Actions
-export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'rename-remote-branch' | 'reset' | 'cherry-pick' | 'cherry-pick-multiple' | 'cherry-pick-abort' | 'rebase' | 'merge' | 'check-merge-conflicts' | 'check-rebase-conflicts' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop' | 'reword' | 'discard';
+export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'rename-remote-branch' | 'reset' | 'cherry-pick' | 'cherry-pick-multiple' | 'cherry-pick-abort' | 'rebase' | 'merge' | 'check-merge-conflicts' | 'check-rebase-conflicts' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop' | 'reword' | 'discard' | 'cleanup-lock-file';
 
 // Map action types to human-readable operation names
 const actionOperationNames: Record<GitActionType, string> = {
@@ -367,12 +367,25 @@ const actionOperationNames: Record<GitActionType, string> = {
   'stash-pop': 'Pop Stash',
   'reword': 'Reword Commit',
   'discard': 'Discard Changes',
+  'cleanup-lock-file': 'Cleanup Lock File',
 };
 
 interface GitActionPayload {
   repoPath: string;
   action: GitActionType;
   data?: any;
+}
+
+async function cleanupLockFile(repoPath: string) {
+  const res = await fetch(`${API_BASE}/git/action`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ repoPath, action: 'cleanup-lock-file' }),
+  });
+  if (!res.ok) {
+    throw new Error('Failed to cleanup lock file');
+  }
+  return res.json();
 }
 
 export function useGitAction() {
@@ -403,7 +416,21 @@ export function useGitAction() {
       const readOnlyActions = ['check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch'];
       if (!readOnlyActions.includes(variables.action)) {
         const operationName = actionOperationNames[variables.action] || variables.action;
-        showGitErrorToast(error, { operation: operationName });
+
+        // Check for lock file error
+        if (error.message.includes('Unable to create') && error.message.includes('.git/index.lock')) {
+          showGitErrorToast(error, {
+            operation: operationName,
+            fixLabel: 'Remove Lock File',
+            onFix: async () => {
+              await cleanupLockFile(variables.repoPath);
+              // Invalidate queries to refresh status
+              queryClient.invalidateQueries({ queryKey: ['git', variables.repoPath] });
+            }
+          });
+        } else {
+          showGitErrorToast(error, { operation: operationName });
+        }
       }
     },
   });

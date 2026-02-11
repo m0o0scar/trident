@@ -2,7 +2,7 @@ import { simpleGit, SimpleGit, SimpleGitOptions } from 'simple-git';
 import { GitStatus, GitLog } from './types';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp } from 'node:fs/promises';
+import { mkdtemp, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -39,6 +39,17 @@ export class GitService {
 
   private get git(): SimpleGit {
     return getGit(this.repoPath);
+  }
+
+  async cleanupLockFile(): Promise<boolean> {
+    const lockFilePath = join(this.repoPath, '.git', 'index.lock');
+    try {
+      await unlink(lockFilePath);
+      return true;
+    } catch (e) {
+      // Ignore if file doesn't exist
+      return false;
+    }
   }
 
   async getStatus(): Promise<GitStatus> {

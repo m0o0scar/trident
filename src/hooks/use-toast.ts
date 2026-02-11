@@ -197,6 +197,8 @@ function useToast() {
 interface GitErrorToastOptions {
   title?: string;
   operation?: string;
+  onFix?: () => void | Promise<void>;
+  fixLabel?: string;
 }
 
 function showGitErrorToast(error: Error | string, options: GitErrorToastOptions = {}) {
@@ -208,6 +210,7 @@ function showGitErrorToast(error: Error | string, options: GitErrorToastOptions 
   // Create a stateful component for the copy button
   const CopyableErrorDescription = () => {
     const [copied, setCopied] = React.useState(false);
+    const [fixing, setFixing] = React.useState(false);
     
     const handleCopy = async (e: React.MouseEvent) => {
       e.stopPropagation();
@@ -215,6 +218,20 @@ function showGitErrorToast(error: Error | string, options: GitErrorToastOptions 
       if (success) {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+      }
+    };
+
+    const handleFix = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (!options.onFix) return;
+
+      setFixing(true);
+      try {
+        await options.onFix();
+        dispatch({ type: "DISMISS_TOAST", toastId: id });
+      } catch (err) {
+        console.error("Fix failed", err);
+        setFixing(false);
       }
     };
     
@@ -226,13 +243,23 @@ function showGitErrorToast(error: Error | string, options: GitErrorToastOptions 
       React.createElement('div', { 
         className: 'max-h-[120px] overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed bg-black/20 p-3 rounded-md break-words text-error-content/90 border border-error-content/20'
       }, errorMessage),
-      // Copy button
-      React.createElement('button', {
-        onClick: handleCopy,
-        type: 'button',
-        className: `btn btn-xs ${copied ? 'btn-success text-white' : 'bg-white/20 hover:bg-white/30 text-white border-white/20'}`,
-      }, 
-        copied ? 'Copied!' : 'Copy Error'
+      // Buttons container
+      React.createElement('div', { className: 'flex gap-2' },
+        // Copy button
+        React.createElement('button', {
+          onClick: handleCopy,
+          type: 'button',
+          className: `btn btn-xs ${copied ? 'btn-success text-white' : 'bg-white/20 hover:bg-white/30 text-white border-white/20'}`,
+        },
+          copied ? 'Copied!' : 'Copy Error'
+        ),
+        // Fix button
+        options.onFix ? React.createElement('button', {
+          onClick: handleFix,
+          type: 'button',
+          disabled: fixing,
+          className: 'btn btn-xs btn-warning text-white',
+        }, fixing ? 'Fixing...' : (options.fixLabel || 'Fix Issue')) : null
       )
     );
   };
