@@ -12,10 +12,11 @@
   width: 100% !important;
 }
 
-/* Force all nested divs and tables to be full width */
-.diff-viewer-wrapper div,
-.diff-viewer-wrapper table,
-.diff-viewer-wrapper tbody {
+/* Force diff-library layout elements to be full width */
+.diff-viewer-wrapper .diff-container,
+.diff-viewer-wrapper .diff-container div,
+.diff-viewer-wrapper .diff-container table,
+.diff-viewer-wrapper .diff-container tbody {
   width: 100% !important;
   max-width: 100% !important;
 }
