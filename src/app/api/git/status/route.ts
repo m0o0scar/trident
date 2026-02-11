@@ -1,7 +1,6 @@
-
 import { NextResponse } from 'next/server';
 import { GitService } from '@/lib/git';
-import fs from 'node:fs';
+import fs from 'node:fs/promises';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -12,7 +11,9 @@ export async function GET(request: Request) {
   }
 
   // Check if path exists
-  if (!fs.existsSync(path)) {
+  try {
+    await fs.access(path);
+  } catch {
     return NextResponse.json({ error: `Path not found: ${path}` }, { status: 404 });
   }
 
