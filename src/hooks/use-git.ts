@@ -337,7 +337,7 @@ export function useStashFileDiff(repoPath: string | null, stashIndex: number | n
 }
 
 // Actions
-export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'rename-remote-branch' | 'reset' | 'cherry-pick' | 'rebase' | 'merge' | 'check-merge-conflicts' | 'check-rebase-conflicts' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop' | 'reword' | 'discard';
+export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'rename-remote-branch' | 'reset' | 'cherry-pick' | 'cherry-pick-multiple' | 'cherry-pick-abort' | 'rebase' | 'merge' | 'check-merge-conflicts' | 'check-rebase-conflicts' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop' | 'reword' | 'discard';
 
 // Map action types to human-readable operation names
 const actionOperationNames: Record<GitActionType, string> = {
@@ -356,6 +356,8 @@ const actionOperationNames: Record<GitActionType, string> = {
   'rename-remote-branch': 'Rename Remote Branch',
   'reset': 'Reset',
   'cherry-pick': 'Cherry Pick',
+  'cherry-pick-multiple': 'Cherry Pick',
+  'cherry-pick-abort': 'Cherry Pick',
   'rebase': 'Rebase',
   'merge': 'Merge',
   'check-merge-conflicts': 'Check Merge Conflicts',

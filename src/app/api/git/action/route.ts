@@ -8,7 +8,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rename-remote-branch', 'reset', 'cherry-pick', 'rebase', 'merge', 'check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword', 'discard']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rename-remote-branch', 'reset', 'cherry-pick', 'cherry-pick-multiple', 'cherry-pick-abort', 'rebase', 'merge', 'check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword', 'discard']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -171,6 +171,18 @@ export async function POST(request: Request) {
       case 'cherry-pick':
         if (!data?.commitHash) throw new Error('Commit hash is required for cherry-pick');
         await git.cherryPick(data.commitHash);
+        break;
+      case 'cherry-pick-multiple':
+        if (!Array.isArray(data?.commitHashes) || data.commitHashes.length === 0) {
+          throw new Error('Commit hashes are required for multi cherry-pick');
+        }
+        if (!data.commitHashes.every((hash: unknown) => typeof hash === 'string' && hash.trim().length > 0)) {
+          throw new Error('All commit hashes must be non-empty strings');
+        }
+        await git.cherryPickMultiple(data.commitHashes);
+        break;
+      case 'cherry-pick-abort':
+        await git.abortCherryPick();
         break;
       case 'rebase':
         if (!data?.ontoBranch) throw new Error('Target branch is required for rebase');

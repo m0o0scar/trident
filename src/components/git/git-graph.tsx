@@ -60,11 +60,13 @@ export interface GitGraphHandle {
 
 export const GitGraph = forwardRef<GitGraphHandle, {
     commits: Commit[],
-    onSelectCommit?: (hash: string) => void,
+    onSelectCommit?: (hash: string, modifiers?: { isMultiSelect: boolean; isRangeSelect: boolean }) => void,
     onResetToCommit?: (hash: string) => void,
     onCherryPickCommit?: (hash: string, message: string) => void,
+    onCherryPickSelectedCommits?: () => void,
     onRewordCommit?: (hash: string, message: string, branch: string) => void,
     selectedHash?: string,
+    selectedHashes?: Set<string>,
     onEndReached?: () => void,
     isLoadingMore?: boolean,
     currentBranch?: string,
@@ -75,8 +77,10 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     onSelectCommit,
     onResetToCommit,
     onCherryPickCommit,
+    onCherryPickSelectedCommits,
     onRewordCommit,
     selectedHash,
+    selectedHashes,
     onEndReached,
     isLoadingMore,
     currentBranch,
@@ -235,6 +239,8 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                     {/* List Rows */}
                     <div style={{ width: '100%' }}>
                         {nodes.map((node) => {
+                            const isSelected = selectedHashes ? selectedHashes.has(node.hash) : selectedHash === node.hash;
+                            const selectedCount = selectedHashes?.size ?? (selectedHash ? 1 : 0);
                             const menuItems = [
                                 { label: "Reset to here", onClick: () => onResetToCommit?.(node.hash) },
                             ];
@@ -242,6 +248,12 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                 menuItems.push({
                                     label: "Cherry-pick commit",
                                     onClick: () => onCherryPickCommit(node.hash, node.message),
+                                });
+                            }
+                            if (onCherryPickSelectedCommits && selectedCount > 1 && isSelected) {
+                                menuItems.push({
+                                    label: `Cherry-pick ${selectedCount} selected commits`,
+                                    onClick: onCherryPickSelectedCommits,
                                 });
                             }
 
@@ -277,10 +289,13 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                 <div
                                     className={cn(
                                         "flex items-center hover:bg-base-200 border-b border-base-200 last:border-0 cursor-pointer transition-colors text-xs",
-                                        selectedHash === node.hash && "bg-primary/10"
+                                        isSelected && "bg-primary/10"
                                     )}
                                     style={{ height: ROW_HEIGHT }}
-                                    onClick={() => onSelectCommit?.(node.hash)}
+                                    onClick={(e) => onSelectCommit?.(node.hash, {
+                                        isMultiSelect: e.metaKey || e.ctrlKey,
+                                        isRangeSelect: e.shiftKey,
+                                    })}
                                 >
                                     {/* Spacing for Graph */}
                                     <div style={{ width: width, flexShrink: 0 }} />
@@ -324,7 +339,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                                     </span>
                                                 );
                                             })}
-                                            <span className={cn("truncate min-w-0 max-w-[600px]", selectedHash === node.hash ? "font-semibold" : "")} title={node.message}>
+                                            <span className={cn("truncate min-w-0 max-w-[600px]", isSelected ? "font-semibold" : "")} title={node.message}>
                                                 <HighlightedText text={node.message} searchQuery={searchQuery} />
                                             </span>
                                         </div>

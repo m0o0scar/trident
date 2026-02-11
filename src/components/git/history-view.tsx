@@ -28,6 +28,7 @@ interface BranchTreeNode {
 const MIN_HISTORY_PANEL_HEIGHT = 100;
 const MAX_HISTORY_PANEL_HEIGHT = 900;
 type MergeConflictStatus = 'checking' | 'no-conflict' | 'has-conflicts';
+type CommitRowSelectModifiers = { isMultiSelect: boolean; isRangeSelect: boolean };
 
 function clampHistoryPanelHeight(height: number): number {
   return Math.min(Math.max(height, MIN_HISTORY_PANEL_HEIGHT), MAX_HISTORY_PANEL_HEIGHT);
@@ -815,11 +816,19 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const { data: statusData } = useGitStatus(repoPath);
   const mergeDestinationBranch = branchData?.current ?? null;
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
+  const [selectedCommitHashes, setSelectedCommitHashes] = useState<string[]>([]);
+  const [selectionAnchorHash, setSelectionAnchorHash] = useState<string | null>(null);
+
+  const selectSingleCommit = useCallback((hash: string | null) => {
+    setSelectedHash(hash);
+    setSelectedCommitHashes(hash ? [hash] : []);
+    setSelectionAnchorHash(hash);
+  }, []);
 
   // Clear selected commit and close commit details panel when repository changes
   useEffect(() => {
-    setSelectedHash(null);
-  }, [repoPath]);
+    selectSingleCommit(null);
+  }, [repoPath, selectSingleCommit]);
 
   const { mutateAsync: runGitAction } = useGitAction();
   const [iscreateBranchOpen, setIsCreateBranchOpen] = useState(false);
@@ -832,8 +841,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const [isCherryPickOpen, setIsCherryPickOpen] = useState(false);
-  const [commitToCherryPick, setCommitToCherryPick] = useState<{ hash: string; message: string } | null>(null);
+  const [commitsToCherryPick, setCommitsToCherryPick] = useState<{ hash: string; message: string }[]>([]);
   const [isCherryPicking, setIsCherryPicking] = useState(false);
+  const [isAbortCherryPickOpen, setIsAbortCherryPickOpen] = useState(false);
+  const [isAbortingCherryPick, setIsAbortingCherryPick] = useState(false);
 
   const [isRenameOpen, setIsRenameOpen] = useState(false);
   const [branchToRename, setBranchToRename] = useState<string | null>(null);
@@ -925,6 +936,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const branchPopoverRef = useRef<HTMLDivElement>(null);
 
   const closeTopPopup = useCallback(() => {
+    if (isAbortCherryPickOpen) {
+      setIsAbortCherryPickOpen(false);
+      setCommitsToCherryPick([]);
+      return;
+    }
     if (isCheckoutToLocalOpen) {
       setIsCheckoutToLocalOpen(false);
       return;
@@ -959,7 +975,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
     if (isCherryPickOpen) {
       setIsCherryPickOpen(false);
-      setCommitToCherryPick(null);
+      setCommitsToCherryPick([]);
       return;
     }
     if (isDeleteOpen) {
@@ -978,6 +994,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       setIsBranchPopoverOpen(false);
     }
   }, [
+    isAbortCherryPickOpen,
     isCheckoutToLocalOpen,
     iscreateBranchOpen,
     isPullOpen,
@@ -998,6 +1015,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     isResetOpen ||
     isRewordOpen ||
     isDeleteOpen ||
+    isAbortCherryPickOpen ||
     isCherryPickOpen ||
     isRenameOpen ||
     isRebaseOpen ||
@@ -1322,6 +1340,79 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     return log.all;
   }, [log?.all, branchData?.branches, branchData?.branchCommits, branchData?.remotes, visibilityMap, getBranchEffectiveVisibility]);
 
+  const selectedCommitHashSet = useMemo(() => new Set(selectedCommitHashes), [selectedCommitHashes]);
+  const filteredCommitHashes = useMemo(() => filteredCommits.map((commit) => commit.hash), [filteredCommits]);
+
+  useEffect(() => {
+    if (filteredCommitHashes.length === 0) {
+      if (selectedHash || selectedCommitHashes.length > 0 || selectionAnchorHash) {
+        selectSingleCommit(null);
+      }
+      return;
+    }
+
+    const filteredHashSet = new Set(filteredCommitHashes);
+    const nextSelected = selectedCommitHashes.filter((hash) => filteredHashSet.has(hash));
+
+    if (nextSelected.length !== selectedCommitHashes.length) {
+      setSelectedCommitHashes(nextSelected);
+    }
+
+    if (selectedHash && !filteredHashSet.has(selectedHash)) {
+      setSelectedHash(nextSelected.length > 0 ? nextSelected[nextSelected.length - 1] : null);
+    }
+
+    if (selectionAnchorHash && !filteredHashSet.has(selectionAnchorHash)) {
+      setSelectionAnchorHash(nextSelected.length > 0 ? nextSelected[nextSelected.length - 1] : null);
+    }
+  }, [filteredCommitHashes, selectedHash, selectedCommitHashes, selectionAnchorHash, selectSingleCommit]);
+
+  const handleSelectCommit = useCallback((hash: string, modifiers?: CommitRowSelectModifiers) => {
+    const isRangeSelect = modifiers?.isRangeSelect ?? false;
+    const isMultiSelect = modifiers?.isMultiSelect ?? false;
+
+    if (isRangeSelect) {
+      const anchor = selectionAnchorHash ?? selectedHash ?? hash;
+      const anchorIndex = filteredCommitHashes.indexOf(anchor);
+      const targetIndex = filteredCommitHashes.indexOf(hash);
+
+      if (anchorIndex !== -1 && targetIndex !== -1) {
+        const [start, end] = anchorIndex < targetIndex ? [anchorIndex, targetIndex] : [targetIndex, anchorIndex];
+        const rangeSelection = filteredCommitHashes.slice(start, end + 1);
+        setSelectedCommitHashes(rangeSelection);
+        setSelectedHash(hash);
+        setSelectionAnchorHash(anchor);
+        return;
+      }
+    }
+
+    if (isMultiSelect) {
+      if (selectedCommitHashSet.has(hash)) {
+        const nextSelected = selectedCommitHashes.filter((selected) => selected !== hash);
+        setSelectedCommitHashes(nextSelected);
+        setSelectedHash((prev) => {
+          if (prev !== hash) return prev;
+          return nextSelected.length > 0 ? nextSelected[nextSelected.length - 1] : null;
+        });
+        if (selectionAnchorHash === hash) {
+          setSelectionAnchorHash(nextSelected.length > 0 ? nextSelected[nextSelected.length - 1] : null);
+        }
+      } else {
+        setSelectedCommitHashes([...selectedCommitHashes, hash]);
+        setSelectedHash(hash);
+        setSelectionAnchorHash(hash);
+      }
+      return;
+    }
+
+    selectSingleCommit(hash);
+  }, [filteredCommitHashes, selectedCommitHashSet, selectedCommitHashes, selectedHash, selectionAnchorHash, selectSingleCommit]);
+
+  const selectedCommitsForCherryPick = useMemo(
+    () => filteredCommits.filter((commit) => selectedCommitHashSet.has(commit.hash)).reverse(),
+    [filteredCommits, selectedCommitHashSet]
+  );
+
   // Check if visibility filters are active
   const hasVisibilityFilters = useMemo(() => {
     return Object.values(visibilityMap).some(v => v === 'visible' || v === 'hidden');
@@ -1386,7 +1477,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       requestAnimationFrame(() => {
         const scrolled = gitGraphRef.current?.scrollToCommit(pendingScrollCommit);
         if (scrolled) {
-          setSelectedHash(pendingScrollCommit);
+          selectSingleCommit(pendingScrollCommit);
           setPendingScrollCommit(null);
         }
       });
@@ -1401,7 +1492,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         setPendingScrollCommit(null);
       }
     }
-  }, [pendingScrollCommit, log?.all, isFetching, limit]);
+  }, [pendingScrollCommit, log?.all, isFetching, limit, selectSingleCommit]);
 
   // Handle branch click - find the branch's latest commit and scroll to it
   const handleBranchClick = useCallback((branch: string) => {
@@ -1416,15 +1507,15 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     if (commitExists && gitGraphRef.current) {
       const scrolled = gitGraphRef.current.scrollToCommit(commitHash);
       if (scrolled) {
-        setSelectedHash(commitHash);
+        selectSingleCommit(commitHash);
         return;
       }
     }
     
     // Need to load more commits or scroll failed, set pending
     setPendingScrollCommit(commitHash);
-    setSelectedHash(commitHash);
-  }, [branchData?.branchCommits, log?.all]);
+    selectSingleCommit(commitHash);
+  }, [branchData?.branchCommits, log?.all, selectSingleCommit]);
 
   const confirmDeleteBranch = (branch: string) => {
     setBranchToDelete(branch);
@@ -2097,25 +2188,115 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   };
 
   const confirmCherryPickCommit = (commitHash: string, commitMessage: string) => {
-    setCommitToCherryPick({ hash: commitHash, message: commitMessage });
+    setCommitsToCherryPick([{ hash: commitHash, message: commitMessage }]);
     setIsCherryPickOpen(true);
   };
 
-  const handleCherryPickCommit = async () => {
-    if (!commitToCherryPick) return;
-    setIsCherryPicking(true);
-    try {
+  const confirmCherryPickSelectedCommits = () => {
+    if (selectedCommitsForCherryPick.length < 2) return;
+    setCommitsToCherryPick(selectedCommitsForCherryPick.map((commit) => ({
+      hash: commit.hash,
+      message: commit.message,
+    })));
+    setIsCherryPickOpen(true);
+  };
+
+  const isCherryPickAlreadyInProgressError = (error: unknown) => {
+    if (!(error instanceof Error)) return false;
+    const message = error.message.toLowerCase();
+    return message.includes('cherry-pick') && message.includes('already in progress');
+  };
+
+  const isCherryPickConflictError = (error: unknown) => {
+    if (!(error instanceof Error)) return false;
+    const message = error.message.toLowerCase();
+    return (
+      message.includes('could not apply') ||
+      message.includes('conflict') ||
+      message.includes('cherry-pick --continue')
+    );
+  };
+
+  const runCherryPickByHashes = useCallback(async (commitHashes: string[]) => {
+    if (commitHashes.length === 1) {
       await runGitAction({
         repoPath,
         action: 'cherry-pick',
-        data: { commitHash: commitToCherryPick.hash }
+        data: { commitHash: commitHashes[0] }
       });
+      return;
+    }
+
+    await runGitAction({
+      repoPath,
+      action: 'cherry-pick-multiple',
+      data: { commitHashes }
+    });
+  }, [repoPath, runGitAction]);
+
+  const abortCherryPickAndResetUi = useCallback(async () => {
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'cherry-pick-abort',
+      });
+    } catch (abortError) {
+      console.error(abortError);
+    } finally {
       setIsCherryPickOpen(false);
-      setCommitToCherryPick(null);
+      setIsAbortCherryPickOpen(false);
+      setCommitsToCherryPick([]);
+    }
+  }, [repoPath, runGitAction]);
+
+  const handleCherryPickCommit = async () => {
+    if (commitsToCherryPick.length === 0) return;
+    setIsCherryPicking(true);
+    try {
+      const commitHashes = commitsToCherryPick.map((commit) => commit.hash);
+      await runCherryPickByHashes(commitHashes);
+      setIsCherryPickOpen(false);
+      setCommitsToCherryPick([]);
     } catch (e) {
+      if (isCherryPickAlreadyInProgressError(e)) {
+        setIsCherryPickOpen(false);
+        setIsAbortCherryPickOpen(true);
+      } else if (isCherryPickConflictError(e)) {
+        await abortCherryPickAndResetUi();
+      }
       console.error(e);
     } finally {
       setIsCherryPicking(false);
+    }
+  };
+
+  const handleAbortCherryPick = async () => {
+    if (commitsToCherryPick.length === 0) {
+      setIsAbortCherryPickOpen(false);
+      return;
+    }
+
+    setIsAbortingCherryPick(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'cherry-pick-abort',
+      });
+
+      const commitHashes = commitsToCherryPick.map((commit) => commit.hash);
+      await runCherryPickByHashes(commitHashes);
+
+      setIsAbortCherryPickOpen(false);
+      setCommitsToCherryPick([]);
+    } catch (e) {
+      if (isCherryPickAlreadyInProgressError(e)) {
+        setIsAbortCherryPickOpen(true);
+      } else if (isCherryPickConflictError(e)) {
+        await abortCherryPickAndResetUi();
+      }
+      console.error(e);
+    } finally {
+      setIsAbortingCherryPick(false);
     }
   };
 
@@ -2431,16 +2612,36 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <dialog className="modal modal-open">
           <div className="modal-box">
             <h3 className="font-bold text-lg">Cherry Pick</h3>
-            <p className="text-sm opacity-70 mt-1">Apply changes of the individual commit</p>
-            <p className="py-4 break-words">
-              Are you sure to apply <span className="font-bold font-mono break-all">{commitToCherryPick?.hash}</span> <span className="font-bold break-words">{commitToCherryPick?.message}</span> to <span className="font-bold break-all">{branchData?.current || 'current'}</span> branch?
+            <p className="text-sm opacity-70 mt-1">
+              {commitsToCherryPick.length > 1
+                ? 'Apply selected commits from oldest to newest'
+                : 'Apply changes from the selected commit'}
             </p>
+            {commitsToCherryPick.length === 1 ? (
+              <p className="py-4 break-words">
+                Are you sure to apply <span className="font-bold font-mono break-all">{commitsToCherryPick[0]?.hash}</span> <span className="font-bold break-words">{commitsToCherryPick[0]?.message}</span> to <span className="font-bold break-all">{branchData?.current || 'current'}</span> branch?
+              </p>
+            ) : (
+              <div className="py-4 space-y-3">
+                <p className="break-words">
+                  Are you sure to apply <span className="font-bold">{commitsToCherryPick.length} selected commits</span> to <span className="font-bold break-all">{branchData?.current || 'current'}</span> branch?
+                </p>
+                <div className="max-h-44 overflow-auto rounded border border-base-300 bg-base-200/40 p-2 space-y-1">
+                  {commitsToCherryPick.map((commit) => (
+                    <div key={commit.hash} className="text-xs min-w-0">
+                      <span className="font-mono opacity-70">{commit.hash.slice(0, 7)}</span>{' '}
+                      <span className="break-words">{commit.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="modal-action">
               <button
                 className="btn"
                 onClick={() => {
                   setIsCherryPickOpen(false);
-                  setCommitToCherryPick(null);
+                  setCommitsToCherryPick([]);
                 }}
                 disabled={isCherryPicking}
               >
@@ -2456,7 +2657,49 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <button
               onClick={() => {
                 setIsCherryPickOpen(false);
-                setCommitToCherryPick(null);
+                setCommitsToCherryPick([]);
+              }}
+            >
+              close
+            </button>
+          </form>
+        </dialog>
+      )}
+
+      {isAbortCherryPickOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Cherry Pick In Progress</h3>
+            <p className="text-sm opacity-70 mt-1">Another cherry-pick operation is currently in progress.</p>
+            <p className="py-4 break-words">
+              Abort the in-progress cherry-pick and continue with {commitsToCherryPick.length > 1 ? 'the selected commits' : 'this commit'}?
+            </p>
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={() => {
+                  setIsAbortCherryPickOpen(false);
+                  setCommitsToCherryPick([]);
+                }}
+                disabled={isAbortingCherryPick}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-warning"
+                onClick={() => void handleAbortCherryPick()}
+                disabled={isAbortingCherryPick}
+              >
+                {isAbortingCherryPick && <span className="loading loading-spinner loading-xs"></span>}
+                Abort and Continue
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button
+              onClick={() => {
+                setIsAbortCherryPickOpen(false);
+                setCommitsToCherryPick([]);
               }}
             >
               close
@@ -2944,9 +3187,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               ref={gitGraphRef}
               commits={filteredCommits}
               selectedHash={selectedHash || undefined}
-              onSelectCommit={setSelectedHash}
+              selectedHashes={selectedCommitHashSet}
+              onSelectCommit={handleSelectCommit}
               onResetToCommit={handleResetToCommit}
               onCherryPickCommit={confirmCherryPickCommit}
+              onCherryPickSelectedCommits={confirmCherryPickSelectedCommits}
               onRewordCommit={confirmRewordCommit}
               localBranches={branchData?.branches || []}
               onEndReached={() => {
@@ -2990,7 +3235,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   className="ml-2 btn btn-ghost btn-xs btn-square"
-                  onClick={() => setSelectedHash(null)}
+                  onClick={() => selectSingleCommit(null)}
                   title="Close"
                 >
                   ✕

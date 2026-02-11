@@ -454,6 +454,15 @@ export class GitService {
     await this.git.raw(['cherry-pick', commitHash]);
   }
 
+  async cherryPickMultiple(commitHashes: string[]): Promise<void> {
+    if (commitHashes.length === 0) return;
+    await this.git.raw(['cherry-pick', ...commitHashes]);
+  }
+
+  async abortCherryPick(): Promise<void> {
+    await this.git.raw(['cherry-pick', '--abort']);
+  }
+
   async rebase(ontoBranch: string, stashChanges: boolean = true): Promise<void> {
     if (stashChanges) {
       // Stash any local changes before rebasing

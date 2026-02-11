@@ -76,7 +76,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] Command Palette (Cmd+K)
 - [x] Error reporting & copy
 - [x] Cherry-pick a single commit
-- [ ] Cherry-pick multiple commits
+- [x] Cherry-pick multiple commits
 - [ ] Revert commits
 - [ ] Tags management
 - [ ] Submodules support
