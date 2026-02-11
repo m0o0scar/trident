@@ -59,26 +59,37 @@ function getAppDataDir(): string {
 const DATA_DIR = getAppDataDir();
 const CREDENTIALS_FILE = path.join(DATA_DIR, 'credentials.json');
 
+// Cache variable
+let _credentialsCache: CredentialMetadata[] | null = null;
+
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
 function getCredentialsMetadata(): CredentialMetadata[] {
+  if (_credentialsCache !== null) {
+    return [..._credentialsCache];
+  }
+
   if (!fs.existsSync(CREDENTIALS_FILE)) {
+    _credentialsCache = [];
     return [];
   }
   try {
     const data = fs.readFileSync(CREDENTIALS_FILE, 'utf-8');
-    return JSON.parse(data);
+    _credentialsCache = JSON.parse(data);
+    return [..._credentialsCache!];
   } catch (error) {
     console.error('Failed to parse credentials.json', error);
+    _credentialsCache = [];
     return [];
   }
 }
 
 function saveCredentialsMetadata(credentials: CredentialMetadata[]): void {
   fs.writeFileSync(CREDENTIALS_FILE, JSON.stringify(credentials, null, 2));
+  _credentialsCache = [...credentials];
 }
 
 // Generate a unique ID
