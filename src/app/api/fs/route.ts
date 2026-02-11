@@ -1,4 +1,3 @@
-
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
@@ -22,13 +21,6 @@ export async function GET(request: Request) {
 
       const items = fs.readdirSync(currentPath, { withFileTypes: true });
       
-      const folders = items
-          .filter(item => item.isDirectory() && !item.name.startsWith('.')) // Filter hidden folders for noise reduction? Optional.
-          // Let's allow hidden folders but maybe sort them last or user preference. 
-          // For now, filter out common junk, but keep useful ones. 
-          // Actually, let's keep all, but filter some really noisy ones if needed.
-          // Or just standard: show all.
-      
       // Let's verify if they are git repos
       const contents = items
         .filter(item => item.isDirectory())
@@ -40,7 +32,7 @@ export async function GET(request: Request) {
                 if (fs.existsSync(path.join(itemPath, '.git'))) {
                     isRepo = true;
                 }
-            } catch (e) {}
+            } catch {}
 
             return {
                 name: item.name,
