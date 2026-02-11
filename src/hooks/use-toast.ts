@@ -230,7 +230,7 @@ function showGitErrorToast(error: Error | string, options: GitErrorToastOptions 
       React.createElement('button', {
         onClick: handleCopy,
         type: 'button',
-        className: `btn btn-xs ${copied ? 'btn-success' : 'btn-outline btn-error'}`,
+        className: `btn btn-xs ${copied ? 'btn-success text-white' : 'bg-white/20 hover:bg-white/30 text-white border-white/20'}`,
       }, 
         copied ? 'Copied!' : 'Copy Error'
       )
