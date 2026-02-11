@@ -1,9 +1,190 @@
 'use client';
 
 import { useGitStatus, useGitAction } from '@/hooks/use-git';
-import { useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { DiffView } from './diff-view';
+
+const EMPTY_FILES: Array<{ path: string; index: string; working_dir: string }> = [];
+
+interface StatusFileTreeNode {
+    name: string;
+    path: string;
+    filePath?: string;
+    children: Map<string, StatusFileTreeNode>;
+}
+
+function buildStatusFileTree(paths: string[]): StatusFileTreeNode {
+    const root: StatusFileTreeNode = {
+        name: '',
+        path: '',
+        children: new Map(),
+    };
+
+    for (const filePath of paths) {
+        const parts = filePath.split('/').filter(Boolean);
+        let current = root;
+        let currentPath = '';
+
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            currentPath = currentPath ? `${currentPath}/${part}` : part;
+
+            if (!current.children.has(part)) {
+                current.children.set(part, {
+                    name: part,
+                    path: currentPath,
+                    children: new Map(),
+                });
+            }
+
+            current = current.children.get(part)!;
+
+            if (i === parts.length - 1) {
+                current.filePath = filePath;
+            }
+        }
+    }
+
+    return root;
+}
+
+function collectFolderPaths(node: StatusFileTreeNode): string[] {
+    const paths: string[] = [];
+    const children = Array.from(node.children.values());
+
+    children.forEach((child) => {
+        if (child.children.size > 0) {
+            paths.push(child.path);
+            paths.push(...collectFolderPaths(child));
+        }
+    });
+
+    return paths;
+}
+
+function getParentPaths(filePath: string): string[] {
+    const parts = filePath.split('/').filter(Boolean);
+    const parentPaths: string[] = [];
+
+    for (let i = 1; i < parts.length; i++) {
+        parentPaths.push(parts.slice(0, i).join('/'));
+    }
+
+    return parentPaths;
+}
+
+function StatusFileTreeItem({
+    node,
+    selectedFile,
+    expandedFolders,
+    onToggleFolder,
+    onSelectFile,
+    onActionFile,
+    actionType,
+    actionPending,
+    depth = 0,
+}: {
+    node: StatusFileTreeNode;
+    selectedFile: string | null;
+    expandedFolders: Set<string>;
+    onToggleFolder: (path: string) => void;
+    onSelectFile: (path: string) => void;
+    onActionFile: (path: string) => Promise<void>;
+    actionType: 'stage' | 'unstage';
+    actionPending: boolean;
+    depth?: number;
+}) {
+    const children = Array.from(node.children.values()).sort((a, b) => {
+        const aIsFolder = a.children.size > 0;
+        const bIsFolder = b.children.size > 0;
+
+        if (aIsFolder && !bIsFolder) return -1;
+        if (!aIsFolder && bIsFolder) return 1;
+        return a.name.localeCompare(b.name);
+    });
+
+    return (
+        <>
+            {children.map((child) => {
+                const isFolder = child.children.size > 0;
+
+                if (isFolder) {
+                    const isExpanded = expandedFolders.has(child.path);
+
+                    return (
+                        <div key={child.path}>
+                            <div
+                                className="flex items-center gap-1 px-2 py-1.5 text-xs rounded cursor-pointer hover:bg-base-300 transition-colors opacity-80"
+                                style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                                onClick={() => onToggleFolder(child.path)}
+                                title={child.path}
+                            >
+                                <span className="text-[10px] opacity-70">{isExpanded ? '▼' : '▶'}</span>
+                                <i className="iconoir-folder text-[14px] opacity-70" aria-hidden="true" />
+                                <span className="truncate flex-1">{child.name}</span>
+                            </div>
+                            {isExpanded && (
+                                <StatusFileTreeItem
+                                    node={child}
+                                    selectedFile={selectedFile}
+                                    expandedFolders={expandedFolders}
+                                    onToggleFolder={onToggleFolder}
+                                    onSelectFile={onSelectFile}
+                                    onActionFile={onActionFile}
+                                    actionType={actionType}
+                                    actionPending={actionPending}
+                                    depth={depth + 1}
+                                />
+                            )}
+                        </div>
+                    );
+                }
+
+                if (!child.filePath) return null;
+
+                return (
+                    <div
+                        key={child.filePath}
+                        className={cn(
+                            'flex items-center justify-between gap-2 px-2 py-1.5 rounded-md cursor-pointer group hover:bg-base-300 transition-colors text-sm',
+                            selectedFile === child.filePath && 'bg-base-300 font-medium text-primary'
+                        )}
+                        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                        onClick={() => onSelectFile(child.filePath!)}
+                        title={child.filePath}
+                    >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <i className="iconoir-page text-[14px] opacity-70 shrink-0" aria-hidden="true" />
+                            <span className="truncate flex-1 font-mono text-xs">{child.name}</span>
+                        </div>
+                        <button
+                            className={cn(
+                                'btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 transition-opacity',
+                                actionType === 'stage'
+                                    ? 'text-success hover:bg-success/10'
+                                    : 'text-error hover:bg-error/10'
+                            )}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                void onActionFile(child.filePath);
+                            }}
+                            disabled={actionPending}
+                        >
+                            <i
+                                className={cn(
+                                    'text-[14px]',
+                                    actionType === 'stage' ? 'iconoir-plus-circle' : 'iconoir-minus-circle'
+                                )}
+                                aria-hidden="true"
+                            />
+                        </button>
+                    </div>
+                );
+            })}
+        </>
+    );
+}
 
 export function StatusView({ repoPath }: { repoPath: string }) {
     const { data: status, isLoading, isError, error, refetch } = useGitStatus(repoPath);
@@ -13,38 +194,90 @@ export function StatusView({ repoPath }: { repoPath: string }) {
     const [stashDialogOpen, setStashDialogOpen] = useState(false);
     const [stashMessage, setStashMessage] = useState('');
     const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
-
-    if (isLoading) {
-        return <div className="flex items-center justify-center h-64"><span className="loading loading-spinner text-base-content/50"></span></div>;
-    }
-
-    if (isError) {
-        return (
-            <div className="flex items-center justify-center h-64 flex-col gap-4">
-                <p className="text-error font-bold">Error Loading Status</p>
-                <p className="text-sm opacity-70">{(error as Error)?.message || 'An unknown error occurred'}</p>
-                <button onClick={() => refetch()} className="btn btn-outline btn-sm">
-                    <i className="iconoir-refresh-circle text-[16px] mr-1" aria-hidden="true" />
-                    Try Again
-                </button>
-            </div>
-        );
-    }
-
-    if (!status) return <div className="flex items-center justify-center h-64 opacity-70">No status data available</div>;
+    const [collapsedChangeFolders, setCollapsedChangeFolders] = useState<Set<string>>(new Set());
+    const [collapsedStagedFolders, setCollapsedStagedFolders] = useState<Set<string>>(new Set());
+    const files = status?.files ?? EMPTY_FILES;
 
     // Group files
-    const staged: string[] = [];
-    const changes: string[] = [];
+    const { staged, changes } = useMemo(() => {
+        const stagedFiles: string[] = [];
+        const changedFiles: string[] = [];
 
-    status.files.forEach(file => {
-        if (file.index !== ' ' && file.index !== '?') {
-            staged.push(file.path);
+        files.forEach((file) => {
+            if (file.index !== ' ' && file.index !== '?') {
+                stagedFiles.push(file.path);
+            }
+            if (file.working_dir !== ' ' || file.index === '?') {
+                changedFiles.push(file.path);
+            }
+        });
+
+        return {
+            staged: stagedFiles,
+            changes: changedFiles,
+        };
+    }, [files]);
+
+    const changesTree = useMemo(() => buildStatusFileTree(changes), [changes]);
+    const stagedTree = useMemo(() => buildStatusFileTree(staged), [staged]);
+    const allChangeFolderPaths = useMemo(() => collectFolderPaths(changesTree), [changesTree]);
+    const allStagedFolderPaths = useMemo(() => collectFolderPaths(stagedTree), [stagedTree]);
+
+    const expandedChangeFolders = useMemo(() => {
+        const expanded = new Set<string>();
+
+        allChangeFolderPaths.forEach((path) => {
+            if (!collapsedChangeFolders.has(path)) {
+                expanded.add(path);
+            }
+        });
+
+        if (selectedFile) {
+            getParentPaths(selectedFile).forEach((path) => expanded.add(path));
         }
-        if (file.working_dir !== ' ' || file.index === '?') {
-            changes.push(file.path);
+
+        return expanded;
+    }, [allChangeFolderPaths, collapsedChangeFolders, selectedFile]);
+
+    const expandedStagedFolders = useMemo(() => {
+        const expanded = new Set<string>();
+
+        allStagedFolderPaths.forEach((path) => {
+            if (!collapsedStagedFolders.has(path)) {
+                expanded.add(path);
+            }
+        });
+
+        if (selectedFile) {
+            getParentPaths(selectedFile).forEach((path) => expanded.add(path));
         }
-    });
+
+        return expanded;
+    }, [allStagedFolderPaths, collapsedStagedFolders, selectedFile]);
+
+    const handleToggleChangeFolder = useCallback((path: string) => {
+        setCollapsedChangeFolders((prev) => {
+            const next = new Set(prev);
+            if (next.has(path)) {
+                next.delete(path);
+            } else {
+                next.add(path);
+            }
+            return next;
+        });
+    }, []);
+
+    const handleToggleStagedFolder = useCallback((path: string) => {
+        setCollapsedStagedFolders((prev) => {
+            const next = new Set(prev);
+            if (next.has(path)) {
+                next.delete(path);
+            } else {
+                next.add(path);
+            }
+            return next;
+        });
+    }, []);
 
     const handleStage = async (file: string) => {
         await action.mutateAsync({ repoPath, action: 'stage', data: { files: [file] } });
@@ -92,6 +325,25 @@ export function StatusView({ repoPath }: { repoPath: string }) {
         }
     };
 
+    if (isLoading) {
+        return <div className="flex items-center justify-center h-64"><span className="loading loading-spinner text-base-content/50"></span></div>;
+    }
+
+    if (isError) {
+        return (
+            <div className="flex items-center justify-center h-64 flex-col gap-4">
+                <p className="text-error font-bold">Error Loading Status</p>
+                <p className="text-sm opacity-70">{(error as Error)?.message || 'An unknown error occurred'}</p>
+                <button onClick={() => refetch()} className="btn btn-outline btn-sm">
+                    <i className="iconoir-refresh-circle text-[16px] mr-1" aria-hidden="true" />
+                    Try Again
+                </button>
+            </div>
+        );
+    }
+
+    if (!status) return <div className="flex items-center justify-center h-64 opacity-70">No status data available</div>;
+
     return (
         <div className="flex h-full overflow-hidden">
             {/* Left Panel: File List */}
@@ -128,21 +380,18 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                         </div>
                         <div className="space-y-0.5">
                             {changes.length === 0 && <p className="px-2 py-2 text-xs opacity-50 italic">No changes</p>}
-                            {changes.map(path => (
-                                <div
-                                    key={path}
-                                    className={cn(
-                                        "flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer group hover:bg-base-300 transition-colors text-sm",
-                                        selectedFile === path && "bg-base-300 font-medium text-primary"
-                                    )}
-                                    onClick={() => setSelectedFile(path)}
-                                >
-                                    <span className="truncate flex-1 font-mono text-xs" title={path}>{path}</span>
-                                    <button className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 text-success hover:bg-success/10" onClick={(e) => { e.stopPropagation(); handleStage(path); }}>
-                                        <i className="iconoir-plus-circle text-[14px]" aria-hidden="true" />
-                                    </button>
-                                </div>
-                            ))}
+                            {changes.length > 0 && (
+                                <StatusFileTreeItem
+                                    node={changesTree}
+                                    selectedFile={selectedFile}
+                                    expandedFolders={expandedChangeFolders}
+                                    onToggleFolder={handleToggleChangeFolder}
+                                    onSelectFile={setSelectedFile}
+                                    onActionFile={handleStage}
+                                    actionType="stage"
+                                    actionPending={action.isPending}
+                                />
+                            )}
                         </div>
                     </div>
 
@@ -155,21 +404,18 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                         </div>
                         <div className="space-y-0.5">
                             {staged.length === 0 && <p className="px-2 py-2 text-xs opacity-50 italic">No staged changes</p>}
-                            {staged.map(path => (
-                                <div
-                                    key={path}
-                                    className={cn(
-                                        "flex items-center justify-between px-2 py-1.5 rounded-md cursor-pointer group hover:bg-base-300 transition-colors text-sm",
-                                        selectedFile === path && "bg-base-300 font-medium text-primary"
-                                    )}
-                                    onClick={() => setSelectedFile(path)}
-                                >
-                                    <span className="truncate flex-1 font-mono text-xs" title={path}>{path}</span>
-                                    <button className="btn btn-ghost btn-xs btn-square opacity-0 group-hover:opacity-100 text-error hover:bg-error/10" onClick={(e) => { e.stopPropagation(); handleUnstage(path); }}>
-                                        <i className="iconoir-minus-circle text-[14px]" aria-hidden="true" />
-                                    </button>
-                                </div>
-                            ))}
+                            {staged.length > 0 && (
+                                <StatusFileTreeItem
+                                    node={stagedTree}
+                                    selectedFile={selectedFile}
+                                    expandedFolders={expandedStagedFolders}
+                                    onToggleFolder={handleToggleStagedFolder}
+                                    onSelectFile={setSelectedFile}
+                                    onActionFile={handleUnstage}
+                                    actionType="unstage"
+                                    actionPending={action.isPending}
+                                />
+                            )}
                         </div>
                     </div>
                 </div>
