@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Repository } from '@/lib/types';
 import { useRepositories } from '@/hooks/use-git';
 import { cn, getRepositoryDisplayName } from '@/lib/utils';
+import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
 
 function sortByLastOpenedDesc(a: Repository, b: Repository) {
   return new Date(b.lastOpenedAt || 0).getTime() - new Date(a.lastOpenedAt || 0).getTime();
@@ -63,18 +64,14 @@ export function CommandPalette() {
       if (isCommandOpenShortcut) {
         event.preventDefault();
         setIsOpen(true);
-        return;
-      }
-
-      if (isOpen && event.key === 'Escape') {
-        event.preventDefault();
-        closePalette();
       }
     };
 
     window.addEventListener('keydown', onGlobalKeyDown);
     return () => window.removeEventListener('keydown', onGlobalKeyDown);
-  }, [closePalette, isOpen]);
+  }, []);
+
+  useEscapeDismiss(isOpen, closePalette);
 
   useEffect(() => {
     if (!isOpen) return;

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { FileSystemBrowser } from './fs-browser';
+import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
 
 interface Settings {
   defaultRootFolder: string | null;
@@ -49,6 +50,8 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
       loadSettings();
     }
   }, [open]);
+
+  useEscapeDismiss(open, () => onOpenChange(false));
 
   const handleSave = async () => {
     setIsSaving(true);

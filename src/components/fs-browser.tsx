@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
 
 interface FSItem {
   name: string;
@@ -59,6 +60,8 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, t
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialPath]);
+
+  useEscapeDismiss(open, () => onOpenChange(false));
 
   const handleNavigate = (path: string) => {
       loadPath(path);

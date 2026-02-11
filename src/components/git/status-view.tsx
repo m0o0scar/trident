@@ -4,6 +4,7 @@ import { useGitStatus, useGitAction } from '@/hooks/use-git';
 import { useCallback, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { DiffView } from './diff-view';
+import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
 
 const EMPTY_FILES: Array<{ path: string; index: string; working_dir: string }> = [];
 
@@ -198,6 +199,8 @@ export function StatusView({ repoPath }: { repoPath: string }) {
     const [collapsedChangeFolders, setCollapsedChangeFolders] = useState<Set<string>>(new Set());
     const [collapsedStagedFolders, setCollapsedStagedFolders] = useState<Set<string>>(new Set());
     const files = status?.files ?? EMPTY_FILES;
+    useEscapeDismiss(stashDialogOpen, () => setStashDialogOpen(false));
+    useEscapeDismiss(discardDialogOpen, () => setDiscardDialogOpen(false));
 
     // Group files
     const { staged, changes } = useMemo(() => {

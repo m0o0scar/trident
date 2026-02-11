@@ -5,6 +5,7 @@ import { useCredentials, useCreateCredential, useUpdateCredential, useDeleteCred
 import type { Credential, GitLabCredential } from '@/hooks/use-credentials';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
 
 type CredentialFormType = 'github' | 'gitlab' | null;
 type ProviderType = 'github' | 'gitlab';
@@ -104,6 +105,8 @@ export default function CredentialsPage() {
   };
 
   const isSubmitting = createCredential.isPending || updateCredential.isPending;
+  useEscapeDismiss(formType !== null, resetForm);
+  useEscapeDismiss(deletingCredential !== null, () => setDeletingCredential(null));
 
   return (
     <main className="min-h-screen bg-base-100">

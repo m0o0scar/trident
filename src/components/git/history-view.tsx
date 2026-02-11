@@ -9,6 +9,7 @@ import { cn, sanitizeBranchName, isFileBinary, isImageFile } from '@/lib/utils';
 import { ContextMenu } from '@/components/context-menu';
 import { GroupedDiffViewer } from './grouped-diff-viewer';
 import { ImageDiffView } from './image-diff-view';
+import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
 
 
 // Visibility state for branches/folders
@@ -907,6 +908,90 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [isBranchPopoverOpen, setIsBranchPopoverOpen] = useState(false);
   const branchPopoverRef = useRef<HTMLDivElement>(null);
 
+  const closeTopPopup = useCallback(() => {
+    if (isCheckoutToLocalOpen) {
+      setIsCheckoutToLocalOpen(false);
+      return;
+    }
+    if (iscreateBranchOpen) {
+      setIsCreateBranchOpen(false);
+      return;
+    }
+    if (isPullOpen) {
+      setIsPullOpen(false);
+      return;
+    }
+    if (isPushOpen) {
+      setIsPushOpen(false);
+      return;
+    }
+    if (isMergeOpen) {
+      setIsMergeOpen(false);
+      return;
+    }
+    if (isRebaseOpen) {
+      setIsRebaseOpen(false);
+      return;
+    }
+    if (isRenameOpen) {
+      setIsRenameOpen(false);
+      setBranchToRename(null);
+      setRemoteBranchToRename(null);
+      setNewBranchNameForRename('');
+      setRenameTrackingRemoteBranch(false);
+      return;
+    }
+    if (isCherryPickOpen) {
+      setIsCherryPickOpen(false);
+      setCommitToCherryPick(null);
+      return;
+    }
+    if (isDeleteOpen) {
+      setIsDeleteOpen(false);
+      return;
+    }
+    if (isRewordOpen) {
+      setIsRewordOpen(false);
+      return;
+    }
+    if (isResetOpen) {
+      setIsResetOpen(false);
+      return;
+    }
+    if (isBranchPopoverOpen) {
+      setIsBranchPopoverOpen(false);
+    }
+  }, [
+    isCheckoutToLocalOpen,
+    iscreateBranchOpen,
+    isPullOpen,
+    isPushOpen,
+    isMergeOpen,
+    isRebaseOpen,
+    isRenameOpen,
+    isCherryPickOpen,
+    isDeleteOpen,
+    isRewordOpen,
+    isResetOpen,
+    isBranchPopoverOpen,
+  ]);
+
+  const isAnyPopupOpen =
+    isResetOpen ||
+    isRewordOpen ||
+    isDeleteOpen ||
+    isCherryPickOpen ||
+    isRenameOpen ||
+    isRebaseOpen ||
+    isMergeOpen ||
+    isPushOpen ||
+    isPullOpen ||
+    iscreateBranchOpen ||
+    isCheckoutToLocalOpen ||
+    isBranchPopoverOpen;
+
+  useEscapeDismiss(isAnyPopupOpen, closeTopPopup);
+
   // Resizable bottom panel state - load from global settings or fallback to localStorage
   const panelHeightStorageKey = 'git-web:history-panel-height';
   const [panelHeight, setPanelHeight] = useState(300);
@@ -993,18 +1078,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       }
     };
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsBranchPopoverOpen(false);
-      }
-    };
-
     document.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('keydown', handleKeyDown);
 
     return () => {
       document.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isBranchPopoverOpen]);
 

@@ -8,6 +8,7 @@ import { FileSystemBrowser } from './fs-browser';
 import { toast } from '@/hooks/use-toast';
 import { HomeSettingsModal } from './home-settings-modal';
 import { getRepositoryDisplayName } from '@/lib/utils';
+import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
 
 export function RepoList() {
     const { data: repos, isLoading } = useRepositories();
@@ -19,6 +20,7 @@ export function RepoList() {
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [defaultRootFolder, setDefaultRootFolder] = useState<string | undefined>(undefined);
     const router = useRouter();
+    useEscapeDismiss(deleteDialogOpen, () => setDeleteDialogOpen(false));
 
     // Load settings on mount
     useEffect(() => {
