@@ -35,7 +35,11 @@ export function getGit(repoPath: string): SimpleGit {
 }
 
 export class GitService {
-  constructor(private repoPath: string) { }
+  private repoPath: string;
+
+  constructor(repoPath: string) {
+    this.repoPath = repoPath;
+  }
 
   private get git(): SimpleGit {
     return getGit(this.repoPath);
