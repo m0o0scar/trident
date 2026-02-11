@@ -1,6 +1,6 @@
 {
   "name": "trident",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "find-port": "node -e \"p=3100;var s=require('net').createServer;var c=()=>s().listen(p,()=>console.log(p)||process.exit()).on('error',()=>++p&&c());c()\"",
