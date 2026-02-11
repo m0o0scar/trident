@@ -919,6 +919,11 @@ export class GitService {
           throw new Error('Pull succeeded but failed to restore local changes. Run "git stash pop" manually.');
         }
       }
+
+      // Refresh remote refs again after pull so remote branch updates are reflected in the UI.
+      console.log('[pullFromRemote] Refreshing remote refs after pull:', remote);
+      await this.git.fetch(remote);
+      console.log('[pullFromRemote] Post-pull fetch completed');
       
       console.log('[pullFromRemote] Operation completed successfully');
     } catch (e) {
