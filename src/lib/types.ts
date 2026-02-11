@@ -82,3 +82,9 @@ export interface GitLog {
   total: number;
   latest: Commit | null;
 }
+
+export interface BranchTrackingInfo {
+  upstream: string;
+  ahead: number;
+  behind: number;
+}

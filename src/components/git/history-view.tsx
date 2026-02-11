@@ -1,7 +1,7 @@
 'use client';
 
-import { useGitLog, useGitBranches, useGitStatus, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, BranchTrackingInfo, useRepository, useUpdateRepository, useSettings, useUpdateSettings } from '@/hooks/use-git';
-import { Repository, RepositoryCustomScript } from '@/lib/types';
+import { useGitLog, useGitBranches, useGitStatus, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, useRepository, useUpdateRepository, useSettings, useUpdateSettings } from '@/hooks/use-git';
+import { Repository, RepositoryCustomScript, BranchTrackingInfo } from '@/lib/types';
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from 'next-themes';
@@ -3683,6 +3683,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               onCherryPickSelectedCommits={confirmCherryPickSelectedCommits}
               onRewordCommit={confirmRewordCommit}
               localBranches={branchData?.branches || []}
+              trackingInfo={branchData?.trackingInfo}
               onEndReached={() => {
                 if (!isFetching && log.all.length >= limit) {
                   setLimit(l => l + 50);

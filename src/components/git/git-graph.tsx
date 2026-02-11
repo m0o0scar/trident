@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef, useState, useLayoutEffect, useImperativeHandle, forwardRef, useEffect, useCallback } from 'react';
-import { Commit } from '@/lib/types';
+import { Commit, BranchTrackingInfo } from '@/lib/types';
 import { generateGraphData } from '@/lib/graph-utils';
 import { cn } from '@/lib/utils';
 import { ContextMenu, ContextMenuItem } from '@/components/context-menu';
@@ -72,6 +72,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     currentBranch?: string,
     hiddenBranches?: Set<string>,
     localBranches?: string[],
+    trackingInfo?: Record<string, BranchTrackingInfo>,
     getBranchTagContextMenuItems?: (displayRef: string) => ContextMenuItem[] | null
 }>(function GitGraph({
     commits,
@@ -87,6 +88,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     currentBranch,
     hiddenBranches,
     localBranches = [],
+    trackingInfo,
     getBranchTagContextMenuItems
 }, ref) {
     const nodes = useMemo(() => generateGraphData(commits), [commits]);
@@ -243,17 +245,9 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                         {nodes.map((node) => {
                             const isSelected = selectedHashes ? selectedHashes.has(node.hash) : selectedHash === node.hash;
                             const selectedCount = selectedHashes?.size ?? (selectedHash ? 1 : 0);
-
-                            // Check if this commit is the latest commit of the current branch
-                            const nodeRefs = node.refs ? node.refs.replace(/[()]/g, '').split(',').map(r => r.trim()) : [];
-                            const isCurrentBranchTip = nodeRefs.some(ref => ref.startsWith('HEAD ->'));
-
-                            const menuItems: ContextMenuItem[] = [];
-
-                            if (!isCurrentBranchTip) {
-                                menuItems.push({ label: "Reset to here", onClick: () => onResetToCommit?.(node.hash) });
-                            }
-
+                            const menuItems = [
+                                { label: "Reset to here", onClick: () => onResetToCommit?.(node.hash) },
+                            ];
                             if (onCherryPickCommit) {
                                 menuItems.push({
                                     label: "Cherry-pick commit",
@@ -294,6 +288,76 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                 }
                             }
 
+
+                            // Process refs to combine local and tracking remote branches
+                            const processRefs = () => {
+                                if (!node.refs) return [];
+
+                                const rawRefs = node.refs.replace(/^\s*\((.*)\)\s*$/, '$1').split(', ').map(r => {
+                                    const isHead = r.startsWith('HEAD -> ');
+                                    const name = r.replace(/^HEAD\s*->\s*/, '');
+                                    return { raw: r, name, isHead };
+                                });
+
+                                const result: {
+                                    displayName: string;
+                                    primaryRef: string;
+                                    secondaryRef?: string;
+                                    isHead: boolean
+                                }[] = [];
+
+                                const processedIndices = new Set<number>();
+                                const isHidden = (name: string) => hiddenBranches && (hiddenBranches.has(name) || hiddenBranches.has(`remotes/${name}`));
+
+                                // First pass: find local branches and their tracking remotes
+                                rawRefs.forEach((ref, idx) => {
+                                    if (processedIndices.has(idx)) return;
+
+                                    // Only attempt to combine if local branch is visible
+                                    if (localBranches.includes(ref.name) && !isHidden(ref.name)) {
+                                        const tracking = trackingInfo?.[ref.name];
+                                        if (tracking && tracking.upstream) {
+                                            const upstreamIdx = rawRefs.findIndex((r, i) => i !== idx && !processedIndices.has(i) && r.name === tracking.upstream);
+
+                                            if (upstreamIdx !== -1) {
+                                                const upstreamRef = rawRefs[upstreamIdx];
+                                                const parts = tracking.upstream.split('/');
+                                                const remoteName = parts[0];
+
+                                                result.push({
+                                                    displayName: `${ref.name} (${remoteName})`,
+                                                    primaryRef: ref.name,
+                                                    secondaryRef: upstreamRef.name,
+                                                    isHead: ref.isHead
+                                                });
+
+                                                processedIndices.add(idx);
+                                                processedIndices.add(upstreamIdx);
+                                                return;
+                                            }
+                                        }
+                                    }
+                                });
+
+                                // Second pass: add remaining refs
+                                rawRefs.forEach((ref, idx) => {
+                                    if (!processedIndices.has(idx)) {
+                                        // Skip hidden branches
+                                        if (isHidden(ref.name)) return;
+
+                                        result.push({
+                                            displayName: ref.name,
+                                            primaryRef: ref.name,
+                                            isHead: ref.isHead
+                                        });
+                                    }
+                                });
+
+                                return result;
+                            };
+
+                            const processedTags = processRefs();
+
                             return (
                             <ContextMenu key={node.hash} items={menuItems}>
                                 <div
@@ -314,25 +378,12 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                     <div className="flex flex-1 gap-4 overflow-hidden pr-4 items-center">
                                         <div className="flex-1 truncate flex items-center gap-2">
                                             {/* Refs Pills */}
-                                            {node.refs && node.refs.split(', ').map((refName, idx) => {
-                                                // remove potential leading and trailing brackets
-                                                const displayName = refName.replace(/^\s*\(|\)\s*$/g, '');
-                                                // Clean up "HEAD -> " prefix for display but keep for checking
-                                                const cleanDisplayName = displayName.replace(/^HEAD\s*->\s*/, '');
-                                                // Skip hidden branches
-                                                if (hiddenBranches && (
-                                                    hiddenBranches.has(cleanDisplayName) ||
-                                                    hiddenBranches.has(`remotes/${cleanDisplayName}`)
-                                                )) {
-                                                    return null;
-                                                }
-                                                
-                                                // Check if this is the current branch by checking if it contains "HEAD -> branchName"
+                                            {processedTags.map((tag, idx) => {
                                                 const isCurrent = currentBranch && (
-                                                    displayName === currentBranch || 
-                                                    displayName === `HEAD -> ${currentBranch}` ||
-                                                    displayName.includes(`HEAD -> ${currentBranch}`)
+                                                    tag.primaryRef === currentBranch ||
+                                                    tag.isHead && tag.primaryRef === currentBranch
                                                 );
+
                                                 const tagElement = (
                                                     <span
                                                         className={cn(
@@ -343,14 +394,15 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                                             color: isCurrent ? undefined : node.color,
                                                             backgroundColor: `${node.color}15` // 10% opacity
                                                         }}
-                                                        title={cleanDisplayName}
+                                                        title={tag.displayName}
                                                     >
-                                                        <HighlightedText text={cleanDisplayName} searchQuery={searchQuery} />
+                                                        <HighlightedText text={tag.displayName} searchQuery={searchQuery} />
                                                     </span>
                                                 );
 
-                                                const branchMenuItems = getBranchTagContextMenuItems?.(cleanDisplayName);
-                                                if (!branchMenuItems || branchMenuItems.length === 0) {
+                                                let branchMenuItems = getBranchTagContextMenuItems?.(tag.primaryRef) || [];
+
+                                                if (branchMenuItems.length === 0) {
                                                     return <span key={idx} className="shrink-0">{tagElement}</span>;
                                                 }
 
