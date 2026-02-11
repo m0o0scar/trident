@@ -6,7 +6,8 @@
     "dev": "node -e \"var p=3100,n=require('net'),c=require('child_process'),x=()=>{var s=n.createServer();s.listen(p,()=>{s.close(()=>{c.spawn('next',['dev','--webpack','-p',p],{stdio:'inherit',shell:true})})}).on('error',(e)=>{if(e.code==='EADDRINUSE'){p++;x()}else{throw e}})};x()\"",
     "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "@alexbruf/react-diff-viewer": "^3.1.5",
@@ -32,6 +33,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }
