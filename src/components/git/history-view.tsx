@@ -672,7 +672,7 @@ function buildBranchContextMenuItems(
   if (!isRemote) menuItems.push({ label: 'Push to Remote', onClick: () => callbacks.onPushToRemote(branchRef) });
   if (!isRemote) menuItems.push({ label: 'Pull from Remote', onClick: () => callbacks.onPullFromRemote(branchRef) });
   if (!isCurrent) menuItems.push({ label: `Rebase ${currentBranch} onto ${branchLeafName}`, onClick: () => callbacks.onRebase(branchRef) });
-  if (!isCurrent) menuItems.push({ label: `Merge ${branchLeafName} into ${currentBranch}`, onClick: () => callbacks.onMerge(branchRef) });
+  if (!isCurrent) menuItems.push({ label: `Merge ${currentBranch} into ${branchLeafName}`, onClick: () => callbacks.onMerge(branchRef) });
   if (!isCurrent) menuItems.push({ label: isRemote ? 'Delete Remote Branch' : 'Delete Branch', onClick: () => callbacks.onDeleteBranch(branchRef), danger: true });
 
   return menuItems;
@@ -957,6 +957,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [mergeTargetBranch, setMergeTargetBranch] = useState<string | null>(null);
+  const [mergeSourceBranch, setMergeSourceBranch] = useState<string | null>(null);
   const [mergeRebaseBeforeMerge, setMergeRebaseBeforeMerge] = useState(false);
   const [mergeSquash, setMergeSquash] = useState(false);
   const [mergeFastForward, setMergeFastForward] = useState(false);
@@ -967,6 +968,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const closeMergeDialog = useCallback(() => {
     setIsMergeOpen(false);
     setMergeTargetBranch(null);
+    setMergeSourceBranch(null);
     setMergeConflictStatus('checking');
   }, []);
 
@@ -2005,7 +2007,9 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   }, [isRebaseOpen, mergeDestinationBranch, rebaseTargetBranch, repoPath, runGitAction]);
 
   const confirmMerge = (targetBranch: string) => {
+    if (!mergeDestinationBranch) return;
     setMergeTargetBranch(targetBranch);
+    setMergeSourceBranch(mergeDestinationBranch);
     setMergeRebaseBeforeMerge(false);
     setMergeSquash(false);
     setMergeFastForward(false);
@@ -2015,14 +2019,20 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   }
 
   const handleMerge = async () => {
-    if (!mergeTargetBranch) return;
+    if (!mergeTargetBranch || !mergeSourceBranch) return;
     setIsMerging(true);
     try {
       await runGitAction({
         repoPath,
+        action: 'checkout',
+        data: { branch: mergeTargetBranch }
+      });
+
+      await runGitAction({
+        repoPath,
         action: 'merge',
         data: {
-          targetBranch: mergeTargetBranch,
+          targetBranch: mergeSourceBranch,
           rebaseBeforeMerge: mergeRebaseBeforeMerge,
           squash: mergeSquash,
           fastForward: mergeFastForward,
@@ -2038,8 +2048,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   }
 
   useEffect(() => {
-    const sourceBranch = mergeTargetBranch;
-    const targetBranch = mergeDestinationBranch;
+    const sourceBranch = mergeSourceBranch;
+    const targetBranch = mergeTargetBranch;
 
     if (!isMergeOpen || !sourceBranch || !targetBranch) {
       return;
@@ -2076,7 +2086,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     return () => {
       cancelled = true;
     };
-  }, [isMergeOpen, mergeTargetBranch, mergeDestinationBranch, repoPath, runGitAction]);
+  }, [isMergeOpen, mergeSourceBranch, mergeTargetBranch, repoPath, runGitAction]);
 
   const confirmPushToRemote = async (branch: string) => {
     setPushBranch(branch);
@@ -3232,7 +3242,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 <h3 className="font-bold text-lg">Merge</h3>
                 <p className="py-4 break-words">
                     Merge branch into another one.<br/>
-                    Are you sure to merge <span className="font-bold break-all">{mergeTargetBranch}</span> into <span className="font-bold break-all">{branchData?.current}</span>?
+                    Are you sure to merge <span className="font-bold break-all">{mergeSourceBranch}</span> into <span className="font-bold break-all">{mergeTargetBranch}</span>?
                 </p>
                 <div className="form-control">
                     <label className="label cursor-pointer justify-start gap-2">
@@ -3265,17 +3275,17 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 {mergeConflictStatus === 'checking' ? (
                   <div className="alert alert-info text-sm mt-4 py-2">
                     <span className="loading loading-spinner loading-xs"></span>
-                    <span>Checking conflicts for merging <span className="font-bold break-all">{mergeTargetBranch}</span> into <span className="font-bold break-all">{branchData?.current}</span>...</span>
+                    <span>Checking conflicts for merging <span className="font-bold break-all">{mergeSourceBranch}</span> into <span className="font-bold break-all">{mergeTargetBranch}</span>...</span>
                   </div>
                 ) : mergeConflictStatus === 'no-conflict' ? (
                   <div className="alert alert-success text-sm mt-4 py-2">
                     <i className="iconoir-check-circle-solid text-[18px]" aria-hidden="true" />
-                    <span>No conflict: merging <span className="font-bold break-all">{mergeTargetBranch}</span> into <span className="font-bold break-all">{branchData?.current}</span> will not cause conflicts.</span>
+                    <span>No conflict: merging <span className="font-bold break-all">{mergeSourceBranch}</span> into <span className="font-bold break-all">{mergeTargetBranch}</span> will not cause conflicts.</span>
                   </div>
                 ) : (
                   <div className="alert alert-warning text-sm mt-4 py-2">
                     <i className="iconoir-warning-circle-solid text-[18px]" aria-hidden="true" />
-                    <span>Conflicts detected: merging <span className="font-bold break-all">{mergeTargetBranch}</span> into <span className="font-bold break-all">{branchData?.current}</span> will cause conflicts.</span>
+                    <span>Conflicts detected: merging <span className="font-bold break-all">{mergeSourceBranch}</span> into <span className="font-bold break-all">{mergeTargetBranch}</span> will cause conflicts.</span>
                   </div>
                 )}
                 <div className="modal-action">
