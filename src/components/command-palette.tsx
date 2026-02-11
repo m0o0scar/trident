@@ -59,7 +59,7 @@ export function CommandPalette() {
 
   useEffect(() => {
     const onGlobalKeyDown = (event: KeyboardEvent) => {
-      const isCommandOpenShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'p';
+      const isCommandOpenShortcut = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k';
       if (isCommandOpenShortcut) {
         event.preventDefault();
         setIsOpen(true);
