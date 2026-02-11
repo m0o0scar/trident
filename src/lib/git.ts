@@ -2,6 +2,9 @@ import { simpleGit, SimpleGit, SimpleGitOptions } from 'simple-git';
 import { GitStatus, GitLog } from './types';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { mkdtemp } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 
 const execFileAsync = promisify(execFile);
 
@@ -608,6 +611,118 @@ export class GitService {
     } catch (e) {
       console.warn('Failed to get commit file diff:', e);
       return '';
+    }
+  }
+
+  async willMergeHaveConflicts(sourceBranch: string, targetBranch?: string): Promise<boolean> {
+    const branchSummary = await this.git.branchLocal();
+    const mergeTargetBranch = targetBranch || branchSummary.current;
+
+    if (!mergeTargetBranch) {
+      throw new Error('Could not determine target branch for merge conflict check');
+    }
+
+    if (sourceBranch === mergeTargetBranch) {
+      return false;
+    }
+
+    // Ensure both refs can be resolved before checking for conflicts.
+    await this.git.revparse(['--verify', sourceBranch]);
+    await this.git.revparse(['--verify', mergeTargetBranch]);
+
+    try {
+      // Modern Git: non-destructive conflict detection using exit code.
+      await this.git.raw(['merge-tree', '--write-tree', mergeTargetBranch, sourceBranch]);
+      return false;
+    } catch (e) {
+      const errorOutput = e as { message?: string; stdout?: string; stderr?: string };
+      const rawOutput = `${errorOutput.message ?? ''}\n${errorOutput.stdout ?? ''}\n${errorOutput.stderr ?? ''}`;
+      const normalizedOutput = rawOutput.toLowerCase();
+
+      if (normalizedOutput.includes('conflict')) {
+        return true;
+      }
+
+      const isWriteTreeUnsupported =
+        normalizedOutput.includes('unknown option') ||
+        normalizedOutput.includes('usage: git merge-tree');
+
+      if (!isWriteTreeUnsupported) {
+        throw e;
+      }
+    }
+
+    // Fallback for older Git versions without --write-tree.
+    const mergeBase = (await this.git.raw(['merge-base', mergeTargetBranch, sourceBranch])).trim();
+    const mergeTreeOutput = await this.git.raw(['merge-tree', mergeBase, mergeTargetBranch, sourceBranch]);
+    const normalizedOutput = mergeTreeOutput.toLowerCase();
+
+    return (
+      mergeTreeOutput.includes('<<<<<<<') ||
+      normalizedOutput.includes('changed in both') ||
+      normalizedOutput.includes('added in both') ||
+      normalizedOutput.includes('removed in both') ||
+      normalizedOutput.includes('conflict')
+    );
+  }
+
+  async willRebaseHaveConflicts(ontoBranch: string, sourceBranch?: string): Promise<boolean> {
+    const branchSummary = await this.git.branchLocal();
+    const rebaseSourceBranch = sourceBranch || branchSummary.current;
+
+    if (!rebaseSourceBranch) {
+      throw new Error('Could not determine source branch for rebase conflict check');
+    }
+
+    if (rebaseSourceBranch === ontoBranch) {
+      return false;
+    }
+
+    // Ensure refs exist before creating a temporary worktree.
+    await this.git.revparse(['--verify', rebaseSourceBranch]);
+    await this.git.revparse(['--verify', ontoBranch]);
+
+    const tempWorktreePath = await mkdtemp(join(tmpdir(), 'git-web-rebase-check-'));
+    let worktreeAdded = false;
+
+    try {
+      // Detached worktree avoids locking local branch refs and keeps check isolated.
+      await this.git.raw(['worktree', 'add', '--detach', tempWorktreePath, rebaseSourceBranch]);
+      worktreeAdded = true;
+
+      const tempGit = simpleGit({
+        baseDir: tempWorktreePath,
+        binary: 'git',
+        maxConcurrentProcesses: 2,
+        trimmed: false,
+      });
+
+      tempGit.env({
+        ...process.env,
+        GIT_TERMINAL_PROMPT: '0',
+        GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o StrictHostKeyChecking=no',
+      });
+
+      await tempGit.rebase([ontoBranch]);
+      return false;
+    } catch (e) {
+      const errorOutput = e as { message?: string; stdout?: string; stderr?: string };
+      const rawOutput = `${errorOutput.message ?? ''}\n${errorOutput.stdout ?? ''}\n${errorOutput.stderr ?? ''}`;
+      const normalizedOutput = rawOutput.toLowerCase();
+
+      if (normalizedOutput.includes('conflict') || normalizedOutput.includes('could not apply')) {
+        return true;
+      }
+
+      throw e;
+    } finally {
+      if (worktreeAdded) {
+        try {
+          await this.git.raw(['worktree', 'remove', '--force', tempWorktreePath]);
+        } catch (e) {
+          console.debug(`[willRebaseHaveConflicts] Failed to remove temp worktree ${tempWorktreePath}:`, e);
+        }
+      }
     }
   }
 

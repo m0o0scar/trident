@@ -27,6 +27,7 @@ interface BranchTreeNode {
 
 const MIN_HISTORY_PANEL_HEIGHT = 100;
 const MAX_HISTORY_PANEL_HEIGHT = 900;
+type MergeConflictStatus = 'checking' | 'no-conflict' | 'has-conflicts';
 
 function clampHistoryPanelHeight(height: number): number {
   return Math.min(Math.max(height, MIN_HISTORY_PANEL_HEIGHT), MAX_HISTORY_PANEL_HEIGHT);
@@ -812,6 +813,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const { data: log, isLoading, isError, error, refetch, isFetching } = useGitLog(repoPath, limit);
   const { data: branchData, isLoading: isBranchesLoading } = useGitBranches(repoPath);
   const { data: statusData } = useGitStatus(repoPath);
+  const mergeDestinationBranch = branchData?.current ?? null;
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
 
   // Clear selected commit and close commit details panel when repository changes
@@ -844,6 +846,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [rebaseTargetBranch, setRebaseTargetBranch] = useState<string | null>(null);
   const [rebaseStashChanges, setRebaseStashChanges] = useState(true);
   const [isRebasing, setIsRebasing] = useState(false);
+  const [rebaseConflictStatus, setRebaseConflictStatus] = useState<MergeConflictStatus>('checking');
+
+  const closeRebaseDialog = useCallback(() => {
+    setIsRebaseOpen(false);
+    setRebaseTargetBranch(null);
+    setRebaseConflictStatus('checking');
+  }, []);
 
   const [isMergeOpen, setIsMergeOpen] = useState(false);
   const [mergeTargetBranch, setMergeTargetBranch] = useState<string | null>(null);
@@ -852,6 +861,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [mergeFastForward, setMergeFastForward] = useState(false);
   const [mergeSquashMessage, setMergeSquashMessage] = useState('');
   const [isMerging, setIsMerging] = useState(false);
+  const [mergeConflictStatus, setMergeConflictStatus] = useState<MergeConflictStatus>('checking');
+
+  const closeMergeDialog = useCallback(() => {
+    setIsMergeOpen(false);
+    setMergeTargetBranch(null);
+    setMergeConflictStatus('checking');
+  }, []);
 
   // Push to remote dialog state
   const [isPushOpen, setIsPushOpen] = useState(false);
@@ -926,11 +942,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       return;
     }
     if (isMergeOpen) {
-      setIsMergeOpen(false);
+      closeMergeDialog();
       return;
     }
     if (isRebaseOpen) {
-      setIsRebaseOpen(false);
+      closeRebaseDialog();
       return;
     }
     if (isRenameOpen) {
@@ -966,7 +982,9 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     iscreateBranchOpen,
     isPullOpen,
     isPushOpen,
+    closeMergeDialog,
     isMergeOpen,
+    closeRebaseDialog,
     isRebaseOpen,
     isRenameOpen,
     isCherryPickOpen,
@@ -1544,6 +1562,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const confirmRebase = (targetBranch: string) => {
     setRebaseTargetBranch(targetBranch);
     setRebaseStashChanges(true);
+    setRebaseConflictStatus('checking');
     setIsRebaseOpen(true);
   }
 
@@ -1556,8 +1575,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         action: 'rebase',
         data: { ontoBranch: rebaseTargetBranch, stashChanges: rebaseStashChanges }
       });
-      setIsRebaseOpen(false);
-      setRebaseTargetBranch(null);
+      closeRebaseDialog();
     } catch (e) {
       console.error(e);
     } finally {
@@ -1565,12 +1583,54 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }
 
+  useEffect(() => {
+    const sourceBranch = mergeDestinationBranch;
+    const ontoBranch = rebaseTargetBranch;
+
+    if (!isRebaseOpen || !sourceBranch || !ontoBranch) {
+      return;
+    }
+
+    let cancelled = false;
+    setRebaseConflictStatus('checking');
+
+    const checkRebaseConflicts = async () => {
+      try {
+        const result = await runGitAction({
+          repoPath,
+          action: 'check-rebase-conflicts',
+          data: {
+            sourceBranch,
+            ontoBranch,
+          },
+        });
+
+        if (!cancelled) {
+          setRebaseConflictStatus(result.hasConflicts ? 'has-conflicts' : 'no-conflict');
+        }
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          // Be conservative when the check cannot be completed.
+          setRebaseConflictStatus('has-conflicts');
+        }
+      }
+    };
+
+    void checkRebaseConflicts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isRebaseOpen, mergeDestinationBranch, rebaseTargetBranch, repoPath, runGitAction]);
+
   const confirmMerge = (targetBranch: string) => {
     setMergeTargetBranch(targetBranch);
     setMergeRebaseBeforeMerge(false);
     setMergeSquash(false);
     setMergeFastForward(false);
     setMergeSquashMessage('');
+    setMergeConflictStatus('checking');
     setIsMergeOpen(true);
   }
 
@@ -1589,14 +1649,54 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           squashMessage: mergeSquash ? mergeSquashMessage : undefined,
         }
       });
-      setIsMergeOpen(false);
-      setMergeTargetBranch(null);
+      closeMergeDialog();
     } catch (e) {
       console.error(e);
     } finally {
       setIsMerging(false);
     }
   }
+
+  useEffect(() => {
+    const sourceBranch = mergeTargetBranch;
+    const targetBranch = mergeDestinationBranch;
+
+    if (!isMergeOpen || !sourceBranch || !targetBranch) {
+      return;
+    }
+
+    let cancelled = false;
+    setMergeConflictStatus('checking');
+
+    const checkMergeConflicts = async () => {
+      try {
+        const result = await runGitAction({
+          repoPath,
+          action: 'check-merge-conflicts',
+          data: {
+            sourceBranch,
+            targetBranch,
+          },
+        });
+
+        if (!cancelled) {
+          setMergeConflictStatus(result.hasConflicts ? 'has-conflicts' : 'no-conflict');
+        }
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          // Be conservative when the check cannot be completed.
+          setMergeConflictStatus('has-conflicts');
+        }
+      }
+    };
+
+    void checkMergeConflicts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isMergeOpen, mergeTargetBranch, mergeDestinationBranch, repoPath, runGitAction]);
 
   const confirmPushToRemote = async (branch: string) => {
     setPushBranch(branch);
@@ -2471,8 +2571,24 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 Warning: All local changes will be discarded.
               </p>
             )}
+            {rebaseConflictStatus === 'checking' ? (
+              <div className="alert alert-info text-sm mt-4 py-2">
+                <span className="loading loading-spinner loading-xs"></span>
+                <span>Checking conflicts for rebasing <span className="font-bold break-all">{branchData?.current}</span> onto <span className="font-bold break-all">{rebaseTargetBranch}</span>...</span>
+              </div>
+            ) : rebaseConflictStatus === 'no-conflict' ? (
+              <div className="alert alert-success text-sm mt-4 py-2">
+                <i className="iconoir-check-circle-solid text-[18px]" aria-hidden="true" />
+                <span>No conflict: rebasing <span className="font-bold break-all">{branchData?.current}</span> onto <span className="font-bold break-all">{rebaseTargetBranch}</span> will not cause conflicts.</span>
+              </div>
+            ) : (
+              <div className="alert alert-warning text-sm mt-4 py-2">
+                <i className="iconoir-warning-circle-solid text-[18px]" aria-hidden="true" />
+                <span>Conflicts detected: rebasing <span className="font-bold break-all">{branchData?.current}</span> onto <span className="font-bold break-all">{rebaseTargetBranch}</span> will cause conflicts.</span>
+              </div>
+            )}
             <div className="modal-action">
-              <button className="btn" onClick={() => setIsRebaseOpen(false)} disabled={isRebasing}>Cancel</button>
+              <button className="btn" onClick={closeRebaseDialog} disabled={isRebasing}>Cancel</button>
               <button className="btn btn-primary" onClick={handleRebase} disabled={isRebasing}>
                 {isRebasing && <span className="loading loading-spinner loading-xs"></span>}
                 Confirm
@@ -2480,7 +2596,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             </div>
           </div>
           <form method="dialog" className="modal-backdrop">
-            <button onClick={() => setIsRebaseOpen(false)}>close</button>
+            <button onClick={closeRebaseDialog}>close</button>
           </form>
         </dialog>
       )}
@@ -2491,7 +2607,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 <h3 className="font-bold text-lg">Merge</h3>
                 <p className="py-4 break-words">
                     Merge branch into another one.<br/>
-                    Are you sure to merge <span className="font-bold break-all">{branchData?.current}</span> into <span className="font-bold break-all">{mergeTargetBranch}</span>?
+                    Are you sure to merge <span className="font-bold break-all">{mergeTargetBranch}</span> into <span className="font-bold break-all">{branchData?.current}</span>?
                 </p>
                 <div className="form-control">
                     <label className="label cursor-pointer justify-start gap-2">
@@ -2521,8 +2637,24 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                         <span className="label-text">Fast forward merge</span>
                     </label>
                 </div>
+                {mergeConflictStatus === 'checking' ? (
+                  <div className="alert alert-info text-sm mt-4 py-2">
+                    <span className="loading loading-spinner loading-xs"></span>
+                    <span>Checking conflicts for merging <span className="font-bold break-all">{mergeTargetBranch}</span> into <span className="font-bold break-all">{branchData?.current}</span>...</span>
+                  </div>
+                ) : mergeConflictStatus === 'no-conflict' ? (
+                  <div className="alert alert-success text-sm mt-4 py-2">
+                    <i className="iconoir-check-circle-solid text-[18px]" aria-hidden="true" />
+                    <span>No conflict: merging <span className="font-bold break-all">{mergeTargetBranch}</span> into <span className="font-bold break-all">{branchData?.current}</span> will not cause conflicts.</span>
+                  </div>
+                ) : (
+                  <div className="alert alert-warning text-sm mt-4 py-2">
+                    <i className="iconoir-warning-circle-solid text-[18px]" aria-hidden="true" />
+                    <span>Conflicts detected: merging <span className="font-bold break-all">{mergeTargetBranch}</span> into <span className="font-bold break-all">{branchData?.current}</span> will cause conflicts.</span>
+                  </div>
+                )}
                 <div className="modal-action">
-                    <button className="btn" onClick={() => setIsMergeOpen(false)} disabled={isMerging}>Cancel</button>
+                    <button className="btn" onClick={closeMergeDialog} disabled={isMerging}>Cancel</button>
                     <button className="btn btn-primary" onClick={handleMerge} disabled={isMerging}>
                         {isMerging && <span className="loading loading-spinner loading-xs"></span>}
                         Confirm
@@ -2530,7 +2662,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 </div>
             </div>
             <form method="dialog" className="modal-backdrop">
-                <button onClick={() => setIsMergeOpen(false)}>close</button>
+                <button onClick={closeMergeDialog}>close</button>
             </form>
         </dialog>
       )}

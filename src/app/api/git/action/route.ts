@@ -8,7 +8,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rename-remote-branch', 'reset', 'cherry-pick', 'rebase', 'merge', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword', 'discard']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rename-remote-branch', 'reset', 'cherry-pick', 'rebase', 'merge', 'check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword', 'discard']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -190,6 +190,15 @@ export async function POST(request: Request) {
           squashMessage: data.squashMessage,
         });
         break;
+      case 'check-merge-conflicts':
+        if (!data?.sourceBranch) throw new Error('Source branch is required for merge conflict check');
+        const hasConflicts = await git.willMergeHaveConflicts(data.sourceBranch, data.targetBranch);
+        return NextResponse.json({ success: true, hasConflicts });
+      case 'check-rebase-conflicts':
+        if (!data?.ontoBranch) throw new Error('Target branch is required for rebase conflict check');
+        if (!data?.sourceBranch) throw new Error('Source branch is required for rebase conflict check');
+        const hasRebaseConflicts = await git.willRebaseHaveConflicts(data.ontoBranch, data.sourceBranch);
+        return NextResponse.json({ success: true, hasConflicts: hasRebaseConflicts });
       case 'get-remotes':
         const remotes = await git.getRemotes();
         return NextResponse.json({ success: true, remotes });
