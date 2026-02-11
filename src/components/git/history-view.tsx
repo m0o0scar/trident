@@ -2624,20 +2624,25 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       branch: tracking.upstream.slice(slashIndex + 1),
     };
   }, [currentBranch, trackingInfoByBranch]);
-  const trackingActionDisabledReason = useMemo(() => {
+  const pullActionDisabledReason = useMemo(() => {
     if (isBranchesLoading) return 'Loading branches...';
     if (!currentBranch) return 'Not on a local branch';
     if (!currentTrackingBranch) return `Branch "${currentBranch}" has no tracking remote branch`;
     return null;
   }, [currentBranch, currentTrackingBranch, isBranchesLoading]);
+  const pushActionDisabledReason = useMemo(() => {
+    if (isBranchesLoading) return 'Loading branches...';
+    if (!currentBranch) return 'Not on a local branch';
+    return null;
+  }, [currentBranch, isBranchesLoading]);
 
   const confirmPullCurrentBranch = () => {
-    if (!currentBranch || trackingActionDisabledReason) return;
+    if (!currentBranch || pullActionDisabledReason) return;
     void confirmPullFromRemote(currentBranch);
   };
 
   const confirmPushCurrentBranch = () => {
-    if (!currentBranch || trackingActionDisabledReason) return;
+    if (!currentBranch || pushActionDisabledReason) return;
     void confirmPushToRemote(currentBranch);
   };
 
@@ -3606,8 +3611,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               <button
                 className="btn btn-sm gap-2"
                 onClick={confirmPullCurrentBranch}
-                disabled={!!trackingActionDisabledReason || isPullOpen || isPushOpen}
-                title={trackingActionDisabledReason || `Pull from ${currentTrackingBranch?.upstream}`}
+                disabled={!!pullActionDisabledReason || isPullOpen || isPushOpen}
+                title={pullActionDisabledReason || `Pull from ${currentTrackingBranch?.upstream}`}
               >
                 {pullLoadingRemotes ? (
                   <span className="loading loading-spinner loading-xs"></span>
@@ -3619,8 +3624,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               <button
                 className="btn btn-sm gap-2"
                 onClick={confirmPushCurrentBranch}
-                disabled={!!trackingActionDisabledReason || isPullOpen || isPushOpen}
-                title={trackingActionDisabledReason || `Push to ${currentTrackingBranch?.upstream}`}
+                disabled={!!pushActionDisabledReason || isPullOpen || isPushOpen}
+                title={pushActionDisabledReason || (currentTrackingBranch ? `Push to ${currentTrackingBranch.upstream}` : 'Push current branch to remote')}
               >
                 {pushLoadingRemotes ? (
                   <span className="loading loading-spinner loading-xs"></span>
