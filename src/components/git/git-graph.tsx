@@ -243,9 +243,17 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                         {nodes.map((node) => {
                             const isSelected = selectedHashes ? selectedHashes.has(node.hash) : selectedHash === node.hash;
                             const selectedCount = selectedHashes?.size ?? (selectedHash ? 1 : 0);
-                            const menuItems = [
-                                { label: "Reset to here", onClick: () => onResetToCommit?.(node.hash) },
-                            ];
+
+                            // Check if this commit is the latest commit of the current branch
+                            const nodeRefs = node.refs ? node.refs.replace(/[()]/g, '').split(',').map(r => r.trim()) : [];
+                            const isCurrentBranchTip = nodeRefs.some(ref => ref.startsWith('HEAD ->'));
+
+                            const menuItems: ContextMenuItem[] = [];
+
+                            if (!isCurrentBranchTip) {
+                                menuItems.push({ label: "Reset to here", onClick: () => onResetToCommit?.(node.hash) });
+                            }
+
                             if (onCherryPickCommit) {
                                 menuItems.push({
                                     label: "Cherry-pick commit",
