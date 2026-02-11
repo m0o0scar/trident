@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { FileSystemBrowser } from './fs-browser';
 import { toast } from '@/hooks/use-toast';
 import { HomeSettingsModal } from './home-settings-modal';
+import { getRepositoryDisplayName } from '@/lib/utils';
 
 export function RepoList() {
     const { data: repos, isLoading } = useRepositories();
@@ -14,7 +15,7 @@ export function RepoList() {
     const deleteRepo = useDeleteRepository();
     const [browserOpen, setBrowserOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-    const [repoToDelete, setRepoToDelete] = useState<{ path: string; name: string } | null>(null);
+    const [repoToDelete, setRepoToDelete] = useState<{ path: string; displayName: string } | null>(null);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [defaultRootFolder, setDefaultRootFolder] = useState<string | undefined>(undefined);
     const router = useRouter();
@@ -60,7 +61,7 @@ export function RepoList() {
         }
     };
 
-    const handleDeleteClick = (e: React.MouseEvent, repo: { path: string; name: string }) => {
+    const handleDeleteClick = (e: React.MouseEvent, repo: { path: string; displayName: string }) => {
         e.stopPropagation();
         setRepoToDelete(repo);
         setDeleteDialogOpen(true);
@@ -126,7 +127,9 @@ export function RepoList() {
                                 </td>
                             </tr>
                         )}
-                        {repos?.map((repo) => (
+                        {repos?.map((repo) => {
+                            const repoDisplayName = getRepositoryDisplayName(repo);
+                            return (
                             <tr
                                 key={repo.path}
                                 className="hover:bg-base-200/30 cursor-pointer group"
@@ -135,7 +138,7 @@ export function RepoList() {
                                 <td>
                                     <div className="flex items-center gap-3">
                                         <i className="iconoir-bookmark text-[20px] opacity-70 group-hover:text-primary transition-colors" aria-hidden="true" />
-                                        <span className="font-bold text-sm">{repo.name}</span>
+                                        <span className="font-bold text-sm">{repoDisplayName}</span>
                                     </div>
                                 </td>
                                 <td className="text-sm opacity-70 font-mono truncate max-w-xs" title={repo.path}>
@@ -152,14 +155,15 @@ export function RepoList() {
                                         </Link>
                                         <button
                                             className="btn btn-ghost btn-sm btn-square text-error hover:bg-error/10"
-                                            onClick={(e) => handleDeleteClick(e, repo)}
+                                            onClick={(e) => handleDeleteClick(e, { path: repo.path, displayName: repoDisplayName })}
                                         >
                                             <i className="iconoir-trash text-[16px]" aria-hidden="true" />
                                         </button>
                                     </div>
                                 </td>
                             </tr>
-                        ))}
+                            );
+                        })}
                     </tbody>
                 </table>
             </div>
@@ -182,7 +186,7 @@ export function RepoList() {
                     <div className="modal-box">
                         <h3 className="font-bold text-lg">Delete Repository</h3>
                         <p className="py-4 break-words">
-                            Are you sure you want to remove <strong className="break-all">{repoToDelete?.name}</strong> from the list? 
+                            Are you sure you want to remove <strong className="break-all">{repoToDelete?.displayName}</strong> from the list? 
                             This will only remove it from your repository list, not delete the files from your file system.
                         </p>
                         <div className="modal-action">

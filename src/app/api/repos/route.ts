@@ -11,12 +11,14 @@ export async function GET() {
 const addRepoSchema = z.object({
   path: z.string().min(1),
   name: z.string().optional(),
+  displayName: z.string().nullable().optional(),
 });
 
 const updateRepoSchema = z.object({
   path: z.string().min(1),
   updates: z.object({
     name: z.string().optional(),
+    displayName: z.string().nullable().optional(),
     lastOpenedAt: z.string().optional(),
     credentialId: z.string().optional().nullable(),
     expandedFolders: z.array(z.string()).optional(),
@@ -29,8 +31,8 @@ const updateRepoSchema = z.object({
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { path, name } = addRepoSchema.parse(body);
-    const repo = addRepository(path, name);
+    const { path, name, displayName } = addRepoSchema.parse(body);
+    const repo = addRepository(path, name, displayName);
     return NextResponse.json(repo);
   } catch (error) {
      if (error instanceof z.ZodError) {

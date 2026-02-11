@@ -44,16 +44,24 @@ export function getRepositories(): Repository[] {
   }
 }
 
-export function addRepository(repoPath: string, name?: string): Repository {
+function normalizeDisplayName(displayName?: string | null): string | null | undefined {
+  if (displayName === undefined) return undefined;
+  const normalized = displayName.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+export function addRepository(repoPath: string, name?: string, displayName?: string | null): Repository {
   const repos = getRepositories();
   // Check if exists
   if (repos.find(r => r.path === repoPath)) {
     throw new Error('Repository already exists');
   }
 
+  const normalizedDisplayName = normalizeDisplayName(displayName);
   const newRepo: Repository = {
     path: repoPath,
     name: name || path.basename(repoPath),
+    ...(normalizedDisplayName ? { displayName: normalizedDisplayName } : {}),
   };
 
   repos.push(newRepo);
@@ -69,7 +77,12 @@ export function updateRepository(repoPath: string, updates: Partial<Repository>)
     throw new Error('Repository not found');
   }
 
-  const updatedRepo = { ...repos[repoIndex], ...updates };
+  const normalizedUpdates: Partial<Repository> = { ...updates };
+  if ('displayName' in normalizedUpdates) {
+    normalizedUpdates.displayName = normalizeDisplayName(normalizedUpdates.displayName);
+  }
+
+  const updatedRepo = { ...repos[repoIndex], ...normalizedUpdates };
   repos[repoIndex] = updatedRepo;
   
   fs.writeFileSync(DATA_FILE, JSON.stringify(repos, null, 2));

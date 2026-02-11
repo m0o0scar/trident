@@ -1,11 +1,11 @@
 'use client';
 
-import { cn } from '@/lib/utils';
+import { cn, getRepoFolderName, getRepositoryDisplayName } from '@/lib/utils';
 import Link from 'next/link';
 import { HomeSettingsModal } from '@/components/home-settings-modal';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import { useGitStatus, useUpdateSettings } from '@/hooks/use-git';
+import { useGitStatus, useRepository, useUpdateSettings } from '@/hooks/use-git';
 
 const SIDEBAR_COLLAPSED_KEY = 'workspace-sidebar-collapsed';
 const SIDEBAR_WIDTH_EXPANDED = 256; // w-64
@@ -21,6 +21,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
   const searchParams = useSearchParams();
   const router = useRouter();
   const repoPath = searchParams.get('path') || '';
+  const repository = useRepository(repoPath || null);
   const [isCollapsed, setIsCollapsed] = useState(initialCollapsed);
   const [enableTransition, setEnableTransition] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -30,6 +31,9 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
   // Fetch git status to get uncommitted changes count
   const { data: gitStatus } = useGitStatus(repoPath || null);
   const changesCount = gitStatus?.files?.length ?? 0;
+  const repoDisplayName = repository
+    ? getRepositoryDisplayName(repository)
+    : (repoPath ? getRepoFolderName(repoPath) : '');
 
   // Enable transitions only after initial paint to avoid first-load animation.
   useEffect(() => {
@@ -143,7 +147,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
           {!isCollapsed && (
             <div className="px-4 mb-6">
               <p className="text-xs font-mono opacity-70 break-all border border-base-300 rounded p-2 bg-base-200/50" title={repoPath}>
-                {repoPath.split('/').pop()}
+                {repoDisplayName}
               </p>
             </div>
           )}

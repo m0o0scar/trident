@@ -1,6 +1,7 @@
 export interface Repository {
   path: string;
   name: string;
+  displayName?: string | null;
   lastOpenedAt?: string;
   credentialId?: string | null;
   expandedFolders?: string[];

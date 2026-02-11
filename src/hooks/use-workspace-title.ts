@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useRepository } from './use-git';
+import { getRepoFolderName, getRepositoryDisplayName } from '@/lib/utils';
 
 /**
  * Updates the document title with the repo name and page name.
@@ -8,9 +10,14 @@ import { useEffect } from 'react';
  * @param pageName - The name of the current page (e.g., "History", "Changes", "Stashes", "Settings")
  */
 export function useWorkspaceTitle(repoPath: string | null, pageName: string) {
+    const repository = useRepository(repoPath);
+
     useEffect(() => {
-        // Handle both Windows (backslash) and Unix (forward slash) paths
-        const repoName = repoPath ? repoPath.split(/[/\\]/).pop() : 'Workspace';
+        const repoName = repoPath
+            ? repository
+                ? getRepositoryDisplayName(repository)
+                : getRepoFolderName(repoPath)
+            : 'Workspace';
         document.title = `${repoName} | ${pageName}`;
-    }, [repoPath, pageName]);
+    }, [repoPath, repository, pageName]);
 }

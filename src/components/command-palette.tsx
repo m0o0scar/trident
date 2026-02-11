@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Repository } from '@/lib/types';
 import { useRepositories } from '@/hooks/use-git';
-import { cn } from '@/lib/utils';
+import { cn, getRepositoryDisplayName } from '@/lib/utils';
 
 function sortByLastOpenedDesc(a: Repository, b: Repository) {
   return new Date(b.lastOpenedAt || 0).getTime() - new Date(a.lastOpenedAt || 0).getTime();
@@ -32,7 +32,7 @@ export function CommandPalette() {
     if (!keyword) return recentRepositories;
 
     return recentRepositories.filter((repo) => {
-      const name = repo.name.toLowerCase();
+      const name = getRepositoryDisplayName(repo).toLowerCase();
       const repoPath = repo.path.toLowerCase();
       return name.includes(keyword) || repoPath.includes(keyword);
     });
@@ -149,7 +149,9 @@ export function CommandPalette() {
             <div className="px-4 py-6 text-sm opacity-60">No matching repositories.</div>
           )}
 
-          {filteredRepositories.map((repo, index) => (
+          {filteredRepositories.map((repo, index) => {
+            const repoDisplayName = getRepositoryDisplayName(repo);
+            return (
             <button
               key={repo.path}
               type="button"
@@ -161,12 +163,13 @@ export function CommandPalette() {
               onClick={() => openRepository(repo.path)}
             >
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium">{repo.name}</div>
+                <div className="truncate text-sm font-medium">{repoDisplayName}</div>
                 <div className="truncate text-xs opacity-65">{repo.path}</div>
               </div>
               <span className="text-xs opacity-60">Open</span>
             </button>
-          ))}
+            );
+          })}
         </div>
 
         <div className="border-t border-base-300 px-4 py-2 text-xs opacity-60">

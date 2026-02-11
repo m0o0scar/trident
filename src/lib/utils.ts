@@ -1,8 +1,28 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import type { Repository } from './types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
+}
+
+export function getRepoFolderName(repoPath: string): string {
+  const normalizedPath = repoPath.replace(/[\\/]+$/, '');
+  const segments = normalizedPath.split(/[/\\]/).filter(Boolean);
+  return segments[segments.length - 1] || repoPath;
+}
+
+export function getRepositoryDisplayName(repo: Pick<Repository, 'path' | 'name' | 'displayName'>): string {
+  const customName = repo.displayName?.trim();
+  if (customName) {
+    return customName;
+  }
+
+  if (repo.name?.trim()) {
+    return repo.name;
+  }
+
+  return getRepoFolderName(repo.path);
 }
 
 function getNormalizedExtension(filePath: string): string {
