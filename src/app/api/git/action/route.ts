@@ -127,7 +127,7 @@ export async function POST(request: Request) {
         break;
       case 'branch':
         if (!data?.branch) throw new Error('Branch name is required to create branch');
-        await git.createBranch(data.branch);
+        await git.createBranch(data.branch, data?.fromRef);
         break;
       case 'delete-branch':
         if (!data?.branch) throw new Error('Branch name is required to delete branch');

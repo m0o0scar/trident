@@ -9,7 +9,15 @@ export interface ContextMenuItem {
     danger?: boolean;
 }
 
-export function ContextMenu({ children, items }: { children: React.ReactNode, items: ContextMenuItem[] }) {
+export function ContextMenu({
+    children,
+    items,
+    containerClassName = 'w-full',
+}: {
+    children: React.ReactNode,
+    items: ContextMenuItem[],
+    containerClassName?: string
+}) {
     const [isOpen, setIsOpen] = useState(false);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const menuRef = useRef<HTMLUListElement>(null);
@@ -134,7 +142,7 @@ export function ContextMenu({ children, items }: { children: React.ReactNode, it
     }, [isOpen, position, items]);
 
     return (
-        <div ref={containerRef} className="w-full" onContextMenu={handleContextMenu}>
+        <div ref={containerRef} className={containerClassName} onContextMenu={handleContextMenu}>
             {children}
             {isOpen && (
                 <ul

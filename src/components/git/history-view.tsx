@@ -6,7 +6,7 @@ import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { cn, sanitizeBranchName, isFileBinary, isImageFile } from '@/lib/utils';
-import { ContextMenu } from '@/components/context-menu';
+import { ContextMenu, ContextMenuItem } from '@/components/context-menu';
 import { GroupedDiffViewer } from './grouped-diff-viewer';
 import { ImageDiffView } from './image-diff-view';
 import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
@@ -587,6 +587,48 @@ function VisibilityToggle({
   );
 }
 
+interface BranchMenuCallbacks {
+  onCheckout: (branch: string) => void;
+  onCheckoutToLocal: (remoteBranch: string) => void;
+  onCreateBranch: (sourceBranch: string) => void;
+  onDeleteBranch: (branch: string) => void;
+  onRenameBranch: (branch: string) => void;
+  onRenameRemoteBranch: (branch: string) => void;
+  onRebase: (targetBranch: string) => void;
+  onMerge: (targetBranch: string) => void;
+  onPushToRemote: (branch: string) => void;
+  onPullFromRemote: (branch: string) => void;
+}
+
+interface BranchMenuOptions {
+  branchRef: string;
+  branchLeafName: string;
+  currentBranch?: string;
+  isRemote: boolean;
+}
+
+function buildBranchContextMenuItems(
+  options: BranchMenuOptions,
+  callbacks: BranchMenuCallbacks
+): ContextMenuItem[] {
+  const { branchRef, branchLeafName, currentBranch, isRemote } = options;
+  const isCurrent = !isRemote && branchRef === currentBranch;
+  const menuItems: ContextMenuItem[] = [];
+
+  if (!isCurrent && !isRemote) menuItems.push({ label: 'Checkout', onClick: () => callbacks.onCheckout(branchRef) });
+  if (isRemote) menuItems.push({ label: 'Checkout to local', onClick: () => callbacks.onCheckoutToLocal(branchRef) });
+  menuItems.push({ label: 'Create Branch', onClick: () => callbacks.onCreateBranch(branchRef) });
+  if (!isRemote) menuItems.push({ label: 'Rename Branch', onClick: () => callbacks.onRenameBranch(branchRef) });
+  if (isRemote) menuItems.push({ label: 'Rename branch', onClick: () => callbacks.onRenameRemoteBranch(branchRef) });
+  if (!isRemote) menuItems.push({ label: 'Push to Remote', onClick: () => callbacks.onPushToRemote(branchRef) });
+  if (!isRemote) menuItems.push({ label: 'Pull from Remote', onClick: () => callbacks.onPullFromRemote(branchRef) });
+  if (!isCurrent) menuItems.push({ label: `Rebase ${currentBranch} onto ${branchLeafName}`, onClick: () => callbacks.onRebase(branchRef) });
+  if (!isCurrent) menuItems.push({ label: `Merge ${branchLeafName} into ${currentBranch}`, onClick: () => callbacks.onMerge(branchRef) });
+  if (!isCurrent) menuItems.push({ label: isRemote ? 'Delete Remote Branch' : 'Delete Branch', onClick: () => callbacks.onDeleteBranch(branchRef), danger: true });
+
+  return menuItems;
+}
+
 // Recursive component to render branch tree
 function BranchTreeItem({
   node,
@@ -603,6 +645,7 @@ function BranchTreeItem({
   onMerge,
   onPushToRemote,
   onPullFromRemote,
+  getBranchContextMenuItems,
   onBranchClick,
   visibilityMap,
   onToggleVisibility,
@@ -626,6 +669,7 @@ function BranchTreeItem({
   onMerge: (targetBranch: string) => void;
   onPushToRemote: (branch: string) => void;
   onPullFromRemote: (branch: string) => void;
+  getBranchContextMenuItems: (options: BranchMenuOptions) => ContextMenuItem[];
   onBranchClick?: (branch: string) => void;
   visibilityMap: VisibilityMap;
   onToggleVisibility: (path: string, type: 'visible' | 'hidden') => void;
@@ -707,6 +751,7 @@ function BranchTreeItem({
                   onMerge={onMerge}
                   onPushToRemote={onPushToRemote}
                   onPullFromRemote={onPullFromRemote}
+                  getBranchContextMenuItems={getBranchContextMenuItems}
                   onBranchClick={onBranchClick}
                   visibilityMap={visibilityMap}
                   onToggleVisibility={onToggleVisibility}
@@ -725,17 +770,12 @@ function BranchTreeItem({
         const branchTracking = !isRemote && child.fullPath ? trackingInfo?.[child.fullPath] : undefined;
         const hasDivergence = branchTracking && (branchTracking.ahead > 0 || branchTracking.behind > 0);
 
-        const menuItems = [];
-        if (!isCurrent && !isRemote) menuItems.push({ label: "Checkout", onClick: () => onCheckout(child.fullPath!) });
-        if (isRemote) menuItems.push({ label: "Checkout to local", onClick: () => onCheckoutToLocal(child.fullPath!) });
-        menuItems.push({ label: "Create Branch", onClick: onCreateBranch });
-        if (!isRemote) menuItems.push({ label: "Rename Branch", onClick: () => onRenameBranch(child.fullPath!) });
-        if (isRemote) menuItems.push({ label: "Rename branch", onClick: () => onRenameRemoteBranch(child.fullPath!) });
-        if (!isRemote) menuItems.push({ label: "Push to Remote", onClick: () => onPushToRemote(child.fullPath!) });
-        if (!isRemote) menuItems.push({ label: "Pull from Remote", onClick: () => onPullFromRemote(child.fullPath!) });
-        if (!isCurrent) menuItems.push({ label: `Rebase ${currentBranch} onto ${child.name}`, onClick: () => onRebase(child.fullPath!) });
-        if (!isCurrent) menuItems.push({ label: `Merge ${child.name} into ${currentBranch}`, onClick: () => onMerge(child.fullPath!) });
-        if (!isCurrent) menuItems.push({ label: isRemote ? "Delete Remote Branch" : "Delete Branch", onClick: () => onDeleteBranch(child.fullPath!), danger: true });
+        const menuItems = getBranchContextMenuItems({
+          branchRef: child.fullPath!,
+          branchLeafName: child.name,
+          currentBranch,
+          isRemote,
+        });
 
 
         return (
@@ -833,6 +873,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const { mutateAsync: runGitAction } = useGitAction();
   const [iscreateBranchOpen, setIsCreateBranchOpen] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
+  const [createBranchFromRef, setCreateBranchFromRef] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -947,6 +988,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
     if (iscreateBranchOpen) {
       setIsCreateBranchOpen(false);
+      setCreateBranchFromRef(null);
       return;
     }
     if (isPullOpen) {
@@ -2307,16 +2349,22 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       await runGitAction({
         repoPath,
         action: 'branch',
-        data: { branch: newBranchName }
+        data: { branch: newBranchName, fromRef: createBranchFromRef || undefined }
       });
       setIsCreateBranchOpen(false);
       setNewBranchName('');
+      setCreateBranchFromRef(null);
     } catch (e) {
       console.error(e);
       // alert or toast error
     } finally {
       setIsCreating(false);
     }
+  };
+
+  const confirmCreateBranch = (sourceBranch?: string) => {
+    setCreateBranchFromRef(sourceBranch || null);
+    setIsCreateBranchOpen(true);
   };
 
   const currentBranch = branchData?.current;
@@ -2360,6 +2408,59 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     void confirmPushToRemote(currentBranch);
   };
 
+  const getBranchContextMenuItems = (options: BranchMenuOptions): ContextMenuItem[] => {
+    return buildBranchContextMenuItems(options, {
+      onCheckout: handleCheckout,
+      onCheckoutToLocal: confirmCheckoutToLocal,
+      onCreateBranch: confirmCreateBranch,
+      onDeleteBranch: confirmDeleteBranch,
+      onRenameBranch: confirmRenameBranch,
+      onRenameRemoteBranch: confirmRenameRemoteBranch,
+      onRebase: confirmRebase,
+      onMerge: confirmMerge,
+      onPushToRemote: confirmPushToRemote,
+      onPullFromRemote: confirmPullFromRemote,
+    });
+  };
+
+  const localBranchSet = useMemo(() => {
+    return new Set(branchData?.branches ?? []);
+  }, [branchData?.branches]);
+
+  const remoteBranchMap = useMemo(() => {
+    const map = new Map<string, string>();
+    if (!branchData?.remotes) return map;
+
+    for (const [remoteName, branches] of Object.entries(branchData.remotes)) {
+      for (const branch of branches) {
+        map.set(`${remoteName}/${branch}`, `remotes/${remoteName}/${branch}`);
+      }
+    }
+
+    return map;
+  }, [branchData?.remotes]);
+
+  const getBranchTagContextMenuItems = (displayRef: string): ContextMenuItem[] | null => {
+    if (localBranchSet.has(displayRef)) {
+      return getBranchContextMenuItems({
+        branchRef: displayRef,
+        branchLeafName: displayRef.split('/').pop() || displayRef,
+        currentBranch,
+        isRemote: false,
+      });
+    }
+
+    const remoteBranchRef = remoteBranchMap.get(displayRef);
+    if (!remoteBranchRef) return null;
+
+    return getBranchContextMenuItems({
+      branchRef: remoteBranchRef,
+      branchLeafName: remoteBranchRef.split('/').pop() || displayRef,
+      currentBranch,
+      isRemote: true,
+    });
+  };
+
   const branchTreePopoverContent = (
     <div className="w-[22rem] max-w-[calc(100vw-2rem)] flex flex-col border border-base-300 bg-base-100 rounded-box shadow-xl overflow-hidden">
       <div className="px-4 border-b border-base-300 flex items-center justify-between bg-base-100 h-[57px] shrink-0">
@@ -2376,7 +2477,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             </div>
           )}
           <div className="tooltip tooltip-left z-20" data-tip="Create Branch">
-            <button className="btn btn-ghost btn-xs btn-square" onClick={() => setIsCreateBranchOpen(true)}>
+            <button className="btn btn-ghost btn-xs btn-square" onClick={() => confirmCreateBranch()}>
               <i className="iconoir-plus-circle text-[16px]" aria-hidden="true" />
             </button>
           </div>
@@ -2403,7 +2504,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   onToggleFolder={toggleFolder}
                   onCheckout={handleCheckout}
                   onCheckoutToLocal={confirmCheckoutToLocal}
-                  onCreateBranch={() => setIsCreateBranchOpen(true)}
+                  onCreateBranch={() => confirmCreateBranch()}
                   onDeleteBranch={confirmDeleteBranch}
                   onRenameBranch={confirmRenameBranch}
                   onRenameRemoteBranch={confirmRenameRemoteBranch}
@@ -2411,6 +2512,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   onMerge={confirmMerge}
                   onPushToRemote={confirmPushToRemote}
                   onPullFromRemote={confirmPullFromRemote}
+                  getBranchContextMenuItems={getBranchContextMenuItems}
                   onBranchClick={handleBranchClick}
                   visibilityMap={visibilityMap}
                   onToggleVisibility={handleToggleVisibility}
@@ -2467,7 +2569,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                         onToggleFolder={toggleFolder}
                         onCheckout={handleCheckout}
                         onCheckoutToLocal={confirmCheckoutToLocal}
-                        onCreateBranch={() => setIsCreateBranchOpen(true)}
+                        onCreateBranch={() => confirmCreateBranch()}
                         onDeleteBranch={confirmDeleteBranch}
                         onRenameBranch={confirmRenameBranch}
                         onRenameRemoteBranch={confirmRenameRemoteBranch}
@@ -2475,6 +2577,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                         onMerge={confirmMerge}
                         onPushToRemote={confirmPushToRemote}
                         onPullFromRemote={confirmPullFromRemote}
+                        getBranchContextMenuItems={getBranchContextMenuItems}
                         onBranchClick={handleBranchClick}
                         visibilityMap={visibilityMap}
                         onToggleVisibility={handleToggleVisibility}
@@ -3062,7 +3165,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <dialog className="modal modal-open">
             <div className="modal-box">
                 <h3 className="font-bold text-lg">Create New Branch</h3>
-                <p className="py-4">Create a new branch from the current HEAD.</p>
+                <p className="py-4 break-words">
+                  Create a new branch from{' '}
+                  <span className="font-bold break-all">
+                    {createBranchFromRef ? createBranchFromRef.replace(/^remotes\//, '') : 'current HEAD'}
+                  </span>.
+                </p>
                 <input
                     type="text"
                     className="input input-bordered w-full"
@@ -3078,14 +3186,30 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                     }}
                 />
                 <div className="modal-action">
-                    <button className="btn" onClick={() => setIsCreateBranchOpen(false)} disabled={isCreating}>Cancel</button>
+                    <button
+                      className="btn"
+                      onClick={() => {
+                        setIsCreateBranchOpen(false);
+                        setCreateBranchFromRef(null);
+                      }}
+                      disabled={isCreating}
+                    >
+                      Cancel
+                    </button>
                     <button className="btn btn-primary" onClick={handleCreateBranch} disabled={!newBranchName || isCreating}>
                         {isCreating && <span className="loading loading-spinner loading-xs"></span>} Create & Checkout
                     </button>
                 </div>
             </div>
             <form method="dialog" className="modal-backdrop">
-                <button onClick={() => setIsCreateBranchOpen(false)}>close</button>
+                <button
+                  onClick={() => {
+                    setIsCreateBranchOpen(false);
+                    setCreateBranchFromRef(null);
+                  }}
+                >
+                  close
+                </button>
             </form>
         </dialog>
       )}
@@ -3202,6 +3326,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               isLoadingMore={isFetching && limit > 100}
               currentBranch={branchData?.current}
               hiddenBranches={hiddenBranches}
+              getBranchTagContextMenuItems={getBranchTagContextMenuItems}
             />
           )}
         </div>

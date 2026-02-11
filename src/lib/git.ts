@@ -327,8 +327,18 @@ export class GitService {
     await this.git.checkout(['-b', localBranch, '--track', `${remoteName}/${remoteBranchName}`]);
   }
 
-  async createBranch(branch: string): Promise<void> {
-    await this.git.checkoutLocalBranch(branch);
+  async createBranch(branch: string, fromRef?: string): Promise<void> {
+    if (!fromRef) {
+      await this.git.checkoutLocalBranch(branch);
+      return;
+    }
+
+    // For remote refs, use "<remote>/<branch>" as start point.
+    const startPoint = fromRef.startsWith('remotes/')
+      ? fromRef.replace(/^remotes\//, '')
+      : fromRef;
+
+    await this.git.checkout(['-b', branch, startPoint]);
   }
 
   async deleteBranch(branch: string): Promise<void> {
