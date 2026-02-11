@@ -94,7 +94,7 @@ export function RepoList() {
                 </div>
                 <div className="flex items-center gap-2">
                     <button className="btn btn-square btn-ghost" onClick={() => setSettingsOpen(true)} title="Settings">
-                        <i className="iconoir-settings text-[20px]" aria-hidden="true" />
+                        <i className="iconoir-ios-settings text-[20px]" aria-hidden="true" />
                     </button>
                     <Link href="/credentials" className="btn gap-2">
                         <i className="iconoir-key text-[20px]" aria-hidden="true" />

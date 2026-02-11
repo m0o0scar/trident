@@ -225,11 +225,11 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
           <button
             className="btn btn-ghost btn-sm btn-square"
             onClick={() => setSettingsOpen(true)}
-            title={isCollapsed ? "Settings" : undefined}
+            title={isCollapsed ? "Preferences" : undefined}
           >
             <i className="iconoir-ios-settings text-[20px]" aria-hidden="true" />
           </button>
-          {!isCollapsed && <span className="text-xs opacity-70">Settings</span>}
+          {!isCollapsed && <span className="text-xs opacity-70">Preferences</span>}
         </div>
       </div>
 
