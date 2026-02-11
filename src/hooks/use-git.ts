@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GitStatus, GitLog, Repository, AppSettings, FileDiffPayload } from '@/lib/types';
+import { GitStatus, GitLog, Repository, AppSettings, FileDiffPayload, BranchTrackingInfo } from '@/lib/types';
 import { showGitErrorToast } from './use-toast';
 
 const API_BASE = '/api';
@@ -162,12 +162,6 @@ export function useGitLog(repoPath: string | null, limit: number = 50) {
 }
 
 // ... UseGitLog ...
-
-export interface BranchTrackingInfo {
-  upstream: string;
-  ahead: number;
-  behind: number;
-}
 
 export function useGitBranches(repoPath: string | null) {
   return useQuery<{ 
