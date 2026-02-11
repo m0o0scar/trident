@@ -5,8 +5,10 @@ import { cn } from '@/lib/utils';
 
 export interface ContextMenuItem {
     label: string;
-    onClick: () => void;
+    onClick?: () => void;
     danger?: boolean;
+    children?: ContextMenuItem[];
+    disabled?: boolean;
 }
 
 export function ContextMenu({
@@ -141,6 +143,42 @@ export function ContextMenu({
         });
     }, [isOpen, position, items]);
 
+    const renderMenuItem = (item: ContextMenuItem, key: string) => {
+        const hasChildren = !!item.children?.length;
+
+        return (
+            <li key={key} className={cn(hasChildren && "relative group/submenu")}>
+                <a
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (item.disabled || hasChildren) {
+                            return;
+                        }
+                        item.onClick?.();
+                        setIsOpen(false);
+                    }}
+                    className={cn(
+                        "whitespace-nowrap",
+                        item.danger && "text-error",
+                        item.disabled && "opacity-40 pointer-events-none",
+                        hasChildren && "flex items-center justify-between gap-3"
+                    )}
+                >
+                    <span>{item.label}</span>
+                    {hasChildren && <i className="iconoir-nav-arrow-right text-[12px]" aria-hidden="true" />}
+                </a>
+                {hasChildren && (
+                    <>
+                        <span className="hidden group-hover/submenu:block absolute left-full top-0 h-full w-3" />
+                        <ul className="hidden group-hover/submenu:block absolute left-[calc(100%-1px)] top-0 menu !m-0 p-2 shadow-lg bg-base-100 rounded-box border border-base-200 min-w-[220px] z-[10000] [&:before]:hidden">
+                            {item.children!.map((child, idx) => renderMenuItem(child, `${key}-${idx}`))}
+                        </ul>
+                    </>
+                )}
+            </li>
+        );
+    };
+
     return (
         <div ref={containerRef} className={containerClassName} onContextMenu={handleContextMenu}>
             {children}
@@ -153,20 +191,7 @@ export function ContextMenu({
                         top: `${position.y}px`,
                     }}
                 >
-                    {items.map((item, idx) => (
-                        <li key={idx}>
-                            <a
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    item.onClick();
-                                    setIsOpen(false);
-                                }}
-                                className={cn(item.danger ? "text-error" : "", "whitespace-nowrap")}
-                            >
-                                {item.label}
-                            </a>
-                        </li>
-                    ))}
+                    {items.map((item, idx) => renderMenuItem(item, `menu-${idx}`))}
                 </ul>
             )}
         </div>

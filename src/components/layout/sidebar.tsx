@@ -71,9 +71,10 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
     return `/workspace${subPath}?${p.toString()}`;
   };
 
-  const isActive = (view: 'status' | 'history' | 'settings' | 'stashes') => {
+  const isActive = (view: 'status' | 'history' | 'custom-scripts' | 'settings' | 'stashes') => {
     if (view === 'status') return pathname === '/workspace/changes';
     if (view === 'history') return pathname === '/workspace' || pathname.startsWith('/workspace/history');
+    if (view === 'custom-scripts') return pathname.startsWith('/workspace/custom-scripts');
     if (view === 'settings') return pathname.startsWith('/workspace/settings');
     if (view === 'stashes') return pathname.startsWith('/workspace/stashes');
     return false;
@@ -202,6 +203,19 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
             >
               <i className={cn("iconoir-download-square text-[20px]", !isCollapsed && "mr-2")} aria-hidden="true" />
               {!isCollapsed && "Stashes"}
+            </Link>
+
+            <Link
+              href={getHref('/custom-scripts')}
+              className={cn(
+                "btn btn-ghost w-full justify-start font-normal",
+                isCollapsed ? "px-0 justify-center" : "",
+                isActive('custom-scripts') && "btn-active font-medium"
+              )}
+              title={isCollapsed ? "Custom scripts" : undefined}
+            >
+              <i className={cn("iconoir-terminal text-[20px]", !isCollapsed && "mr-2")} aria-hidden="true" />
+              {!isCollapsed && "Custom scripts"}
             </Link>
 
             <Link
