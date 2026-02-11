@@ -1,8 +1,8 @@
-
 import { NextResponse } from 'next/server';
 import { GitService } from '@/lib/git';
 import { getRepositories } from '@/lib/store';
 import { getCredentialById, getCredentialToken, findCredentialForRemote } from '@/lib/credentials';
+import { getImageMimeType, isImageFile } from '@/lib/utils';
 import { z } from 'zod';
 import fs from 'node:fs';
 
@@ -39,6 +39,14 @@ async function resolveCredentials(repoPath: string, git: GitService, remoteName?
   }
 
   return undefined;
+}
+
+function toImageSide(buffer: Buffer | null, mimeType: string) {
+  if (!buffer) return null;
+  return {
+    mimeType,
+    base64: buffer.toString('base64'),
+  };
 }
 
 export async function POST(request: Request) {
@@ -243,6 +251,26 @@ export async function POST(request: Request) {
       case 'stash-file-diff':
         if (data?.index === undefined) throw new Error('Stash index is required');
         if (!data?.file) throw new Error('File path is required');
+        if (isImageFile(data.file)) {
+          const mimeType = getImageMimeType(data.file);
+          const [leftBuffer, rightBuffer, diff] = await Promise.all([
+            git.getFileContentBuffer(data.file, `stash@{${data.index}}^1`),
+            git.getFileContentBuffer(data.file, `stash@{${data.index}}`),
+            git.getStashFilePatch(data.index, data.file),
+          ]);
+
+          return NextResponse.json({
+            success: true,
+            left: '',
+            right: '',
+            diff,
+            imageDiff: {
+              left: toImageSide(leftBuffer, mimeType),
+              right: toImageSide(rightBuffer, mimeType),
+            },
+          });
+        }
+
         const stashFileDiff = await git.getStashFileDiff(data.index, data.file);
         return NextResponse.json({ success: true, ...stashFileDiff });
       default:

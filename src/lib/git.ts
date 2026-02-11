@@ -1,5 +1,9 @@
 import { simpleGit, SimpleGit, SimpleGitOptions } from 'simple-git';
 import { GitStatus, GitLog } from './types';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 // Cache simple-git instances to avoid spawning too many processes if possible,
 // though simple-git is lightweight.
@@ -141,6 +145,23 @@ export class GitService {
       console.error(e);
       return "";
     }
+  }
+
+  private async getBlobFromRef(refSpec: string): Promise<Buffer | null> {
+    try {
+      const { stdout } = await execFileAsync('git', ['show', refSpec], {
+        cwd: this.repoPath,
+        encoding: 'buffer',
+        maxBuffer: 50 * 1024 * 1024, // 50MB safety cap
+      });
+      return Buffer.isBuffer(stdout) ? stdout : Buffer.from(stdout);
+    } catch {
+      return null;
+    }
+  }
+
+  async getFileContentBuffer(path: string, ref: string = 'HEAD'): Promise<Buffer | null> {
+    return this.getBlobFromRef(`${ref}:${path}`);
   }
 
   async getDiff(path: string): Promise<string> {
@@ -563,16 +584,19 @@ export class GitService {
       after = '';
     }
 
-    // Get the diff string
-    let diff = '';
-    try {
-        // Use show to get the diff (log message suppressed by format=)
-        diff = await this.git.raw(['show', '--format=', commitHash, '--', filePath]);
-    } catch (e) {
-        console.warn('Failed to get commit file diff:', e);
-    }
+    const diff = await this.getCommitFilePatch(commitHash, filePath);
     
     return { before, after, diff };
+  }
+
+  async getCommitFilePatch(commitHash: string, filePath: string): Promise<string> {
+    try {
+      // Use show to get the diff (log message suppressed by format=)
+      return await this.git.raw(['show', '--format=', commitHash, '--', filePath]);
+    } catch (e) {
+      console.warn('Failed to get commit file diff:', e);
+      return '';
+    }
   }
 
   async merge(
@@ -890,16 +914,19 @@ export class GitService {
       right = '';
     }
 
-    // Get diff
-    let diff = '';
-    try {
-        // git stash show -p stash@{index} -- filePath
-        diff = await this.git.raw(['stash', 'show', '-p', `stash@{${index}}`, '--', filePath]);
-    } catch (e) {
-        console.warn('Failed to get stash file diff:', e);
-    }
+    const diff = await this.getStashFilePatch(index, filePath);
     
     return { left, right, diff };
+  }
+
+  async getStashFilePatch(index: number, filePath: string): Promise<string> {
+    try {
+      // git stash show -p stash@{index} -- filePath
+      return await this.git.raw(['stash', 'show', '-p', `stash@{${index}}`, '--', filePath]);
+    } catch (e) {
+      console.warn('Failed to get stash file diff:', e);
+      return '';
+    }
   }
 
   async pushToRemote(

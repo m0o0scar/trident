@@ -5,6 +5,19 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+function getNormalizedExtension(filePath: string): string {
+  if (!filePath) return '';
+
+  const fileName = filePath.split('/').pop() || '';
+  const lastDotIndex = fileName.lastIndexOf('.');
+
+  if (lastDotIndex === -1 || lastDotIndex === 0) {
+    return fileName.toLowerCase();
+  }
+
+  return fileName.slice(lastDotIndex + 1).toLowerCase();
+}
+
 // Known text-based file extensions
 const TEXT_EXTENSIONS = new Set([
   // Programming languages
@@ -84,24 +97,18 @@ const BINARY_EXTENSIONS = new Set([
   'unity', 'unitypackage', 'asset', 'prefab', 'meta',
 ]);
 
+const IMAGE_EXTENSIONS = new Set([
+  'png', 'jpg', 'jpeg', 'gif', 'bmp', 'ico', 'icns', 'tiff', 'tif', 'webp', 'avif', 'heic', 'heif', 'svg',
+]);
+
 /**
  * Determines file type based on extension.
  * @returns 'text' | 'binary' | 'unknown'
  */
 export function getFileTypeByExtension(filePath: string): 'text' | 'binary' | 'unknown' {
   if (!filePath) return 'unknown';
-  
-  // Get the extension (handle files like ".gitignore" or "Dockerfile")
-  const fileName = filePath.split('/').pop() || '';
-  const lastDotIndex = fileName.lastIndexOf('.');
-  
-  let extension: string;
-  if (lastDotIndex === -1 || lastDotIndex === 0) {
-    // No extension or dotfile - use the whole filename
-    extension = fileName.toLowerCase();
-  } else {
-    extension = fileName.slice(lastDotIndex + 1).toLowerCase();
-  }
+
+  const extension = getNormalizedExtension(filePath);
   
   if (TEXT_EXTENSIONS.has(extension)) {
     return 'text';
@@ -156,6 +163,45 @@ export function isFileBinary(filePath: string, leftContent?: string, rightConten
   return isBinaryContent(leftContent || '') || isBinaryContent(rightContent || '');
 }
 
+export function isImageFile(filePath: string): boolean {
+  return IMAGE_EXTENSIONS.has(getNormalizedExtension(filePath));
+}
+
+export function getImageMimeType(filePath: string): string {
+  const extension = getNormalizedExtension(filePath);
+
+  switch (extension) {
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'png':
+      return 'image/png';
+    case 'gif':
+      return 'image/gif';
+    case 'bmp':
+      return 'image/bmp';
+    case 'ico':
+      return 'image/x-icon';
+    case 'icns':
+      return 'image/icns';
+    case 'tiff':
+    case 'tif':
+      return 'image/tiff';
+    case 'webp':
+      return 'image/webp';
+    case 'avif':
+      return 'image/avif';
+    case 'heic':
+      return 'image/heic';
+    case 'heif':
+      return 'image/heif';
+    case 'svg':
+      return 'image/svg+xml';
+    default:
+      return 'application/octet-stream';
+  }
+}
+
 /**
  * Sanitizes a branch name by replacing illegal Git branch name characters with "-".
  * Git branch names cannot contain:
@@ -166,7 +212,7 @@ export function isFileBinary(filePath: string, leftContent?: string, rightConten
  * - Consecutive slashes
  */
 export function sanitizeBranchName(name: string): string {
-  let sanitized = name
+  const sanitized = name
     // Replace illegal characters with "-"
     .replace(/[\s~^:?*\[\]\\@{}<>|"'`!#$%&()+=;,]/g, '-')
     // Replace double dots with single dash

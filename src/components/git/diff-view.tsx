@@ -3,8 +3,9 @@
 import { useGitDiff } from '@/hooks/use-git';
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
-import { isFileBinary } from '@/lib/utils';
+import { isFileBinary, isImageFile } from '@/lib/utils';
 import { GroupedDiffViewer } from './grouped-diff-viewer';
+import { ImageDiffView } from './image-diff-view';
 
 export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: string }) {
   const { data, isLoading } = useGitDiff(repoPath, filePath);
@@ -51,6 +52,20 @@ export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: s
         No diff available
       </div>
     )
+  }
+
+  const isImage = isImageFile(filePath);
+  if (isImage) {
+    return (
+      <div className="flex flex-col h-full bg-base-100">
+        <div className="flex items-center justify-between px-4 h-[57px] border-b border-base-300 shrink-0 bg-base-100">
+          <span className="text-sm font-mono truncate max-w-[70%]" title={filePath}>{filePath}</span>
+        </div>
+        <div className="flex-1 overflow-auto">
+          <ImageDiffView filePath={filePath} imageDiff={data.imageDiff} />
+        </div>
+      </div>
+    );
   }
 
   // Check if file is binary (first by extension, then by content if unknown)

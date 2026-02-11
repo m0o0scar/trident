@@ -1,4 +1,3 @@
-
 export interface Repository {
   path: string;
   name: string;
@@ -14,6 +13,23 @@ export interface AppSettings {
   defaultRootFolder: string | null;
   sidebarCollapsed?: boolean;
   historyPanelHeight?: number;
+}
+
+export interface DiffImageSide {
+  mimeType: string;
+  base64: string;
+}
+
+export interface DiffImage {
+  left: DiffImageSide | null;
+  right: DiffImageSide | null;
+}
+
+export interface FileDiffPayload {
+  diff: string;
+  left: string;
+  right: string;
+  imageDiff?: DiffImage | null;
 }
 
 export interface GitStatus {

@@ -5,9 +5,10 @@ import { Repository } from '@/lib/types';
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from 'next-themes';
-import { cn, sanitizeBranchName, isFileBinary } from '@/lib/utils';
+import { cn, sanitizeBranchName, isFileBinary, isImageFile } from '@/lib/utils';
 import { ContextMenu } from '@/components/context-menu';
 import { GroupedDiffViewer } from './grouped-diff-viewer';
+import { ImageDiffView } from './image-diff-view';
 
 
 // Visibility state for branches/folders
@@ -62,6 +63,10 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
 
   if (!data) {
     return <div className="flex items-center justify-center p-8 opacity-50">No diff available</div>;
+  }
+
+  if (isImageFile(filePath)) {
+    return <ImageDiffView filePath={filePath} imageDiff={data.imageDiff} />;
   }
 
   // Check if file is binary (first by extension, then by content if unknown)

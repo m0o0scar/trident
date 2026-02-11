@@ -4,24 +4,10 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense, useState, useEffect } from 'react';
 import { useWorkspaceTitle } from '@/hooks/use-workspace-title';
 import { useGitStashes, useGitAction, useStashFiles, useStashFileDiff } from '@/hooks/use-git';
-import { cn } from '@/lib/utils';
+import { cn, isFileBinary, isImageFile } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { GroupedDiffViewer } from '@/components/git/grouped-diff-viewer';
-
-// Check if content appears to be binary
-function isBinaryContent(content: string): boolean {
-    if (!content) return false;
-    if (content.includes('\0')) return true;
-    const sample = content.slice(0, 8192);
-    let nonPrintable = 0;
-    for (let i = 0; i < sample.length; i++) {
-        const code = sample.charCodeAt(i);
-        if (code < 32 && code !== 9 && code !== 10 && code !== 13) {
-            nonPrintable++;
-        }
-    }
-    return sample.length > 0 && (nonPrintable / sample.length) > 0.1;
-}
+import { ImageDiffView } from '@/components/git/image-diff-view';
 
 function StashDiffView({ repoPath, stashIndex, filePath }: { repoPath: string; stashIndex: number; filePath: string }) {
     const { data, isLoading } = useStashFileDiff(repoPath, stashIndex, filePath);
@@ -57,7 +43,20 @@ function StashDiffView({ repoPath, stashIndex, filePath }: { repoPath: string; s
         );
     }
 
-    const isBinary = isBinaryContent(data.left || '') || isBinaryContent(data.right || '');
+    if (isImageFile(filePath)) {
+        return (
+            <div className="flex flex-col h-full bg-base-100">
+                <div className="flex items-center justify-between px-4 h-[57px] border-b border-base-300 shrink-0 bg-base-100">
+                    <span className="text-sm font-mono truncate max-w-[70%]" title={filePath}>{filePath}</span>
+                </div>
+                <div className="flex-1 overflow-auto">
+                    <ImageDiffView filePath={filePath} imageDiff={data.imageDiff} />
+                </div>
+            </div>
+        );
+    }
+
+    const isBinary = isFileBinary(filePath, data.left, data.right);
 
     if (isBinary) {
         return (

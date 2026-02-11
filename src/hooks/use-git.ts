@@ -1,7 +1,6 @@
-
 import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GitStatus, GitLog, Repository, AppSettings } from '@/lib/types';
+import { GitStatus, GitLog, Repository, AppSettings, FileDiffPayload } from '@/lib/types';
 import { showGitErrorToast } from './use-toast';
 
 const API_BASE = '/api';
@@ -193,7 +192,7 @@ export function useGitBranches(repoPath: string | null) {
 }
 
 export function useGitDiff(repoPath: string | null, filePath: string | null) {
-  return useQuery<{ diff: string; left: string; right: string }>({
+  return useQuery<FileDiffPayload>({
     queryKey: ['git', repoPath, 'diff', filePath],
     queryFn: async () => {
       if (!repoPath || !filePath) return null;
@@ -244,7 +243,7 @@ export function useCommitDiff(repoPath: string | null, commitHash: string | null
 }
 
 export function useCommitFileDiff(repoPath: string | null, commitHash: string | null, filePath: string | null) {
-  return useQuery<{ left: string; right: string; diff: string }>({
+  return useQuery<FileDiffPayload>({
     queryKey: ['git', repoPath, 'commit-file-diff', commitHash, filePath],
     queryFn: async () => {
       if (!repoPath || !commitHash || !filePath) return null;
@@ -319,10 +318,10 @@ export function useStashFiles(repoPath: string | null, stashIndex: number | null
 }
 
 export function useStashFileDiff(repoPath: string | null, stashIndex: number | null, filePath: string | null) {
-  return useQuery<{ left: string; right: string; diff: string }>({
+  return useQuery<FileDiffPayload>({
     queryKey: ['git', repoPath, 'stash-file-diff', stashIndex, filePath],
     queryFn: async () => {
-      if (!repoPath || stashIndex === null || !filePath) return { left: '', right: '' };
+      if (!repoPath || stashIndex === null || !filePath) return { left: '', right: '', diff: '' };
       const res = await fetch(`${API_BASE}/git/action`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
