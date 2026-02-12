@@ -54,8 +54,9 @@ export function generateGraphData(commits: Commit[]): GraphNode[] {
             // Visually: Node at `freedAt` (lane i) -> terminated.
             // Next node at `currentIndex` (lane i).
             // Gap = currentIndex - freedAt.
-            // We want Gap >= 2 (so there is at least 1 empty unit between them).
-            if (currentIndex - freedAt >= 2) {
+            // We want Gap >= 5 (so there is at least 4 empty units between them).
+            // This larger gap helps in spreading parallel branches horizontally as requested.
+            if (currentIndex - freedAt >= 5) {
                 return i;
             }
         }
