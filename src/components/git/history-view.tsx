@@ -2018,6 +2018,33 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setIsMergeOpen(true);
   }
 
+  const handleMergeSquashToggle = useCallback((enabled: boolean) => {
+    setMergeSquash(enabled);
+
+    if (!enabled) {
+      return;
+    }
+
+    if (!mergeSourceBranch) {
+      setMergeSquashMessage('');
+      return;
+    }
+
+    void (async () => {
+      try {
+        const result = await runGitAction({
+          repoPath,
+          action: 'get-latest-commit-message',
+          data: { branch: mergeSourceBranch },
+        });
+        setMergeSquashMessage(typeof result?.message === 'string' ? result.message : '');
+      } catch (e) {
+        console.error(e);
+        setMergeSquashMessage('');
+      }
+    })();
+  }, [mergeSourceBranch, repoPath, runGitAction]);
+
   const handleMerge = async () => {
     if (!mergeTargetBranch || !mergeSourceBranch) return;
     setIsMerging(true);
@@ -3252,7 +3279,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 </div>
                 <div className="form-control">
                     <label className="label cursor-pointer justify-start gap-2">
-                        <input type="checkbox" className="checkbox checkbox-sm" checked={mergeSquash} onChange={(e) => setMergeSquash(e.target.checked)} disabled={isMerging} />
+                        <input type="checkbox" className="checkbox checkbox-sm" checked={mergeSquash} onChange={(e) => handleMergeSquashToggle(e.target.checked)} disabled={isMerging} />
                         <span className="label-text">Squash before merge</span>
                     </label>
                 </div>

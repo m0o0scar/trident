@@ -331,7 +331,7 @@ export function useStashFileDiff(repoPath: string | null, stashIndex: number | n
 }
 
 // Actions
-export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'rename-remote-branch' | 'reset' | 'cherry-pick' | 'cherry-pick-multiple' | 'cherry-pick-abort' | 'rebase' | 'merge' | 'check-merge-conflicts' | 'check-rebase-conflicts' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop' | 'reword' | 'discard' | 'cleanup-lock-file';
+export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'rename-remote-branch' | 'reset' | 'cherry-pick' | 'cherry-pick-multiple' | 'cherry-pick-abort' | 'rebase' | 'merge' | 'check-merge-conflicts' | 'check-rebase-conflicts' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'get-latest-commit-message' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop' | 'reword' | 'discard' | 'cleanup-lock-file';
 
 // Map action types to human-readable operation names
 const actionOperationNames: Record<GitActionType, string> = {
@@ -359,6 +359,7 @@ const actionOperationNames: Record<GitActionType, string> = {
   'get-remotes': 'Get Remotes',
   'get-remote-branches': 'Get Remote Branches',
   'get-tracking-branch': 'Get Tracking Branch',
+  'get-latest-commit-message': 'Get Latest Commit Message',
   'push-to-remote': 'Push',
   'pull-from-remote': 'Pull',
   'stash': 'Stash',
@@ -405,7 +406,7 @@ export function useGitAction() {
     },
     onSuccess: (_, variables) => {
       // Don't invalidate for read-only actions
-      const readOnlyActions = ['check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch'];
+      const readOnlyActions = ['check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'get-latest-commit-message'];
       if (!readOnlyActions.includes(variables.action)) {
         // Invalidate relevant queries
         queryClient.invalidateQueries({ queryKey: ['git', variables.repoPath] });
@@ -413,7 +414,7 @@ export function useGitAction() {
     },
     onError: (error: Error, variables) => {
       // Show error toast for git operations (except read-only actions)
-      const readOnlyActions = ['check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch'];
+      const readOnlyActions = ['check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'get-latest-commit-message'];
       if (!readOnlyActions.includes(variables.action)) {
         const operationName = actionOperationNames[variables.action] || variables.action;
 

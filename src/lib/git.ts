@@ -95,6 +95,11 @@ export class GitService {
     } as unknown as GitLog;
   }
 
+  async getLatestCommitMessage(branch: string): Promise<string> {
+    const message = await this.git.raw(['show', '-s', '--format=%B', branch]);
+    return message.trimEnd();
+  }
+
   async fetch(): Promise<void> {
     await this.git.fetch();
   }
