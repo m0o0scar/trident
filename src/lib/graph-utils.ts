@@ -53,13 +53,18 @@ export function generateGraphData(commits: Commit[]): GraphNode[] {
   }
 
   commits.forEach((commit, index) => {
-      // 1. Identify which lane this commit belongs to.
-      // It belongs to a lane if that lane is currently "looking for" this commit hash.
-      let lane = lanes.indexOf(commit.hash);
+      // 1. Identify ALL lanes pointing to this commit
+      const matchingLanes: number[] = [];
+      for(let i=0; i<lanes.length; i++) {
+          if (lanes[i] === commit.hash) matchingLanes.push(i);
+      }
       
-      // If no lane is looking for me, I am a new tip (e.g. a branch head).
-      if (lane === -1) {
+      let lane: number;
+      if (matchingLanes.length === 0) {
           lane = getNextFreeLane();
+      } else {
+          // Pick the first one as the primary lane for this node
+          lane = matchingLanes[0];
       }
       
       // Ensure lanes array is large enough
@@ -78,11 +83,37 @@ export function generateGraphData(commits: Commit[]): GraphNode[] {
           isMerge: commit.parents.length > 1
       };
 
-      // 3. Draw Vertical "Rails" for ALL other active lanes
+      // 3. Handle incoming merges (diverging branches in history)
+      matchingLanes.forEach(ml => {
+          if (ml === lane) return;
+
+          // Draw connection from ml to lane
+          // The vertical line from above ended at (ml, index).
+          // We connect it to (lane, index).
+          // Using y1 = index - 0.5 to simulate curve coming from above.
+
+          node.paths.push({
+              x1: ml, y1: index - 0.5,
+              x2: lane, y2: index,
+              color: getColor(ml),
+              type: 'merge'
+          });
+
+          // This lane is now finished (merged)
+          lanes[ml] = null;
+      });
+
+      // Clear the primary lane too (it reached the node)
+      lanes[lane] = null;
+
+      // 4. Draw Vertical "Rails" for ALL other active lanes
       // These are connections from (lane, index) to (lane, index+1) 
       // for branches that just "pass through" this row.
       for (let i = 0; i < lanes.length; i++) {
-          if (i !== lane && lanes[i] !== null) {
+          // Skip if this lane was one of the matching ones (we already handled it)
+          if (matchingLanes.includes(i)) continue;
+
+          if (lanes[i] !== null) {
                node.paths.push({
                    x1: i, y1: index,
                    x2: i, y2: index + 1,
@@ -92,12 +123,9 @@ export function generateGraphData(commits: Commit[]): GraphNode[] {
           }
       }
 
-      // 4. Process Parents & Update Lanes for next row
+      // 5. Process Parents & Update Lanes for next row
       // We are consuming 'lane' (it was pointing to us). 
       // Now we need lanes to point to our parents.
-      
-      // Clear current lane (we reached the node)
-      lanes[lane] = null;
       
       const parents = commit.parents;
       
@@ -130,7 +158,6 @@ export function generateGraphData(commits: Commit[]): GraphNode[] {
               });
           }
           
-          // Other Parents (Merge Heads)
           // Other Parents (Merge Heads)
           for (let i = 1; i < parents.length; i++) {
               const p = parents[i];
