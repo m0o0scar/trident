@@ -35,12 +35,30 @@ export function generateGraphData(commits: Commit[]): GraphNode[] {
   // lanes[i] = "hash123" means lane i is drawing a line downwards towards hash123.
   const lanes: (string | null)[] = []; 
   
+  // Track when a lane was last freed to prevent immediate reuse (visual separation)
+  // laneFreedAt[i] = rowIndex where lane i became null
+  const laneFreedAt: number[] = [];
+
   // Mapping of generic colors to lanes to keep consistency if possible
   const laneColors: string[] = [];
   
-  function getNextFreeLane(): number {
+  function getNextFreeLane(currentIndex: number): number {
     for (let i = 0; i < lanes.length; i++) {
-        if (lanes[i] === null) return i;
+        if (lanes[i] === null) {
+            const freedAt = laneFreedAt[i] ?? -1;
+            // Heuristic: Don't reuse a lane immediately after it was freed.
+            // Leave at least 1 empty row (gap) to avoid visual confusion.
+            // If freed at row `r`, it is empty in row `r`.
+            // We are at `currentIndex`.
+            // If we use it now, the node is at `currentIndex`.
+            // Visually: Node at `freedAt` (lane i) -> terminated.
+            // Next node at `currentIndex` (lane i).
+            // Gap = currentIndex - freedAt.
+            // We want Gap >= 2 (so there is at least 1 empty unit between them).
+            if (currentIndex - freedAt >= 2) {
+                return i;
+            }
+        }
     }
     return lanes.length;
   }
@@ -61,14 +79,17 @@ export function generateGraphData(commits: Commit[]): GraphNode[] {
       
       let lane: number;
       if (matchingLanes.length === 0) {
-          lane = getNextFreeLane();
+          lane = getNextFreeLane(index);
       } else {
           // Pick the first one as the primary lane for this node
           lane = matchingLanes[0];
       }
       
       // Ensure lanes array is large enough
-      while (lanes.length <= lane) { lanes.push(null); }
+      while (lanes.length <= lane) {
+          lanes.push(null);
+          laneFreedAt.push(-1);
+      }
       
       // Update color for this lane if needed (though getNextFreeLane usually finds one)
       const color = getColor(lane);
@@ -101,10 +122,13 @@ export function generateGraphData(commits: Commit[]): GraphNode[] {
 
           // This lane is now finished (merged)
           lanes[ml] = null;
+          laneFreedAt[ml] = index;
       });
 
       // Clear the primary lane too (it reached the node)
+      // Note: We might refill it immediately if we have a parent continuation
       lanes[lane] = null;
+      laneFreedAt[lane] = index;
 
       // 4. Draw Vertical "Rails" for ALL other active lanes
       // These are connections from (lane, index) to (lane, index+1) 
@@ -147,9 +171,14 @@ export function generateGraphData(commits: Commit[]): GraphNode[] {
               });
               // We don't set lanes[lane] = p0, because p0 is already "owned" by existingP0Lane.
               // This lane effectively ends (merges in).
+              // It remains null (set in step 3).
           } else {
               // Standard continuation
               lanes[lane] = p0;
+              // It was freed in step 3, but now we reclaim it.
+              // So effectively it wasn't freed for valid reuse by others.
+              // We don't need to reset laneFreedAt because it's occupied now.
+
               node.paths.push({
                   x1: lane, y1: index,
                   x2: lane, y2: index + 1,
@@ -173,8 +202,11 @@ export function generateGraphData(commits: Commit[]): GraphNode[] {
                   });
               } else {
                   // New lane for this parent
-                  const newLane = getNextFreeLane();
-                  while (lanes.length <= newLane) { lanes.push(null); }
+                  const newLane = getNextFreeLane(index);
+                  while (lanes.length <= newLane) {
+                      lanes.push(null);
+                      laneFreedAt.push(-1);
+                  }
                   
                   lanes[newLane] = p;
                   
