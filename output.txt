@@ -1,0 +1,7 @@
+I've moved the commit message editor to the bottom of the right panel (below the diff viewer) and added a resize handle so you can adjust its height.
+
+Changes made:
+-   Modified `src/components/git/status-view.tsx`:
+    -   Removed the commit box from the left file tree panel.
+    -   Added a resizable commit box section at the bottom of the diff view panel.
+    -   Implemented a resize handle to adjust the height of the commit area.

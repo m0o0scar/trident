@@ -1,7 +1,7 @@
 'use client';
 
 import { useGitStatus, useGitAction } from '@/hooks/use-git';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { DiffView } from './diff-view';
 import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
@@ -205,6 +205,48 @@ export function StatusView({ repoPath }: { repoPath: string }) {
     const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
     const [collapsedChangeFolders, setCollapsedChangeFolders] = useState<Set<string>>(new Set());
     const [collapsedStagedFolders, setCollapsedStagedFolders] = useState<Set<string>>(new Set());
+    
+    // Resize logic for commit box
+    const [commitBoxHeight, setCommitBoxHeight] = useState(250);
+    const [isResizing, setIsResizing] = useState(false);
+    const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isResizing || !resizeRef.current) return;
+            const delta = resizeRef.current.startY - e.clientY;
+            const newHeight = Math.max(150, Math.min(800, resizeRef.current.startHeight + delta));
+            setCommitBoxHeight(newHeight);
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(false);
+            resizeRef.current = null;
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = 'auto';
+        };
+
+        if (isResizing) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = 'ns-resize';
+            document.body.style.userSelect = 'none';
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = 'auto';
+        };
+    }, [isResizing]);
+
+    const handleResizeStart = (e: React.MouseEvent) => {
+        e.preventDefault();
+        setIsResizing(true);
+        resizeRef.current = { startY: e.clientY, startHeight: commitBoxHeight };
+    };
+
     const files = status?.files ?? EMPTY_FILES;
     useEscapeDismiss(stashDialogOpen, () => setStashDialogOpen(false));
     useEscapeDismiss(discardDialogOpen, () => setDiscardDialogOpen(false));
@@ -435,45 +477,62 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                         </div>
                     </div>
                 </div>
-
-                {/* Commit Box */}
-                <div className="p-4 border-t border-base-300 bg-base-100">
-                    <input
-                        type="text"
-                        placeholder="Commit subject..."
-                        value={subject}
-                        onChange={e => setSubject(e.target.value)}
-                        onKeyDown={handleCommitShortcut}
-                        className="input input-bordered w-full text-sm mb-2 font-sans"
-                    />
-                    <textarea
-                        placeholder="Commit message body (optional)..."
-                        value={body}
-                        onChange={e => setBody(e.target.value)}
-                        onKeyDown={handleCommitShortcut}
-                        className="textarea textarea-bordered w-full min-h-[80px] text-sm resize-none mb-3 font-sans"
-                    />
-                    <button className="btn btn-primary w-full btn-sm" onClick={handleCommit} disabled={staged.length === 0 || !subject.trim() || action.isPending}>
-                        {action.isPending ? <span className="loading loading-spinner loading-xs mr-2"></span> : <span className="mr-2">✅</span>}
-                        Commit Changes
-                    </button>
-                </div>
             </div>
 
-            {/* Right Panel: Diff View */}
+            {/* Right Panel: Diff View & Commit Box */}
             <div className="flex-1 flex flex-col bg-base-100 overflow-hidden">
-                {selectedFile ? (
-                    <div className="h-full flex flex-col">
-                        <DiffView repoPath={repoPath} filePath={selectedFile} />
-                    </div>
-                ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center opacity-50">
-                        <div className="p-8 rounded-full bg-base-200 mb-4 text-4xl">
-                             <i className="iconoir-refresh-circle text-[32px]" aria-hidden="true" />
+                {/* Diff View Area */}
+                <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                    {selectedFile ? (
+                        <div className="h-full flex flex-col">
+                            <DiffView repoPath={repoPath} filePath={selectedFile} />
                         </div>
-                        <p className="text-sm font-bold">Select a file to view changes</p>
+                    ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center opacity-50">
+                            <div className="p-8 rounded-full bg-base-200 mb-4 text-4xl">
+                                <i className="iconoir-refresh-circle text-[32px]" aria-hidden="true" />
+                            </div>
+                            <p className="text-sm font-bold">Select a file to view changes</p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Resize Handle */}
+                <div
+                    className="h-1.5 cursor-ns-resize flex items-center justify-center hover:bg-base-200 transition-colors group shrink-0 border-t border-base-300"
+                    onMouseDown={handleResizeStart}
+                >
+                     <div className="w-8 h-1 rounded-full bg-base-300 group-hover:bg-base-400 transition-colors" />
+                </div>
+
+                {/* Commit Box */}
+                <div
+                    className="flex flex-col border-t border-base-300 bg-base-100 shrink-0"
+                    style={{ height: commitBoxHeight }}
+                >
+                    <div className="flex-1 p-4 overflow-y-auto">
+                        <input
+                            type="text"
+                            placeholder="Commit subject..."
+                            value={subject}
+                            onChange={e => setSubject(e.target.value)}
+                            onKeyDown={handleCommitShortcut}
+                            className="input input-bordered w-full text-sm mb-2 font-sans"
+                        />
+                        <textarea
+                            placeholder="Commit message body (optional)..."
+                            value={body}
+                            onChange={e => setBody(e.target.value)}
+                            onKeyDown={handleCommitShortcut}
+                            className="textarea textarea-bordered w-full text-sm resize-none mb-3 font-sans flex-1"
+                            style={{ minHeight: '80px', height: 'calc(100% - 90px)' }}
+                        />
+                        <button className="btn btn-primary w-full btn-sm" onClick={handleCommit} disabled={staged.length === 0 || !subject.trim() || action.isPending}>
+                            {action.isPending ? <span className="loading loading-spinner loading-xs mr-2"></span> : <span className="mr-2">✅</span>}
+                            Commit Changes
+                        </button>
                     </div>
-                )}
+                </div>
             </div>
 
             {/* Stash Dialog */}
