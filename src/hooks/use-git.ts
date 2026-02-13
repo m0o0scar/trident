@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GitStatus, GitLog, Repository, AppSettings, FileDiffPayload, BranchTrackingInfo } from '@/lib/types';
+import { GitStatus, GitLog, Repository, AppSettings, FileDiffPayload, BranchTrackingInfo, GitError } from '@/lib/types';
 import { showGitErrorToast } from './use-toast';
 
 const API_BASE = '/api';
@@ -118,8 +118,8 @@ export function useGitStatus(repoPath: string | null) {
       const res = await fetch(`${API_BASE}/git/status?path=${encodeURIComponent(repoPath)}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        const err = new Error(errorData.error || 'Failed to fetch status');
-        (err as any).status = res.status;
+        const err = new Error(errorData.error || 'Failed to fetch status') as GitError;
+        err.status = res.status;
         throw err;
       }
       return res.json();
@@ -127,7 +127,7 @@ export function useGitStatus(repoPath: string | null) {
     enabled: !!repoPath,
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
-    retry: (failureCount, error: any) => {
+    retry: (failureCount, error: GitError) => {
       // Don't retry for 404 or 400 errors
       if (error.status === 404 || error.status === 400) return false;
       return failureCount < 3;
@@ -143,15 +143,15 @@ export function useGitLog(repoPath: string | null, limit: number = 50) {
       const res = await fetch(`${API_BASE}/git/log?path=${encodeURIComponent(repoPath)}&limit=${limit}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        const err = new Error(errorData.error || 'Failed to fetch log');
-        (err as any).status = res.status;
+        const err = new Error(errorData.error || 'Failed to fetch log') as GitError;
+        err.status = res.status;
         throw err;
       }
       return res.json();
     },
     enabled: !!repoPath,
     placeholderData: (previousData) => previousData,
-    retry: (failureCount, error: any) => {
+    retry: (failureCount, error: GitError) => {
       if (error.status === 404 || error.status === 400) return false;
       return failureCount < 3;
     },
@@ -190,14 +190,14 @@ export function useGitDiff(repoPath: string | null, filePath: string | null) {
       const res = await fetch(`${API_BASE}/git/diff?path=${encodeURIComponent(repoPath)}&file=${encodeURIComponent(filePath)}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        const err = new Error(errorData.error || 'Failed to fetch diff');
-        (err as any).status = res.status;
+        const err = new Error(errorData.error || 'Failed to fetch diff') as GitError;
+        err.status = res.status;
         throw err;
       }
       return res.json();
     },
     enabled: !!repoPath && !!filePath,
-    retry: (failureCount, error: any) => {
+    retry: (failureCount, error: GitError) => {
       if (error.status === 404 || error.status === 400) return false;
       return failureCount < 3;
     },
@@ -219,14 +219,14 @@ export function useCommitDiff(repoPath: string | null, commitHash: string | null
       const res = await fetch(`${API_BASE}/git/diff?path=${encodeURIComponent(repoPath)}&commit=${encodeURIComponent(commitHash)}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        const err = new Error(errorData.error || 'Failed to fetch commit diff');
-        (err as any).status = res.status;
+        const err = new Error(errorData.error || 'Failed to fetch commit diff') as GitError;
+        err.status = res.status;
         throw err;
       }
       return res.json();
     },
     enabled: !!repoPath && !!commitHash,
-    retry: (failureCount, error: any) => {
+    retry: (failureCount, error: GitError) => {
       if (error.status === 404 || error.status === 400) return false;
       return failureCount < 3;
     },
@@ -241,14 +241,14 @@ export function useCommitFileDiff(repoPath: string | null, commitHash: string | 
       const res = await fetch(`${API_BASE}/git/diff?path=${encodeURIComponent(repoPath)}&commit=${encodeURIComponent(commitHash)}&file=${encodeURIComponent(filePath)}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        const err = new Error(errorData.error || 'Failed to fetch file diff');
-        (err as any).status = res.status;
+        const err = new Error(errorData.error || 'Failed to fetch file diff') as GitError;
+        err.status = res.status;
         throw err;
       }
       return res.json();
     },
     enabled: !!repoPath && !!commitHash && !!filePath,
-    retry: (failureCount, error: any) => {
+    retry: (failureCount, error: GitError) => {
       if (error.status === 404 || error.status === 400) return false;
       return failureCount < 3;
     },
