@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { GitService } from '@/lib/git';
+import { handleGitError } from '@/lib/api-utils';
 
 export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
@@ -14,8 +15,7 @@ export async function GET(req: NextRequest) {
         const git = new GitService(path);
         const branches = await git.getBranches();
         return NextResponse.json(branches);
-    } catch (err: any) {
-        console.error('Git branches error:', err);
-        return NextResponse.json({ error: err.message || 'Failed to fetch branches' }, { status: 500 });
+    } catch (err) {
+        return handleGitError(err);
     }
 }

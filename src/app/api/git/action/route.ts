@@ -3,6 +3,7 @@ import { GitService } from '@/lib/git';
 import { getRepositories } from '@/lib/store';
 import { getCredentialById, getCredentialToken, findCredentialForRemote } from '@/lib/credentials';
 import { getImageMimeType, isImageFile } from '@/lib/utils';
+import { handleGitError } from '@/lib/api-utils';
 import { z } from 'zod';
 import fs from 'node:fs';
 
@@ -359,13 +360,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.issues }, { status: 400 });
-    }
-    const message = (error as Error).message;
-    if (message.includes('not a git repository')) {
-      return NextResponse.json({ error: 'Not a git repository' }, { status: 400 });
-    }
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleGitError(error);
   }
 }
