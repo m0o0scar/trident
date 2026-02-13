@@ -157,13 +157,12 @@ export async function POST(request: Request) {
 
     executions.set(executionId, execution);
 
-    child.stdout.on('data', (chunk: Buffer | string) => {
+    const onData = (chunk: Buffer | string) => {
       appendOutput(execution, typeof chunk === 'string' ? chunk : chunk.toString('utf-8'));
-    });
+    };
 
-    child.stderr.on('data', (chunk: Buffer | string) => {
-      appendOutput(execution, typeof chunk === 'string' ? chunk : chunk.toString('utf-8'));
-    });
+    child.stdout.on('data', onData);
+    child.stderr.on('data', onData);
 
     child.on('error', (error) => {
       appendOutput(execution, `\n[error] ${error.message}\n`);
