@@ -158,8 +158,6 @@ export function useGitLog(repoPath: string | null, limit: number = 50) {
   });
 }
 
-// ... UseGitLog ...
-
 export function useGitBranches(repoPath: string | null) {
   return useQuery<{ 
     branches: string[], 
