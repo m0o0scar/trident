@@ -1040,6 +1040,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [branchesToDelete, setBranchesToDelete] = useState<string[]>([]);
   const [deleteRemoteBranch, setDeleteRemoteBranch] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteTagOpen, setIsDeleteTagOpen] = useState(false);
+  const [tagToDelete, setTagToDelete] = useState<string | null>(null);
+  const [deleteRemoteTag, setDeleteRemoteTag] = useState(false);
+  const [isDeletingTag, setIsDeletingTag] = useState(false);
 
   const [isCherryPickOpen, setIsCherryPickOpen] = useState(false);
   const [commitsToCherryPick, setCommitsToCherryPick] = useState<{ hash: string; message: string }[]>([]);
@@ -1211,6 +1215,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       setDeleteRemoteBranch(false);
       return;
     }
+    if (isDeleteTagOpen) {
+      setIsDeleteTagOpen(false);
+      setTagToDelete(null);
+      setDeleteRemoteTag(false);
+      return;
+    }
     if (isRewordOpen) {
       closeRewordDialog();
       return;
@@ -1242,6 +1252,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     isRenameOpen,
     isCherryPickOpen,
     isDeleteOpen,
+    isDeleteTagOpen,
     isRewordOpen,
     closeRewordDialog,
     isResetOpen,
@@ -1254,6 +1265,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     isResetOpen ||
     isRewordOpen ||
     isDeleteOpen ||
+    isDeleteTagOpen ||
     isAbortCherryPickOpen ||
     isCherryPickOpen ||
     isRenameOpen ||
@@ -2097,6 +2109,19 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     confirmDeleteBranches([branch]);
   };
 
+  const closeDeleteTagDialog = useCallback(() => {
+    setIsDeleteTagOpen(false);
+    setTagToDelete(null);
+    setDeleteRemoteTag(false);
+  }, []);
+
+  const confirmDeleteTag = useCallback((tagName: string) => {
+    if (!tagName) return;
+    setTagToDelete(tagName);
+    setDeleteRemoteTag(false);
+    setIsDeleteTagOpen(true);
+  }, []);
+
   const handleDeleteBranch = async () => {
     if (branchesToDelete.length === 0) return;
     setIsDeleting(true);
@@ -2159,6 +2184,36 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       console.error(e);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteTag = async () => {
+    if (!tagToDelete) return;
+    setIsDeletingTag(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'delete-tag',
+        data: { tag: tagToDelete },
+      });
+
+      if (deleteRemoteTag && remoteNameForTagDelete) {
+        try {
+          await runGitAction({
+            repoPath,
+            action: 'delete-remote-tag',
+            data: { remote: remoteNameForTagDelete, tag: tagToDelete },
+          });
+        } catch (error) {
+          console.error('Failed to delete remote tag:', error);
+        }
+      }
+
+      closeDeleteTagDialog();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsDeletingTag(false);
     }
   };
 
@@ -3007,6 +3062,15 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   const currentBranch = branchData?.current;
   const trackingInfoByBranch = branchData?.trackingInfo;
+  const remoteNames = useMemo(() => {
+    const names = Object.keys(branchData?.remoteUrls ?? {});
+    return names.sort((a, b) => {
+      if (a === 'origin') return -1;
+      if (b === 'origin') return 1;
+      return a.localeCompare(b);
+    });
+  }, [branchData?.remoteUrls]);
+  const remoteNameForTagDelete = remoteNames[0] || null;
   const selectedTrackingUpstreams = useMemo(() => {
     const upstreams: string[] = [];
     for (const branchRef of branchesToDelete) {
@@ -3108,6 +3172,18 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   }, [branchData?.remotes]);
 
   const getBranchTagContextMenuItems = (displayRef: string): ContextMenuItem[] | null => {
+    if (displayRef.startsWith('tag:')) {
+      const tagName = displayRef.replace(/^tag:\s*/, '').trim();
+      if (!tagName) return null;
+      return [
+        {
+          label: 'Delete Tag',
+          onClick: () => confirmDeleteTag(tagName),
+          danger: true,
+        },
+      ];
+    }
+
     if (localBranchSet.has(displayRef)) {
       return getBranchContextMenuItems({
         branchRef: displayRef,
@@ -3454,6 +3530,48 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           </div>
           <form method="dialog" className="modal-backdrop">
             <button onClick={() => { setIsDeleteOpen(false); setBranchesToDelete([]); setDeleteRemoteBranch(false); }}>close</button>
+          </form>
+        </dialog>
+      )}
+
+      {isDeleteTagOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Delete Tag</h3>
+            <p className="py-4 break-words">
+              Are you sure you want to delete the tag <span className="font-bold break-all">{tagToDelete}</span>?
+              This action cannot be undone.
+            </p>
+            <div className="form-control">
+              <label className="label cursor-pointer justify-start items-start gap-2 min-w-0">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm"
+                  checked={deleteRemoteTag}
+                  onChange={(e) => setDeleteRemoteTag(e.target.checked)}
+                  disabled={isDeletingTag || !remoteNameForTagDelete}
+                />
+                <span className="label-text break-words whitespace-normal">
+                  {remoteNameForTagDelete ? (
+                    <>
+                      Also delete from remote <span className="font-mono opacity-70">{remoteNameForTagDelete}</span>
+                    </>
+                  ) : (
+                    'No remote configured'
+                  )}
+                </span>
+              </label>
+            </div>
+            <div className="modal-action">
+              <button className="btn" onClick={closeDeleteTagDialog} disabled={isDeletingTag}>Cancel</button>
+              <button className="btn btn-error" onClick={handleDeleteTag} disabled={isDeletingTag || !tagToDelete}>
+                {isDeletingTag && <span className="loading loading-spinner loading-xs"></span>}
+                Delete
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={closeDeleteTagDialog}>close</button>
           </form>
         </dialog>
       )}

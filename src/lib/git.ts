@@ -458,6 +458,32 @@ export class GitService {
     }
   }
 
+  async deleteTag(tag: string): Promise<void> {
+    await this.git.raw(['tag', '-d', tag]);
+  }
+
+  async deleteRemoteTag(remote: string, tag: string, credentials?: { username: string; token: string }): Promise<void> {
+    let targetRemote = remote;
+
+    if (credentials) {
+      const remoteUrl = await this.getRemoteUrl(remote);
+      if (remoteUrl) {
+        try {
+          const urlObj = new URL(remoteUrl);
+          urlObj.username = credentials.username;
+          urlObj.password = credentials.token;
+          targetRemote = urlObj.toString();
+        } catch (e) {
+          console.warn('[deleteRemoteTag] Failed to construct authenticated URL, falling back to remote name', e);
+        }
+      } else {
+        console.warn(`[deleteRemoteTag] Could not resolve URL for remote '${remote}', falling back to remote name`);
+      }
+    }
+
+    await this.git.push([targetRemote, '--delete', `refs/tags/${tag}`]);
+  }
+
   async renameBranch(
     oldName: string,
     newName: string,

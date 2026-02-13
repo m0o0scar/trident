@@ -331,7 +331,7 @@ export function useStashFileDiff(repoPath: string | null, stashIndex: number | n
 }
 
 // Actions
-export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'create-tag' | 'delete-branch' | 'delete-remote-branch' | 'rename-branch' | 'rename-remote-branch' | 'reset' | 'cherry-pick' | 'cherry-pick-multiple' | 'cherry-pick-abort' | 'rebase' | 'merge' | 'check-merge-conflicts' | 'check-rebase-conflicts' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'get-latest-commit-message' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop' | 'reword' | 'discard' | 'cleanup-lock-file';
+export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'create-tag' | 'delete-branch' | 'delete-remote-branch' | 'delete-tag' | 'delete-remote-tag' | 'rename-branch' | 'rename-remote-branch' | 'reset' | 'cherry-pick' | 'cherry-pick-multiple' | 'cherry-pick-abort' | 'rebase' | 'merge' | 'check-merge-conflicts' | 'check-rebase-conflicts' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'get-latest-commit-message' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop' | 'reword' | 'discard' | 'cleanup-lock-file';
 
 // Map action types to human-readable operation names
 const actionOperationNames: Record<GitActionType, string> = {
@@ -347,6 +347,8 @@ const actionOperationNames: Record<GitActionType, string> = {
   'create-tag': 'Create Tag',
   'delete-branch': 'Delete Branch',
   'delete-remote-branch': 'Delete Remote Branch',
+  'delete-tag': 'Delete Tag',
+  'delete-remote-tag': 'Delete Remote Tag',
   'rename-branch': 'Rename Branch',
   'rename-remote-branch': 'Rename Remote Branch',
   'reset': 'Reset',
