@@ -1,10 +1,9 @@
-
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { GitService } from '@/lib/git';
 import { handleGitError } from '@/lib/api-utils';
 
-export async function GET(req: NextRequest) {
-    const searchParams = req.nextUrl.searchParams;
+export async function GET(req: Request) {
+    const { searchParams } = new URL(req.url);
     const path = searchParams.get('path');
 
     if (!path) {
