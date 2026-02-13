@@ -381,7 +381,10 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                                     tag.primaryRef === currentBranch ||
                                                     tag.isHead && tag.primaryRef === currentBranch
                                                 );
-                                                const tagColors = getBranchTagColors(tag.primaryRef);
+                                                const isGitTag = tag.primaryRef.startsWith('tag:');
+                                                const tagColors = isGitTag
+                                                    ? { textColor: '#374151', backgroundColor: '#e5e7eb' }
+                                                    : getBranchTagColors(tag.primaryRef);
 
                                                 const tagElement = (
                                                     <span
