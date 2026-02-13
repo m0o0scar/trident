@@ -1079,7 +1079,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [pushRemoteBranches, setPushRemoteBranches] = useState<string[]>([]);
   const [pushSelectedRemoteBranch, setPushSelectedRemoteBranch] = useState<string>('');
   const [pushTrackingBranch, setPushTrackingBranch] = useState<{ remote: string; branch: string } | null>(null);
-  const [pushRebaseFirst, setPushRebaseFirst] = useState(true);
+  const [pushRebaseFirst, setPushRebaseFirst] = useState(false);
   const [pushForcePush, setPushForcePush] = useState(false);
   const [pushSquash, setPushSquash] = useState(false);
   const [pushSquashMessage, setPushSquashMessage] = useState('');
@@ -2334,7 +2334,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setPushSelectedRemote('');
     setPushSelectedRemoteBranch('');
     setPushTrackingBranch(null);
-    setPushRebaseFirst(true);
+    setPushRebaseFirst(false);
     setPushForcePush(false);
     setPushSquash(false);
     setPushSquashMessage('');
