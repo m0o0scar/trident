@@ -8,7 +8,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rename-remote-branch', 'reset', 'cherry-pick', 'cherry-pick-multiple', 'cherry-pick-abort', 'rebase', 'merge', 'check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'get-latest-commit-message', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword', 'discard', 'cleanup-lock-file']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'create-tag', 'delete-branch', 'delete-remote-branch', 'rename-branch', 'rename-remote-branch', 'reset', 'cherry-pick', 'cherry-pick-multiple', 'cherry-pick-abort', 'rebase', 'merge', 'check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'get-latest-commit-message', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword', 'discard', 'cleanup-lock-file']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -128,6 +128,41 @@ export async function POST(request: Request) {
       case 'branch':
         if (!data?.branch) throw new Error('Branch name is required to create branch');
         await git.createBranch(data.branch, data?.fromRef);
+        break;
+      case 'create-tag':
+        if (!data?.tagName) throw new Error('Tag name is required to create tag');
+        if (!data?.commitHash) throw new Error('Commit hash is required to create tag');
+        if (data?.pushToRemote) {
+          let remoteForTag = typeof data?.remote === 'string' && data.remote.trim() ? data.remote.trim() : undefined;
+          if (!remoteForTag) {
+            const branches = await git.getBranches();
+            const current = branches.current;
+            const trackingUpstream = current ? branches.trackingInfo?.[current]?.upstream : undefined;
+            if (trackingUpstream) {
+              const slashIndex = trackingUpstream.indexOf('/');
+              if (slashIndex > 0) {
+                remoteForTag = trackingUpstream.slice(0, slashIndex);
+              }
+            }
+          }
+          if (!remoteForTag) {
+            const remotes = await git.getRemotes();
+            if (remotes.includes('origin')) {
+              remoteForTag = 'origin';
+            } else {
+              remoteForTag = remotes[0];
+            }
+          }
+
+          const tagCreds = remoteForTag ? await resolveCredentials(repoPath, git, remoteForTag) : undefined;
+          await git.createTag(data.tagName, data.commitHash, {
+            pushToRemote: true,
+            remote: remoteForTag ?? undefined,
+            credentials: tagCreds,
+          });
+        } else {
+          await git.createTag(data.tagName, data.commitHash, { pushToRemote: false });
+        }
         break;
       case 'delete-branch':
         if (!data?.branch) throw new Error('Branch name is required to delete branch');

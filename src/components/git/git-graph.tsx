@@ -63,6 +63,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     commits: Commit[],
     onSelectCommit?: (hash: string, modifiers?: { isMultiSelect: boolean; isRangeSelect: boolean }) => void,
     onResetToCommit?: (hash: string) => void,
+    onCreateTag?: (hash: string) => void,
     onCherryPickCommit?: (hash: string, message: string) => void,
     onCherryPickSelectedCommits?: () => void,
     onRewordCommit?: (hash: string, subject: string, body: string, branch: string) => void,
@@ -79,6 +80,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     commits,
     onSelectCommit,
     onResetToCommit,
+    onCreateTag,
     onCherryPickCommit,
     onCherryPickSelectedCommits,
     onRewordCommit,
@@ -253,6 +255,12 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                             const menuItems = [
                                 { label: "Reset to here", onClick: () => onResetToCommit?.(node.hash) },
                             ];
+                            if (onCreateTag) {
+                                menuItems.push({
+                                    label: "Create tag",
+                                    onClick: () => onCreateTag(node.hash),
+                                });
+                            }
                             if (onCherryPickCommit) {
                                 menuItems.push({
                                     label: "Cherry-pick commit",

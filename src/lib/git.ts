@@ -359,6 +359,70 @@ export class GitService {
     await this.git.checkout(['-b', branch, startPoint]);
   }
 
+  async createTag(
+    tagName: string,
+    commitHash: string,
+    options: {
+      pushToRemote?: boolean;
+      remote?: string;
+      credentials?: { username: string; token: string };
+    } = {}
+  ): Promise<void> {
+    const { pushToRemote = false, remote, credentials } = options;
+
+    const cleanTagName = tagName.trim();
+    const cleanCommitHash = commitHash.trim();
+    if (!cleanTagName) {
+      throw new Error('Tag name is required');
+    }
+    if (!cleanCommitHash) {
+      throw new Error('Commit hash is required');
+    }
+
+    await this.git.raw(['tag', cleanTagName, cleanCommitHash]);
+
+    if (!pushToRemote) return;
+
+    const allRemotes = await this.git.getRemotes();
+    if (allRemotes.length === 0) {
+      throw new Error('No remotes configured for this repository');
+    }
+
+    let selectedRemote = remote?.trim() || '';
+    if (!selectedRemote) {
+      const currentBranch = (await this.git.branchLocal()).current;
+      if (currentBranch) {
+        const tracking = await this.getTrackingBranch(currentBranch);
+        if (tracking?.remote) {
+          selectedRemote = tracking.remote;
+        }
+      }
+    }
+
+    if (!selectedRemote || !allRemotes.some((item) => item.name === selectedRemote)) {
+      selectedRemote = allRemotes.some((item) => item.name === 'origin') ? 'origin' : allRemotes[0].name;
+    }
+
+    let targetRemote = selectedRemote;
+    if (credentials) {
+      const remoteUrl = await this.getRemoteUrl(selectedRemote);
+      if (remoteUrl) {
+        try {
+          const urlObj = new URL(remoteUrl);
+          urlObj.username = credentials.username;
+          urlObj.password = credentials.token;
+          targetRemote = urlObj.toString();
+        } catch (e) {
+          console.warn('[createTag] Failed to construct authenticated URL, falling back to remote name', e);
+        }
+      } else {
+        console.warn(`[createTag] Could not resolve URL for remote '${selectedRemote}', falling back to remote name`);
+      }
+    }
+
+    await this.git.push([targetRemote, `refs/tags/${cleanTagName}`]);
+  }
+
   async deleteBranch(branch: string): Promise<void> {
     await this.git.deleteLocalBranch(branch, true);
   }

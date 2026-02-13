@@ -1030,6 +1030,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [newBranchName, setNewBranchName] = useState('');
   const [createBranchFromRef, setCreateBranchFromRef] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
+  const [isCreateTagOpen, setIsCreateTagOpen] = useState(false);
+  const [createTagCommitHash, setCreateTagCommitHash] = useState<string | null>(null);
+  const [newTagName, setNewTagName] = useState('');
+  const [pushTagToRemote, setPushTagToRemote] = useState(false);
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [branchesToDelete, setBranchesToDelete] = useState<string[]>([]);
@@ -1164,6 +1169,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       setCreateBranchFromRef(null);
       return;
     }
+    if (isCreateTagOpen) {
+      setIsCreateTagOpen(false);
+      setCreateTagCommitHash(null);
+      setNewTagName('');
+      setPushTagToRemote(false);
+      return;
+    }
     if (isPullOpen) {
       setIsPullOpen(false);
       return;
@@ -1220,6 +1232,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     isAbortCherryPickOpen,
     isCheckoutToLocalOpen,
     iscreateBranchOpen,
+    isCreateTagOpen,
     isPullOpen,
     isPushOpen,
     closeMergeDialog,
@@ -1249,6 +1262,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     isPushOpen ||
     isPullOpen ||
     iscreateBranchOpen ||
+    isCreateTagOpen ||
     isCheckoutToLocalOpen ||
     isBranchPopoverOpen ||
     scriptExecution.isOpen;
@@ -2960,6 +2974,37 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setIsCreateBranchOpen(true);
   };
 
+  const confirmCreateTag = (commitHash: string) => {
+    setCreateTagCommitHash(commitHash);
+    setNewTagName('');
+    setPushTagToRemote(false);
+    setIsCreateTagOpen(true);
+  };
+
+  const handleCreateTag = async () => {
+    if (!createTagCommitHash || !newTagName.trim()) return;
+    setIsCreatingTag(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'create-tag',
+        data: {
+          tagName: newTagName.trim(),
+          commitHash: createTagCommitHash,
+          pushToRemote: pushTagToRemote,
+        }
+      });
+      setIsCreateTagOpen(false);
+      setCreateTagCommitHash(null);
+      setNewTagName('');
+      setPushTagToRemote(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsCreatingTag(false);
+    }
+  };
+
   const currentBranch = branchData?.current;
   const trackingInfoByBranch = branchData?.trackingInfo;
   const selectedTrackingUpstreams = useMemo(() => {
@@ -3863,6 +3908,73 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         </dialog>
       )}
 
+      {isCreateTagOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Create Tag</h3>
+            <p className="py-4 break-words">
+              Create a new tag at commit <span className="font-mono bg-base-200 px-1 rounded">{createTagCommitHash?.substring(0, 7)}</span>.
+            </p>
+            <input
+              type="text"
+              className="input input-bordered w-full font-mono"
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              placeholder="Tag name"
+              disabled={isCreatingTag}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newTagName.trim() && !isCreatingTag) {
+                  handleCreateTag();
+                }
+              }}
+            />
+            <div className="form-control mt-3">
+              <label className="label cursor-pointer justify-start gap-2">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-sm"
+                  checked={pushTagToRemote}
+                  onChange={(e) => setPushTagToRemote(e.target.checked)}
+                  disabled={isCreatingTag}
+                />
+                <span className="label-text">Push tag to remote after creation</span>
+              </label>
+            </div>
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={() => {
+                  setIsCreateTagOpen(false);
+                  setCreateTagCommitHash(null);
+                  setNewTagName('');
+                  setPushTagToRemote(false);
+                }}
+                disabled={isCreatingTag}
+              >
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleCreateTag} disabled={!newTagName.trim() || isCreatingTag}>
+                {isCreatingTag && <span className="loading loading-spinner loading-xs"></span>}
+                Create
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button
+              onClick={() => {
+                setIsCreateTagOpen(false);
+                setCreateTagCommitHash(null);
+                setNewTagName('');
+                setPushTagToRemote(false);
+              }}
+            >
+              close
+            </button>
+          </form>
+        </dialog>
+      )}
+
       {iscreateBranchOpen && (
         <dialog className="modal modal-open">
             <div className="modal-box">
@@ -4115,6 +4227,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               selectedHashes={selectedCommitHashSet}
               onSelectCommit={handleSelectCommit}
               onResetToCommit={handleResetToCommit}
+              onCreateTag={confirmCreateTag}
               onCherryPickCommit={confirmCherryPickCommit}
               onCherryPickSelectedCommits={confirmCherryPickSelectedCommits}
               onRewordCommit={confirmRewordCommit}
