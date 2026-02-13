@@ -371,6 +371,15 @@ const actionOperationNames: Record<GitActionType, string> = {
   'cleanup-lock-file': 'Cleanup Lock File',
 };
 
+const READ_ONLY_ACTIONS: readonly GitActionType[] = [
+  'check-merge-conflicts',
+  'check-rebase-conflicts',
+  'get-remotes',
+  'get-remote-branches',
+  'get-tracking-branch',
+  'get-latest-commit-message'
+];
+
 interface GitActionPayload {
   repoPath: string;
   action: GitActionType;
@@ -406,16 +415,14 @@ export function useGitAction() {
     },
     onSuccess: (_, variables) => {
       // Don't invalidate for read-only actions
-      const readOnlyActions = ['check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'get-latest-commit-message'];
-      if (!readOnlyActions.includes(variables.action)) {
+      if (!READ_ONLY_ACTIONS.includes(variables.action)) {
         // Invalidate relevant queries
         queryClient.invalidateQueries({ queryKey: ['git', variables.repoPath] });
       }
     },
     onError: (error: Error, variables) => {
       // Show error toast for git operations (except read-only actions)
-      const readOnlyActions = ['check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'get-latest-commit-message'];
-      if (!readOnlyActions.includes(variables.action)) {
+      if (!READ_ONLY_ACTIONS.includes(variables.action)) {
         const operationName = actionOperationNames[variables.action] || variables.action;
 
         // Check for lock file error
