@@ -27,12 +27,26 @@ function getLaneFallbackColor(lane: number): string {
 function parseBranchRefs(refs?: string): string[] {
   if (!refs) return [];
 
+  const normalizeDecoratedRef = (ref: string): string => {
+    if (ref.startsWith('refs/heads/')) {
+      return ref.slice('refs/heads/'.length);
+    }
+    if (ref.startsWith('refs/remotes/')) {
+      return ref.slice('refs/remotes/'.length);
+    }
+    if (ref.startsWith('remotes/')) {
+      return ref.slice('remotes/'.length);
+    }
+    return ref;
+  };
+
   return refs
     .replace(/^\s*\((.*)\)\s*$/, '$1')
     .split(',')
     .map((part) => part.trim())
     .filter(Boolean)
     .map((ref) => ref.replace(/^HEAD\s*->\s*/, '').trim())
+    .map(normalizeDecoratedRef)
     .filter((ref) => !ref.startsWith('tag:'))
     .filter((ref) => ref !== 'HEAD')
     .filter((ref) => !/\/HEAD$/.test(ref));

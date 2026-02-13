@@ -92,6 +92,13 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     trackingInfo,
     getBranchTagContextMenuItems
 }, ref) {
+    const normalizeDecoratedRef = useCallback((ref: string) => {
+        if (ref.startsWith('refs/heads/')) return ref.slice('refs/heads/'.length);
+        if (ref.startsWith('refs/remotes/')) return ref.slice('refs/remotes/'.length);
+        if (ref.startsWith('remotes/')) return ref.slice('remotes/'.length);
+        return ref;
+    }, []);
+
     const nodes = useMemo(
         () => generateGraphData(commits, { localBranches }),
         [commits, localBranches]
@@ -291,9 +298,9 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                             const processRefs = () => {
                                 if (!node.refs) return [];
 
-                                const rawRefs = node.refs.replace(/^\s*\((.*)\)\s*$/, '$1').split(', ').map(r => {
+                                const rawRefs = node.refs.replace(/^\s*\((.*)\)\s*$/, '$1').split(',').map(r => {
                                     const isHead = r.startsWith('HEAD -> ');
-                                    const name = r.replace(/^HEAD\s*->\s*/, '');
+                                    const name = normalizeDecoratedRef(r.replace(/^HEAD\s*->\s*/, '').trim());
                                     return { raw: r, name, isHead };
                                 });
 
