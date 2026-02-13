@@ -101,15 +101,15 @@ export class GitService {
   }
 
   async fetch(): Promise<void> {
-    await this.git.fetch();
+    await this.git.raw(['fetch', '--prune']);
   }
 
   async fetchRemote(remote: string): Promise<void> {
-    await this.git.fetch(remote);
+    await this.git.raw(['fetch', '--prune', remote]);
   }
 
   async fetchAllRemotes(): Promise<void> {
-    await this.git.fetch(['--all']);
+    await this.git.raw(['fetch', '--all', '--prune']);
   }
 
   async pull(): Promise<void> {
