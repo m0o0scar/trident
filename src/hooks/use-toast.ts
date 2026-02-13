@@ -241,7 +241,7 @@ function showGitErrorToast(error: Error | string, options: GitErrorToastOptions 
     },
       // Error message box
       React.createElement('div', { 
-        className: 'max-h-[120px] overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed bg-black/20 p-3 rounded-md break-words text-error-content/90 border border-error-content/20'
+        className: 'max-h-[120px] overflow-y-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed bg-black/20 p-3 rounded-md break-all text-error-content/90 border border-error-content/20'
       }, errorMessage),
       // Buttons container
       React.createElement('div', { className: 'flex gap-2' },
