@@ -444,7 +444,16 @@ export class GitService {
       }
     }
 
-    await this.git.push([targetRemote, '--delete', branch]);
+    try {
+      await this.git.push([targetRemote, '--delete', branch]);
+    } catch (e: any) {
+      const errorMessage = e?.message || '';
+      if (errorMessage.includes('remote ref does not exist')) {
+        console.debug(`[deleteRemoteBranch] Remote branch ${branch} does not exist on remote ${remote}, ignoring error.`);
+      } else {
+        throw e;
+      }
+    }
 
     // Also delete the remote-tracking branch locally to update the view immediately
     // This is necessary because if we used a URL for targetRemote, git won't automatically prune the named remote's ref
