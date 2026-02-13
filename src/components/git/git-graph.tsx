@@ -100,6 +100,10 @@ export const GitGraph = forwardRef<GitGraphHandle, {
         if (ref.startsWith('remotes/')) return ref.slice('remotes/'.length);
         return ref;
     }, []);
+    const getRefDisplayName = useCallback((ref: string) => {
+        if (ref.startsWith('tag:')) return ref.replace(/^tag:\s*/, '').trim();
+        return ref;
+    }, []);
 
     const nodes = useMemo(
         () => generateGraphData(commits, { localBranches }),
@@ -367,7 +371,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                         if (isHidden(ref.name)) return;
 
                                         result.push({
-                                            displayName: ref.name,
+                                            displayName: getRefDisplayName(ref.name),
                                             primaryRef: ref.name,
                                             isHead: ref.isHead
                                         });
