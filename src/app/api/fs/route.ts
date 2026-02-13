@@ -1,4 +1,3 @@
-
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
@@ -15,39 +14,38 @@ export async function GET(request: Request) {
       // Security check: though this is local app, basic sanity check
       // For now, allow reading anywhere as it's a dev tool/local tool.
       
-      const stats = fs.statSync(currentPath);
+      const stats = await fs.promises.stat(currentPath);
       if (!stats.isDirectory()) {
           return NextResponse.json({ error: 'Not a directory' }, { status: 400 });
       }
 
-      const items = fs.readdirSync(currentPath, { withFileTypes: true });
-      
-      const folders = items
-          .filter(item => item.isDirectory() && !item.name.startsWith('.')) // Filter hidden folders for noise reduction? Optional.
-          // Let's allow hidden folders but maybe sort them last or user preference. 
-          // For now, filter out common junk, but keep useful ones. 
-          // Actually, let's keep all, but filter some really noisy ones if needed.
-          // Or just standard: show all.
+      const items = await fs.promises.readdir(currentPath, { withFileTypes: true });
       
       // Let's verify if they are git repos
-      const contents = items
-        .filter(item => item.isDirectory())
-        .map(item => {
-            const itemPath = path.join(currentPath, item.name);
-            let isRepo = false;
-            try {
-                // Check for .git directory inside
-                if (fs.existsSync(path.join(itemPath, '.git'))) {
-                    isRepo = true;
-                }
-            } catch (e) {}
+      const directories = items.filter(item => item.isDirectory());
 
-            return {
-                name: item.name,
-                path: itemPath,
-                isRepo
-            };
-        });
+      const contents = [];
+      const BATCH_SIZE = 50;
+
+      for (let i = 0; i < directories.length; i += BATCH_SIZE) {
+          const batch = directories.slice(i, i + BATCH_SIZE);
+          const batchResults = await Promise.all(batch.map(async (item) => {
+              const itemPath = path.join(currentPath, item.name);
+              let isRepo = false;
+              try {
+                  // Check for .git directory inside
+                  await fs.promises.access(path.join(itemPath, '.git'), fs.constants.F_OK);
+                  isRepo = true;
+              } catch (e) {}
+
+              return {
+                  name: item.name,
+                  path: itemPath,
+                  isRepo
+              };
+          }));
+          contents.push(...batchResults);
+      }
 
       // Sort: Visible folders first, then Repos first within that group, then alphabetical
       contents.sort((a, b) => {
