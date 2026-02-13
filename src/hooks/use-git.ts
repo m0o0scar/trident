@@ -125,11 +125,8 @@ export function useGitStatus(repoPath: string | null) {
       return res.json();
     },
     enabled: !!repoPath,
-    refetchInterval: (query) => {
-      // Stop polling if we have an error
-      if (query.state.error) return false;
-      return 2000;
-    },
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
     retry: (failureCount, error: any) => {
       // Don't retry for 404 or 400 errors
       if (error.status === 404 || error.status === 400) return false;
