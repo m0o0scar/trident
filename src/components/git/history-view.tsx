@@ -693,6 +693,22 @@ function collectVisibleBranchRefs(
   return refs;
 }
 
+function collectAllBranchRefs(node: BranchTreeNode): string[] {
+  const refs: string[] = [];
+  const sortedChildren = sortBranchTreeChildren(node);
+
+  for (const child of sortedChildren) {
+    if (child.fullPath) {
+      refs.push(child.fullPath);
+      continue;
+    }
+
+    refs.push(...collectAllBranchRefs(child));
+  }
+
+  return refs;
+}
+
 function buildBranchContextMenuItems(
   options: BranchMenuOptions,
   callbacks: BranchMenuCallbacks
@@ -750,6 +766,7 @@ function BranchTreeItem({
   getBranchContextMenuItems,
   onBranchClick,
   onBranchContextMenu,
+  onDeleteBranchGroup,
   selectedBranches,
   visibilityMap,
   onToggleVisibility,
@@ -776,6 +793,7 @@ function BranchTreeItem({
   getBranchContextMenuItems: (options: BranchMenuOptions) => ContextMenuItem[];
   onBranchClick?: (branch: string, modifiers?: BranchRowSelectModifiers) => void;
   onBranchContextMenu?: (branch: string) => void;
+  onDeleteBranchGroup: (branches: string[]) => void;
   selectedBranches: Set<string>;
   visibilityMap: VisibilityMap;
   onToggleVisibility: (path: string, type: 'visible' | 'hidden') => void;
@@ -810,37 +828,51 @@ function BranchTreeItem({
         const isInherited = !directVisibility && effectiveVisibility !== null;
 
         if (isFolder) {
+          const childBranchRefs = collectAllBranchRefs(child);
+          const deletableChildBranchRefs = childBranchRefs.filter((branchRef) => branchRef !== currentBranch);
+
           // Render folder
           return (
             <div key={itemPath}>
-              <div
-                className={cn(
-                  "group flex items-center gap-1 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-base-200 transition-colors opacity-70 select-none",
-                )}
-                style={{ paddingLeft: `${depth * 12 + 8}px` }}
+              <ContextMenu
+                items={[
+                  {
+                    label: 'Delete',
+                    onClick: () => onDeleteBranchGroup(deletableChildBranchRefs),
+                    danger: true,
+                    disabled: deletableChildBranchRefs.length === 0,
+                  },
+                ]}
               >
-                <div className="flex items-center gap-1 flex-1 min-w-0" onClick={() => onToggleFolder(itemPath)}>
-                  <span className="text-xs opacity-70">{isExpanded ? '▼' : '▶'}</span>
-                  <i className="iconoir-folder text-[16px] shrink-0" aria-hidden="true" />
-                  <span className="truncate min-w-0 flex-1">{child.name}</span>
+                <div
+                  className={cn(
+                    "group flex items-center gap-1 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-base-200 transition-colors opacity-70 select-none",
+                  )}
+                  style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                >
+                  <div className="flex items-center gap-1 flex-1 min-w-0" onClick={() => onToggleFolder(itemPath)}>
+                    <span className="text-xs opacity-70">{isExpanded ? '▼' : '▶'}</span>
+                    <i className="iconoir-folder text-[16px] shrink-0" aria-hidden="true" />
+                    <span className="truncate min-w-0 flex-1">{child.name}</span>
+                  </div>
+                  <div className="flex items-center gap-0.5 ml-auto">
+                    <VisibilityToggle
+                      type="visible"
+                      isActive={directVisibility === 'visible' || (isInherited && effectiveVisibility === 'visible')}
+                      isInherited={isInherited && effectiveVisibility === 'visible'}
+                      onClick={(e) => { e.stopPropagation(); onToggleVisibility(itemPath, 'visible'); }}
+                      showOnHover={directVisibility === 'visible' || (isInherited && effectiveVisibility === 'visible')}
+                    />
+                    <VisibilityToggle
+                      type="hidden"
+                      isActive={directVisibility === 'hidden' || (isInherited && effectiveVisibility === 'hidden')}
+                      isInherited={isInherited && effectiveVisibility === 'hidden'}
+                      onClick={(e) => { e.stopPropagation(); onToggleVisibility(itemPath, 'hidden'); }}
+                      showOnHover={directVisibility === 'hidden' || (isInherited && effectiveVisibility === 'hidden')}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-0.5 ml-auto">
-                  <VisibilityToggle
-                    type="visible"
-                    isActive={directVisibility === 'visible' || (isInherited && effectiveVisibility === 'visible')}
-                    isInherited={isInherited && effectiveVisibility === 'visible'}
-                    onClick={(e) => { e.stopPropagation(); onToggleVisibility(itemPath, 'visible'); }}
-                    showOnHover={directVisibility === 'visible' || (isInherited && effectiveVisibility === 'visible')}
-                  />
-                  <VisibilityToggle
-                    type="hidden"
-                    isActive={directVisibility === 'hidden' || (isInherited && effectiveVisibility === 'hidden')}
-                    isInherited={isInherited && effectiveVisibility === 'hidden'}
-                    onClick={(e) => { e.stopPropagation(); onToggleVisibility(itemPath, 'hidden'); }}
-                    showOnHover={directVisibility === 'hidden' || (isInherited && effectiveVisibility === 'hidden')}
-                  />
-                </div>
-              </div>
+              </ContextMenu>
               {isExpanded && (
                 <BranchTreeItem
                   node={child}
@@ -860,6 +892,7 @@ function BranchTreeItem({
                   getBranchContextMenuItems={getBranchContextMenuItems}
                   onBranchClick={onBranchClick}
                   onBranchContextMenu={onBranchContextMenu}
+                  onDeleteBranchGroup={onDeleteBranchGroup}
                   selectedBranches={selectedBranches}
                   visibilityMap={visibilityMap}
                   onToggleVisibility={onToggleVisibility}
@@ -2953,6 +2986,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       isRemote: true,
     });
   };
+  const localGroupBranchRefs = useMemo(() => {
+    if (!localBranchTree) return [];
+    return collectAllBranchRefs(localBranchTree).filter((branchRef) => branchRef !== currentBranch);
+  }, [localBranchTree, currentBranch]);
 
   const branchTreePopoverContent = (
     <div className="w-[22rem] max-w-[calc(100vw-2rem)] flex flex-col border border-base-300 bg-base-100 rounded-box shadow-xl overflow-hidden">
@@ -2980,15 +3017,26 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         <div className="p-2 space-y-0.5">
           {localBranchTree && (
             <>
-              <GroupHeader
-                name="Branches"
-                groupPath="__local__"
-                icon={<i className="iconoir-git-branch text-[14px]" aria-hidden="true" />}
-                isExpanded={localGroupExpanded}
-                onToggle={handleToggleLocalGroup}
-                visibilityMap={visibilityMap}
-                onToggleVisibility={handleToggleVisibility}
-              />
+              <ContextMenu
+                items={[
+                  {
+                    label: 'Delete',
+                    onClick: () => confirmDeleteBranches(localGroupBranchRefs),
+                    danger: true,
+                    disabled: localGroupBranchRefs.length === 0,
+                  },
+                ]}
+              >
+                <GroupHeader
+                  name="Branches"
+                  groupPath="__local__"
+                  icon={<i className="iconoir-git-branch text-[14px]" aria-hidden="true" />}
+                  isExpanded={localGroupExpanded}
+                  onToggle={handleToggleLocalGroup}
+                  visibilityMap={visibilityMap}
+                  onToggleVisibility={handleToggleVisibility}
+                />
+              </ContextMenu>
               {localGroupExpanded && (
                 <BranchTreeItem
                   node={localBranchTree}
@@ -3008,6 +3056,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   getBranchContextMenuItems={getBranchContextMenuItems}
                   onBranchClick={handleBranchClick}
                   onBranchContextMenu={handleBranchContextMenu}
+                  onDeleteBranchGroup={confirmDeleteBranches}
                   selectedBranches={selectedBranchSet}
                   visibilityMap={visibilityMap}
                   onToggleVisibility={handleToggleVisibility}
@@ -3021,7 +3070,19 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
           {(hasRemotes || isBranchesLoading) && (
             <>
-              <ContextMenu items={[{ label: "Fetch from all remotes", onClick: handleFetchFromAllRemotes }]}>
+              <ContextMenu
+                items={[
+                  { label: 'Fetch from all remotes', onClick: handleFetchFromAllRemotes },
+                  ...(remoteBranchTrees
+                    ? [{
+                        label: 'Delete',
+                        onClick: () => confirmDeleteBranches(Array.from(remoteBranchTrees.values()).flatMap((tree) => collectAllBranchRefs(tree))),
+                        danger: true,
+                        disabled: Array.from(remoteBranchTrees.values()).every((tree) => collectAllBranchRefs(tree).length === 0),
+                      }]
+                    : []),
+                ]}
+              >
                 <GroupHeader
                   name="Remotes"
                   groupPath="__remotes__"
@@ -3044,7 +3105,16 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
                 return (
                   <div key={remoteName}>
-                    <ContextMenu items={[{ label: `Fetch from ${remoteName}`, onClick: () => handleFetchFromRemote(remoteName) }]}>
+                    <ContextMenu
+                      items={[
+                        { label: `Fetch from ${remoteName}`, onClick: () => handleFetchFromRemote(remoteName) },
+                        {
+                          label: 'Delete',
+                          onClick: () => confirmDeleteBranches(collectAllBranchRefs(tree)),
+                          danger: true,
+                        },
+                      ]}
+                    >
                       <GroupHeader
                         name={remoteName}
                         groupPath={remoteGroupPath}
@@ -3075,6 +3145,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                         getBranchContextMenuItems={getBranchContextMenuItems}
                         onBranchClick={handleBranchClick}
                         onBranchContextMenu={handleBranchContextMenu}
+                        onDeleteBranchGroup={confirmDeleteBranches}
                         selectedBranches={selectedBranchSet}
                         visibilityMap={visibilityMap}
                         onToggleVisibility={handleToggleVisibility}
