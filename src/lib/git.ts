@@ -206,89 +206,87 @@ export class GitService {
   }
 
   async getBranches() {
-    // Get local branches
-    const localBranchSummary = await this.git.branchLocal();
-    
-    // Get all branches including remotes
-    const allBranchSummary = await this.git.branch(['-a']);
-    
-    // Parse remote branches and group by remote name
-    // Remote branches look like: remotes/origin/main, remotes/upstream/feature
-    const remotes: Record<string, string[]> = {};
-    const remoteBranchList: string[] = [];
-    
-    for (const branch of allBranchSummary.all) {
-      if (branch.startsWith('remotes/')) {
-        // Extract remote name and branch name
-        // Format: remotes/origin/branch-name or remotes/origin/HEAD -> origin/main
-        const withoutPrefix = branch.slice('remotes/'.length);
-        const slashIndex = withoutPrefix.indexOf('/');
-        if (slashIndex > 0) {
-          const remoteName = withoutPrefix.slice(0, slashIndex);
-          const branchName = withoutPrefix.slice(slashIndex + 1);
-          
-          // Skip HEAD symbolic refs
-          if (branchName === 'HEAD' || branchName.startsWith('HEAD ')) continue;
-          
-          if (!remotes[remoteName]) {
-            remotes[remoteName] = [];
-          }
-          remotes[remoteName].push(branchName);
-          remoteBranchList.push(branch);
-        }
-      }
+    // 1. Get current branch (HEAD)
+    let currentBranch = '';
+    try {
+      currentBranch = (await this.git.revparse(['--abbrev-ref', 'HEAD'])).trim();
+    } catch (e) {
+      console.warn('Failed to get current branch:', e);
     }
-    
-    // Get commit hash for each branch (local and remote)
+
+    // 2. Get all refs (local and remote) with details
+    // Format: refname|short_hash|upstream|upstream_track
+    // Use a delimiter that is unlikely to be in branch names. '|' is good.
+    const format = '%(refname)|%(objectname:short)|%(upstream:short)|%(upstream:track)';
+    let rawRefs = '';
+    try {
+      rawRefs = await this.git.raw(['for-each-ref', `--format=${format}`, 'refs/heads', 'refs/remotes']);
+    } catch (e) {
+      console.error('Failed to get refs:', e);
+      throw e;
+    }
+
+    const branches: string[] = [];
     const branchCommits: Record<string, string> = {};
-    
-    // Local branches
-    for (const branch of localBranchSummary.all) {
-      try {
-        const result = await this.git.revparse(['--short', branch]);
-        branchCommits[branch] = result.trim();
-      } catch (e) {
-        console.error(`Failed to get commit for branch ${branch}:`, e);
-      }
-    }
-    
-    // Remote branches - store with full ref path (e.g., "remotes/origin/main")
-    for (const branch of remoteBranchList) {
-      try {
-        const result = await this.git.revparse(['--short', branch]);
-        branchCommits[branch] = result.trim();
-      } catch (e) {
-        console.error(`Failed to get commit for remote branch ${branch}:`, e);
-      }
-    }
-    
-    // Get tracking info (upstream) and ahead/behind counts for local branches
+    const remotes: Record<string, string[]> = {};
     const trackingInfo: Record<string, { upstream: string; ahead: number; behind: number }> = {};
     
-    for (const branch of localBranchSummary.all) {
-      try {
-        // Get the upstream branch for this local branch
-        const upstream = await this.git.raw(['for-each-ref', '--format=%(upstream:short)', `refs/heads/${branch}`]);
-        const upstreamBranch = upstream.trim();
+    const lines = rawRefs.trim().split('\n');
+
+    for (const line of lines) {
+      if (!line) continue;
+
+      const [refname, hash, upstream, track] = line.split('|');
+
+      if (refname.startsWith('refs/heads/')) {
+        // Local branch
+        const branchName = refname.slice('refs/heads/'.length);
+        branches.push(branchName);
+        branchCommits[branchName] = hash;
         
-        if (upstreamBranch) {
-          // Get ahead/behind counts using rev-list --left-right --count
-          const counts = await this.git.raw(['rev-list', '--left-right', '--count', `${branch}...${upstreamBranch}`]);
-          const [ahead, behind] = counts.trim().split(/\s+/).map(n => parseInt(n, 10) || 0);
+        if (upstream) {
+          // Parse track info: "[ahead 1, behind 2]"
+          let ahead = 0;
+          let behind = 0;
+          if (track) {
+            const aheadMatch = track.match(/ahead (\d+)/);
+            if (aheadMatch) ahead = parseInt(aheadMatch[1], 10);
+
+            const behindMatch = track.match(/behind (\d+)/);
+            if (behindMatch) behind = parseInt(behindMatch[1], 10);
+          }
           
-          trackingInfo[branch] = {
-            upstream: upstreamBranch,
+          trackingInfo[branchName] = {
+            upstream, // e.g. "origin/main"
             ahead,
             behind
           };
         }
-      } catch (e) {
-        // Branch might not have an upstream, that's ok
-        console.debug(`No tracking info for branch ${branch}:`, e);
+      } else if (refname.startsWith('refs/remotes/')) {
+        // Remote branch
+        const withoutPrefix = refname.slice('refs/remotes/'.length);
+        // Format: origin/main
+        const slashIndex = withoutPrefix.indexOf('/');
+        if (slashIndex > 0) {
+            const remoteName = withoutPrefix.slice(0, slashIndex);
+            const branchName = withoutPrefix.slice(slashIndex + 1);
+
+            // Skip HEAD symbolic refs
+            if (branchName === 'HEAD' || branchName.startsWith('HEAD ')) continue;
+
+            if (!remotes[remoteName]) {
+                remotes[remoteName] = [];
+            }
+            remotes[remoteName].push(branchName);
+
+            // Store commit hash with full remote ref path as used in frontend/original code
+            // Original code used `branch` from `git.branch(['-a'])` which returns `remotes/origin/main`
+            branchCommits[`remotes/${withoutPrefix}`] = hash;
+        }
       }
     }
-    
-    // Get remote URLs
+
+    // 3. Get remote URLs
     const remoteList = await this.git.getRemotes(true);
     const remoteUrls: Record<string, string> = {};
     for (const r of remoteList) {
@@ -296,8 +294,8 @@ export class GitService {
     }
 
     return {
-      branches: localBranchSummary.all,
-      current: localBranchSummary.current,
+      branches,
+      current: currentBranch,
       branchCommits,
       remotes, // { "origin": ["main", "feature"], "upstream": ["main"] }
       remoteUrls,
