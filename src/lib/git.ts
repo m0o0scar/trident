@@ -1268,10 +1268,6 @@ export class GitService {
           pushOptions.push('--force');
       }
       
-      if (setUpstream) {
-        pushOptions.push('-u');
-      }
-      
       // Add --progress to see what's happening
       pushOptions.push('--progress');
       
@@ -1282,6 +1278,13 @@ export class GitService {
       // Use targetRemote (which might contain credentials)
       const pushResult = await this.git.push(targetRemote, `${localBranch}:${remoteBranch}`, pushOptions);
       console.log('[pushToRemote] Push completed successfully, result:', pushResult);
+
+      if (setUpstream) {
+        // Push may use an authenticated URL instead of the named remote, so set upstream
+        // explicitly against the remote name to guarantee tracking is configured.
+        await this.git.raw(['config', `branch.${localBranch}.remote`, remote]);
+        await this.git.raw(['config', `branch.${localBranch}.merge`, `refs/heads/${remoteBranch}`]);
+      }
       
       // If we switched branches, try to switch back
       if (needsCheckout) {

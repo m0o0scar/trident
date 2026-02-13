@@ -29,6 +29,7 @@ const MIN_HISTORY_PANEL_HEIGHT = 100;
 const MAX_HISTORY_PANEL_HEIGHT = 900;
 type MergeConflictStatus = 'checking' | 'no-conflict' | 'has-conflicts';
 type CommitRowSelectModifiers = { isMultiSelect: boolean; isRangeSelect: boolean };
+type BranchRowSelectModifiers = { isMultiSelect: boolean; isRangeSelect: boolean };
 type ScriptExecutionStatus = 'idle' | 'starting' | 'running' | 'completed' | 'failed' | 'canceled';
 type ScriptExecutionState = {
   isOpen: boolean;
@@ -641,6 +642,7 @@ interface BranchMenuCallbacks {
   onCheckoutToLocal: (remoteBranch: string) => void;
   onCreateBranch: (sourceBranch: string) => void;
   onDeleteBranch: (branch: string) => void;
+  onDeleteBranches: (branches: string[]) => void;
   onRenameBranch: (branch: string) => void;
   onRenameRemoteBranch: (branch: string) => void;
   onRebase: (targetBranch: string) => void;
@@ -654,14 +656,51 @@ interface BranchMenuOptions {
   branchLeafName: string;
   currentBranch?: string;
   isRemote: boolean;
+  selectedBranchRefs?: string[];
+}
+
+function sortBranchTreeChildren(node: BranchTreeNode): BranchTreeNode[] {
+  return Array.from(node.children.values()).sort((a, b) => {
+    const aIsFolder = a.children.size > 0 && !a.fullPath;
+    const bIsFolder = b.children.size > 0 && !b.fullPath;
+    if (aIsFolder && !bIsFolder) return -1;
+    if (!aIsFolder && bIsFolder) return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function collectVisibleBranchRefs(
+  node: BranchTreeNode,
+  expandedFolders: Set<string>,
+  parentPath = ''
+): string[] {
+  const refs: string[] = [];
+  const sortedChildren = sortBranchTreeChildren(node);
+
+  for (const child of sortedChildren) {
+    const isLeaf = child.fullPath !== undefined;
+    if (isLeaf) {
+      refs.push(child.fullPath!);
+      continue;
+    }
+
+    const itemPath = parentPath ? `${parentPath}/${child.name}` : child.name;
+    if (expandedFolders.has(itemPath)) {
+      refs.push(...collectVisibleBranchRefs(child, expandedFolders, itemPath));
+    }
+  }
+
+  return refs;
 }
 
 function buildBranchContextMenuItems(
   options: BranchMenuOptions,
   callbacks: BranchMenuCallbacks
 ): ContextMenuItem[] {
-  const { branchRef, branchLeafName, currentBranch, isRemote } = options;
+  const { branchRef, branchLeafName, currentBranch, isRemote, selectedBranchRefs } = options;
   const isCurrent = !isRemote && branchRef === currentBranch;
+  const selectedRefs = selectedBranchRefs && selectedBranchRefs.length > 0 ? selectedBranchRefs : [branchRef];
+  const hasMultiSelection = selectedRefs.length > 1;
   const menuItems: ContextMenuItem[] = [];
 
   if (!isCurrent && !isRemote) menuItems.push({ label: 'Checkout', onClick: () => callbacks.onCheckout(branchRef) });
@@ -673,7 +712,21 @@ function buildBranchContextMenuItems(
   if (!isRemote) menuItems.push({ label: 'Pull from Remote', onClick: () => callbacks.onPullFromRemote(branchRef) });
   if (!isCurrent) menuItems.push({ label: `Rebase ${currentBranch} onto ${branchLeafName}`, onClick: () => callbacks.onRebase(branchRef) });
   if (!isCurrent) menuItems.push({ label: `Merge ${currentBranch} into ${branchLeafName}`, onClick: () => callbacks.onMerge(branchRef) });
-  if (!isCurrent) menuItems.push({ label: isRemote ? 'Delete Remote Branch' : 'Delete Branch', onClick: () => callbacks.onDeleteBranch(branchRef), danger: true });
+  if (!isCurrent) {
+    if (hasMultiSelection) {
+      menuItems.push({
+        label: `Delete Selected Branches (${selectedRefs.length})`,
+        onClick: () => callbacks.onDeleteBranches(selectedRefs),
+        danger: true,
+      });
+    } else {
+      menuItems.push({
+        label: isRemote ? 'Delete Remote Branch' : 'Delete Branch',
+        onClick: () => callbacks.onDeleteBranch(branchRef),
+        danger: true,
+      });
+    }
+  }
 
   return menuItems;
 }
@@ -696,6 +749,8 @@ function BranchTreeItem({
   onPullFromRemote,
   getBranchContextMenuItems,
   onBranchClick,
+  onBranchContextMenu,
+  selectedBranches,
   visibilityMap,
   onToggleVisibility,
   parentPath = '',
@@ -719,7 +774,9 @@ function BranchTreeItem({
   onPushToRemote: (branch: string) => void;
   onPullFromRemote: (branch: string) => void;
   getBranchContextMenuItems: (options: BranchMenuOptions) => ContextMenuItem[];
-  onBranchClick?: (branch: string) => void;
+  onBranchClick?: (branch: string, modifiers?: BranchRowSelectModifiers) => void;
+  onBranchContextMenu?: (branch: string) => void;
+  selectedBranches: Set<string>;
   visibilityMap: VisibilityMap;
   onToggleVisibility: (path: string, type: 'visible' | 'hidden') => void;
   parentPath?: string;
@@ -758,7 +815,7 @@ function BranchTreeItem({
             <div key={itemPath}>
               <div
                 className={cn(
-                  "group flex items-center gap-1 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-base-200 transition-colors opacity-70",
+                  "group flex items-center gap-1 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-base-200 transition-colors opacity-70 select-none",
                 )}
                 style={{ paddingLeft: `${depth * 12 + 8}px` }}
               >
@@ -802,6 +859,8 @@ function BranchTreeItem({
                   onPullFromRemote={onPullFromRemote}
                   getBranchContextMenuItems={getBranchContextMenuItems}
                   onBranchClick={onBranchClick}
+                  onBranchContextMenu={onBranchContextMenu}
+                  selectedBranches={selectedBranches}
                   visibilityMap={visibilityMap}
                   onToggleVisibility={onToggleVisibility}
                   parentPath={itemPath}
@@ -824,21 +883,26 @@ function BranchTreeItem({
           branchLeafName: child.name,
           currentBranch,
           isRemote,
+          selectedBranchRefs: selectedBranches.has(child.fullPath!) ? Array.from(selectedBranches) : [child.fullPath!],
         });
+        const isSelected = selectedBranches.has(child.fullPath!);
 
 
         return (
           <ContextMenu key={child.fullPath} items={menuItems}>
               <div
                 className={cn(
-                  "group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-base-200 transition-colors",
+                  "group flex items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer transition-colors select-none",
+                  !isSelected && "hover:bg-base-200",
+                  isSelected && "bg-primary/10 hover:bg-primary/20",
                   isCurrent && "bg-base-200 font-medium text-primary"
                 )}
                 style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                onContextMenu={() => onBranchContextMenu?.(child.fullPath!)}
               >
                 <div 
                   className="flex items-center gap-2 flex-1 min-w-0" 
-                  onClick={() => onBranchClick?.(child.fullPath!)}
+                  onClick={(e) => onBranchClick?.(child.fullPath!, { isMultiSelect: e.metaKey || e.ctrlKey, isRangeSelect: e.shiftKey })}
                   onDoubleClick={() => !isCurrent && onCheckout(child.fullPath!)}
                 >
                   {isCurrent ? (
@@ -917,6 +981,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   // Clear selected commit and close commit details panel when repository changes
   useEffect(() => {
     selectSingleCommit(null);
+    setSelectedBranchRefs([]);
+    setBranchSelectionAnchor(null);
   }, [repoPath, selectSingleCommit]);
 
   const { mutateAsync: runGitAction } = useGitAction();
@@ -926,7 +992,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [isCreating, setIsCreating] = useState(false);
 
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [branchToDelete, setBranchToDelete] = useState<string | null>(null);
+  const [branchesToDelete, setBranchesToDelete] = useState<string[]>([]);
   const [deleteRemoteBranch, setDeleteRemoteBranch] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -1026,6 +1092,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   
   // State for pending scroll to branch commit
   const [pendingScrollCommit, setPendingScrollCommit] = useState<string | null>(null);
+  const [selectedBranchRefs, setSelectedBranchRefs] = useState<string[]>([]);
+  const [branchSelectionAnchor, setBranchSelectionAnchor] = useState<string | null>(null);
   const [isBranchPopoverOpen, setIsBranchPopoverOpen] = useState(false);
   const branchPopoverRef = useRef<HTMLDivElement>(null);
   const [scriptExecution, setScriptExecution] = useState<ScriptExecutionState>(DEFAULT_SCRIPT_EXECUTION);
@@ -1087,6 +1155,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
     if (isDeleteOpen) {
       setIsDeleteOpen(false);
+      setBranchesToDelete([]);
+      setDeleteRemoteBranch(false);
       return;
     }
     if (isRewordOpen) {
@@ -1248,7 +1318,22 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     if (!branchData?.remotes) return null;
     return buildRemoteBranchTree(branchData.remotes);
   }, [branchData?.remotes]);
-  
+
+  const allBranchRefs = useMemo(() => {
+    const refs = new Set<string>();
+    for (const branch of branchData?.branches ?? []) {
+      refs.add(branch);
+    }
+    for (const [remoteName, branches] of Object.entries(branchData?.remotes ?? {})) {
+      for (const branch of branches) {
+        refs.add(`remotes/${remoteName}/${branch}`);
+      }
+    }
+    return refs;
+  }, [branchData?.branches, branchData?.remotes]);
+
+  const selectedBranchSet = useMemo(() => new Set(selectedBranchRefs), [selectedBranchRefs]);
+
   // Check if we have any remote branches
   const hasRemotes = remoteBranchTrees && remoteBranchTrees.size > 0;
   
@@ -1271,6 +1356,32 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   // Visibility state for branches/folders
   const [visibilityMap, setVisibilityMap] = useState<VisibilityMap>({});
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
+
+  const orderedVisibleBranchRefs = useMemo(() => {
+    const ordered: string[] = [];
+    if (localGroupExpanded && localBranchTree) {
+      ordered.push(...collectVisibleBranchRefs(localBranchTree, expandedFolders));
+    }
+    if (remotesGroupExpanded && remoteBranchTrees) {
+      for (const [remoteName, tree] of Array.from(remoteBranchTrees.entries())) {
+        const remoteGroupPath = `__remotes__/${remoteName}`;
+        if (!expandedFolders.has(remoteGroupPath)) continue;
+        ordered.push(...collectVisibleBranchRefs(tree, expandedFolders, `remotes/${remoteName}`));
+      }
+    }
+    return ordered;
+  }, [expandedFolders, localBranchTree, localGroupExpanded, remoteBranchTrees, remotesGroupExpanded]);
+
+  useEffect(() => {
+    if (selectedBranchRefs.length === 0) return;
+    const nextSelected = selectedBranchRefs.filter((branch) => allBranchRefs.has(branch));
+    if (nextSelected.length !== selectedBranchRefs.length) {
+      setSelectedBranchRefs(nextSelected);
+    }
+    if (branchSelectionAnchor && !allBranchRefs.has(branchSelectionAnchor)) {
+      setBranchSelectionAnchor(nextSelected.length > 0 ? nextSelected[nextSelected.length - 1] : null);
+    }
+  }, [allBranchRefs, branchSelectionAnchor, selectedBranchRefs]);
 
   // Load settings from repository data when it's available
   const lastInitializedRepo = useRef<string | null>(null);
@@ -1329,7 +1440,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         // Set to this type (auto-removes the other one since we're replacing)
         next[path] = type;
       }
-      saveSettings({ visibilityMap: next as any });
+      const persistedVisibilityMap: Record<string, 'visible' | 'hidden'> = {};
+      Object.entries(next).forEach(([key, value]) => {
+        if (value === 'visible' || value === 'hidden') {
+          persistedVisibilityMap[key] = value;
+        }
+      });
+      saveSettings({ visibilityMap: persistedVisibilityMap });
       return next;
     });
   }, [saveSettings]);
@@ -1620,16 +1737,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }, [pendingScrollCommit, log?.all, isFetching, limit, selectSingleCommit]);
 
-  // Handle branch click - find the branch's latest commit and scroll to it
-  const handleBranchClick = useCallback((branch: string) => {
+  const scrollToBranchHeadCommit = useCallback((branch: string) => {
     if (!branchData?.branchCommits) return;
-    
+
     const commitHash = branchData.branchCommits[branch];
     if (!commitHash) return;
-    
-    // Check if commit is already in view
+
     const commitExists = log?.all?.some(c => c.hash === commitHash);
-    
     if (commitExists && gitGraphRef.current) {
       const scrolled = gitGraphRef.current.scrollToCommit(commitHash);
       if (scrolled) {
@@ -1637,11 +1751,57 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         return;
       }
     }
-    
-    // Need to load more commits or scroll failed, set pending
+
     setPendingScrollCommit(commitHash);
     selectSingleCommit(commitHash);
   }, [branchData?.branchCommits, log?.all, selectSingleCommit]);
+
+  const handleBranchClick = useCallback((branch: string, modifiers?: BranchRowSelectModifiers) => {
+    const isRangeSelect = modifiers?.isRangeSelect ?? false;
+    const isMultiSelect = modifiers?.isMultiSelect ?? false;
+
+    if (isRangeSelect) {
+      const anchor = branchSelectionAnchor ?? branch;
+      const anchorIndex = orderedVisibleBranchRefs.indexOf(anchor);
+      const targetIndex = orderedVisibleBranchRefs.indexOf(branch);
+      if (anchorIndex !== -1 && targetIndex !== -1) {
+        const [start, end] = anchorIndex < targetIndex ? [anchorIndex, targetIndex] : [targetIndex, anchorIndex];
+        const rangeSelection = orderedVisibleBranchRefs.slice(start, end + 1);
+        const shouldUnselect = selectedBranchSet.has(branch);
+        if (shouldUnselect) {
+          setSelectedBranchRefs(selectedBranchRefs.filter((selected) => !rangeSelection.includes(selected)));
+        } else {
+          setSelectedBranchRefs(Array.from(new Set([...selectedBranchRefs, ...rangeSelection])));
+        }
+        setBranchSelectionAnchor(anchor);
+      } else {
+        setSelectedBranchRefs([branch]);
+        setBranchSelectionAnchor(branch);
+      }
+      return;
+    }
+
+    if (isMultiSelect) {
+      if (selectedBranchSet.has(branch)) {
+        const nextSelected = selectedBranchRefs.filter((selected) => selected !== branch);
+        setSelectedBranchRefs(nextSelected);
+      } else {
+        setSelectedBranchRefs([...selectedBranchRefs, branch]);
+      }
+      setBranchSelectionAnchor(branch);
+      return;
+    }
+
+    setSelectedBranchRefs([branch]);
+    setBranchSelectionAnchor(branch);
+    scrollToBranchHeadCommit(branch);
+  }, [branchSelectionAnchor, orderedVisibleBranchRefs, scrollToBranchHeadCommit, selectedBranchRefs, selectedBranchSet]);
+
+  const handleBranchContextMenu = useCallback((branch: string) => {
+    if (selectedBranchSet.has(branch)) return;
+    setSelectedBranchRefs([branch]);
+    setBranchSelectionAnchor(branch);
+  }, [selectedBranchSet]);
 
   const handleRunCustomScript = useCallback(async (script: RepositoryCustomScript, branchRef: string) => {
     setDidCopyScriptOutput(false);
@@ -1809,65 +1969,82 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     };
   }, [scriptExecution.executionId, isScriptExecutionRunning]);
 
-  const confirmDeleteBranch = (branch: string) => {
-    setBranchToDelete(branch);
+  const confirmDeleteBranches = (branches: string[]) => {
+    const deletableBranches = branches.filter((branch) => branch !== currentBranch);
+    if (deletableBranches.length === 0) return;
+    setBranchesToDelete(deletableBranches);
     setDeleteRemoteBranch(false);
     setIsDeleteOpen(true);
-  }
+  };
+
+  const confirmDeleteBranch = (branch: string) => {
+    confirmDeleteBranches([branch]);
+  };
 
   const handleDeleteBranch = async () => {
-    if (!branchToDelete) return;
+    if (branchesToDelete.length === 0) return;
     setIsDeleting(true);
     try {
-      // Check if it is a remote branch
-      if (branchToDelete.startsWith('remotes/')) {
-        const parts = branchToDelete.split('/');
-        // remotes/origin/main -> remote=origin, branch=main
-        if (parts.length >= 3) {
-          const remote = parts[1];
-          const branch = parts.slice(2).join('/');
-          await runGitAction({
-            repoPath,
-            action: 'delete-remote-branch',
-            data: { remote, branch }
-          });
-        }
-      } else {
-        // Local branch
-        if (deleteRemoteBranch) {
-          const tracking = branchData?.trackingInfo?.[branchToDelete];
-          if (tracking && tracking.upstream) {
-            try {
-              const [remote, ...branchParts] = tracking.upstream.split('/');
-              const branch = branchParts.join('/');
-              if (remote && branch) {
-                await runGitAction({
-                  repoPath,
-                  action: 'delete-remote-branch',
-                  data: { remote, branch }
-                });
-              }
-            } catch (error) {
-              console.error('Failed to delete remote branch:', error);
-              // Continue to delete local branch even if remote deletion fails
-            }
+      const trackingRemotesToDelete = new Set<string>();
+      if (deleteRemoteBranch) {
+        for (const branchRef of branchesToDelete) {
+          if (branchRef.startsWith('remotes/')) continue;
+          const tracking = branchData?.trackingInfo?.[branchRef];
+          if (tracking?.upstream) {
+            trackingRemotesToDelete.add(tracking.upstream);
           }
+        }
+      }
+
+      for (const upstream of trackingRemotesToDelete) {
+        try {
+          const [remote, ...branchParts] = upstream.split('/');
+          const branch = branchParts.join('/');
+          if (remote && branch) {
+            await runGitAction({
+              repoPath,
+              action: 'delete-remote-branch',
+              data: { remote, branch }
+            });
+          }
+        } catch (error) {
+          console.error('Failed to delete remote branch:', error);
+        }
+      }
+
+      for (const branchRef of branchesToDelete) {
+        if (branchRef.startsWith('remotes/')) {
+          const parts = branchRef.split('/');
+          if (parts.length >= 3) {
+            const remote = parts[1];
+            const branch = parts.slice(2).join('/');
+            await runGitAction({
+              repoPath,
+              action: 'delete-remote-branch',
+              data: { remote, branch }
+            });
+          }
+          continue;
         }
 
         await runGitAction({
           repoPath,
           action: 'delete-branch',
-          data: { branch: branchToDelete }
+          data: { branch: branchRef }
         });
       }
+
       setIsDeleteOpen(false);
-      setBranchToDelete(null);
+      setBranchesToDelete([]);
+      setDeleteRemoteBranch(false);
+      setSelectedBranchRefs([]);
+      setBranchSelectionAnchor(null);
     } catch (e) {
       console.error(e);
     } finally {
       setIsDeleting(false);
     }
-  }
+  };
 
   const confirmRenameBranch = (branch: string) => {
     setBranchToRename(branch);
@@ -2656,6 +2833,15 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   const currentBranch = branchData?.current;
   const trackingInfoByBranch = branchData?.trackingInfo;
+  const selectedTrackingUpstreams = useMemo(() => {
+    const upstreams: string[] = [];
+    for (const branchRef of branchesToDelete) {
+      if (branchRef.startsWith('remotes/')) continue;
+      const upstream = trackingInfoByBranch?.[branchRef]?.upstream;
+      if (upstream) upstreams.push(upstream);
+    }
+    return Array.from(new Set(upstreams));
+  }, [branchesToDelete, trackingInfoByBranch]);
   const trackingInfoForRename = useMemo(() => {
     if (!branchToRename || remoteBranchToRename) return null;
     return trackingInfoByBranch?.[branchToRename] ?? null;
@@ -2706,6 +2892,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       onCheckoutToLocal: confirmCheckoutToLocal,
       onCreateBranch: confirmCreateBranch,
       onDeleteBranch: confirmDeleteBranch,
+      onDeleteBranches: confirmDeleteBranches,
       onRenameBranch: confirmRenameBranch,
       onRenameRemoteBranch: confirmRenameRemoteBranch,
       onRebase: confirmRebase,
@@ -2820,6 +3007,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   onPullFromRemote={confirmPullFromRemote}
                   getBranchContextMenuItems={getBranchContextMenuItems}
                   onBranchClick={handleBranchClick}
+                  onBranchContextMenu={handleBranchContextMenu}
+                  selectedBranches={selectedBranchSet}
                   visibilityMap={visibilityMap}
                   onToggleVisibility={handleToggleVisibility}
                   depth={1}
@@ -2885,6 +3074,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                         onPullFromRemote={confirmPullFromRemote}
                         getBranchContextMenuItems={getBranchContextMenuItems}
                         onBranchClick={handleBranchClick}
+                        onBranchContextMenu={handleBranchContextMenu}
+                        selectedBranches={selectedBranchSet}
                         visibilityMap={visibilityMap}
                         onToggleVisibility={handleToggleVisibility}
                         depth={2}
@@ -3004,21 +3195,45 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       {isDeleteOpen && (
         <dialog className="modal modal-open">
           <div className="modal-box">
-            <h3 className="font-bold text-lg">Delete Branch</h3>
-            <p className="py-4 break-words">
-              Are you sure you want to delete the branch <span className="font-bold break-all">{branchToDelete?.startsWith('remotes/') ? branchToDelete.slice('remotes/'.length) : branchToDelete}</span>?
-              This action cannot be undone.
-            </p>
-            {branchToDelete && !branchToDelete.startsWith('remotes/') && branchData?.trackingInfo?.[branchToDelete] && (
+            <h3 className="font-bold text-lg">{branchesToDelete.length > 1 ? 'Delete Branches' : 'Delete Branch'}</h3>
+            {branchesToDelete.length > 1 ? (
+              <div className="py-4 space-y-3">
+                <p className="break-words">
+                  Are you sure you want to delete <span className="font-bold">{branchesToDelete.length} selected branches</span>?
+                  This action cannot be undone.
+                </p>
+                <div className="max-h-44 overflow-auto rounded border border-base-300 bg-base-200/40 p-2 space-y-1">
+                  {branchesToDelete.map((branch) => (
+                    <div key={branch} className="text-xs min-w-0 break-all">
+                      {branch.startsWith('remotes/') ? branch.slice('remotes/'.length) : branch}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="py-4 break-words">
+                Are you sure you want to delete the branch <span className="font-bold break-all">{branchesToDelete[0]?.startsWith('remotes/') ? branchesToDelete[0].slice('remotes/'.length) : branchesToDelete[0]}</span>?
+                This action cannot be undone.
+              </p>
+            )}
+            {selectedTrackingUpstreams.length > 0 && (
                 <div className="form-control">
                 <label className="label cursor-pointer justify-start items-start gap-2 min-w-0">
                     <input type="checkbox" className="checkbox checkbox-sm" checked={deleteRemoteBranch} onChange={(e) => setDeleteRemoteBranch(e.target.checked)} disabled={isDeleting} />
-                    <span className="label-text break-words whitespace-normal">Delete tracking remote branch <span className="font-mono opacity-70 break-all">{branchData.trackingInfo[branchToDelete].upstream}</span></span>
+                    <span className="label-text break-words whitespace-normal">
+                      {selectedTrackingUpstreams.length === 1 ? (
+                        <>
+                          Delete tracking remote branch <span className="font-mono opacity-70 break-all">{selectedTrackingUpstreams[0]}</span>
+                        </>
+                      ) : (
+                        <>Delete {selectedTrackingUpstreams.length} tracking remote branches</>
+                      )}
+                    </span>
                 </label>
                 </div>
             )}
             <div className="modal-action">
-              <button className="btn" onClick={() => setIsDeleteOpen(false)} disabled={isDeleting}>Cancel</button>
+              <button className="btn" onClick={() => { setIsDeleteOpen(false); setBranchesToDelete([]); setDeleteRemoteBranch(false); }} disabled={isDeleting}>Cancel</button>
               <button className="btn btn-error" onClick={handleDeleteBranch} disabled={isDeleting}>
                 {isDeleting && <span className="loading loading-spinner loading-xs"></span>}
                 Delete
@@ -3026,7 +3241,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             </div>
           </div>
           <form method="dialog" className="modal-backdrop">
-            <button onClick={() => setIsDeleteOpen(false)}>close</button>
+            <button onClick={() => { setIsDeleteOpen(false); setBranchesToDelete([]); setDeleteRemoteBranch(false); }}>close</button>
           </form>
         </dialog>
       )}
