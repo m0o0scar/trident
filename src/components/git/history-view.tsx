@@ -2433,6 +2433,33 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }
 
+  const handlePushSquashToggle = useCallback((enabled: boolean) => {
+    setPushSquash(enabled);
+
+    if (!enabled) {
+      return;
+    }
+
+    if (!pushBranch) {
+      setPushSquashMessage('');
+      return;
+    }
+
+    void (async () => {
+      try {
+        const result = await runGitAction({
+          repoPath,
+          action: 'get-latest-commit-message',
+          data: { branch: pushBranch },
+        });
+        setPushSquashMessage(typeof result?.message === 'string' ? result.message : '');
+      } catch (e) {
+        console.error(e);
+        setPushSquashMessage('');
+      }
+    })();
+  }, [pushBranch, repoPath, runGitAction]);
+
   const handlePushToRemote = async () => {
     if (!pushBranch || !pushSelectedRemote || !pushSelectedRemoteBranch) return;
     
@@ -3678,7 +3705,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
                         <div className="form-control">
                             <label className="label cursor-pointer justify-start gap-2">
-                                <input type="checkbox" className="checkbox checkbox-sm" checked={pushSquash} onChange={(e) => setPushSquash(e.target.checked)} disabled={isPushing} />
+                                <input type="checkbox" className="checkbox checkbox-sm" checked={pushSquash} onChange={(e) => handlePushSquashToggle(e.target.checked)} disabled={isPushing} />
                                 <span className="label-text">Squash local commits before push</span>
                             </label>
                         </div>
