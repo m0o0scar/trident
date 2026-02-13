@@ -1188,6 +1188,39 @@ export class GitService {
     }
   }
 
+  private async getRemoteTagNames(remote: string): Promise<Set<string>> {
+    const output = await this.git.raw(['ls-remote', '--tags', remote]);
+    const remoteTags = new Set<string>();
+
+    for (const line of output.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      const parts = trimmed.split('\t');
+      if (parts.length < 2) continue;
+      const ref = parts[1];
+      if (!ref.startsWith('refs/tags/')) continue;
+      if (ref.endsWith('^{}')) continue;
+
+      remoteTags.add(ref.slice('refs/tags/'.length));
+    }
+
+    return remoteTags;
+  }
+
+  private async pushLocalOnlyTagsToRemote(targetRemote: string, remoteForDiscovery: string): Promise<number> {
+    const localTags = (await this.git.tags()).all;
+    if (localTags.length === 0) return 0;
+
+    const remoteTags = await this.getRemoteTagNames(remoteForDiscovery);
+    const localOnlyTags = localTags.filter((tag) => !remoteTags.has(tag));
+    if (localOnlyTags.length === 0) return 0;
+
+    const tagRefSpecs = localOnlyTags.map((tag) => `refs/tags/${tag}`);
+    await this.git.push([targetRemote, ...tagRefSpecs]);
+    return localOnlyTags.length;
+  }
+
   async pushToRemote(
     localBranch: string,
     remote: string,
@@ -1195,13 +1228,14 @@ export class GitService {
     options: {
       rebaseFirst?: boolean;
       forcePush?: boolean;
+      pushLocalOnlyTags?: boolean;
       setUpstream?: boolean;
       squash?: boolean;
       squashMessage?: string;
       credentials?: { username: string; token: string };
     } = {}
   ): Promise<void> {
-    const { rebaseFirst, forcePush, setUpstream, squash, squashMessage, credentials } = options;
+    const { rebaseFirst, forcePush, pushLocalOnlyTags, setUpstream, squash, squashMessage, credentials } = options;
     
     // Mask token for logging
     const logOptions = { ...options };
@@ -1376,6 +1410,11 @@ export class GitService {
         // explicitly against the remote name to guarantee tracking is configured.
         await this.git.raw(['config', `branch.${localBranch}.remote`, remote]);
         await this.git.raw(['config', `branch.${localBranch}.merge`, `refs/heads/${remoteBranch}`]);
+      }
+
+      if (pushLocalOnlyTags ?? true) {
+        const pushedTagCount = await this.pushLocalOnlyTagsToRemote(targetRemote, remote);
+        console.log(`[pushToRemote] Pushed ${pushedTagCount} local-only tag(s) to ${remote}`);
       }
       
       // If we switched branches, try to switch back

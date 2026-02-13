@@ -1097,6 +1097,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [pushTrackingBranch, setPushTrackingBranch] = useState<{ remote: string; branch: string } | null>(null);
   const [pushRebaseFirst, setPushRebaseFirst] = useState(false);
   const [pushForcePush, setPushForcePush] = useState(false);
+  const [pushLocalOnlyTags, setPushLocalOnlyTags] = useState(true);
   const [pushSquash, setPushSquash] = useState(false);
   const [pushSquashMessage, setPushSquashMessage] = useState('');
   const [isPushing, setIsPushing] = useState(false);
@@ -2474,6 +2475,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setPushTrackingBranch(null);
     setPushRebaseFirst(false);
     setPushForcePush(false);
+    setPushLocalOnlyTags(true);
     setPushSquash(false);
     setPushSquashMessage('');
     setIsPushOpen(true);
@@ -2620,6 +2622,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           remoteBranch: pushSelectedRemoteBranch,
           rebaseFirst: pushForcePush ? false : pushRebaseFirst,
           forcePush: pushForcePush,
+          pushLocalOnlyTags,
           setUpstream: needsSetUpstream,
           squash: pushSquash,
           squashMessage: pushSquashMessage,
@@ -3932,6 +3935,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                             <label className="label cursor-pointer justify-start gap-2">
                                 <input type="checkbox" className="checkbox checkbox-sm checkbox-error" checked={pushForcePush} onChange={(e) => setPushForcePush(e.target.checked)} disabled={isPushing} />
                                 <span className="label-text text-error">Force push</span>
+                            </label>
+                        </div>
+
+                        <div className="form-control">
+                            <label className="label cursor-pointer justify-start gap-2">
+                                <input type="checkbox" className="checkbox checkbox-sm" checked={pushLocalOnlyTags} onChange={(e) => setPushLocalOnlyTags(e.target.checked)} disabled={isPushing} />
+                                <span className="label-text">Push all tags</span>
                             </label>
                         </div>
 

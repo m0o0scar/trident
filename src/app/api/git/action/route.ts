@@ -284,6 +284,7 @@ export async function POST(request: Request) {
         await git.pushToRemote(data.localBranch, data.remote, data.remoteBranch, {
           rebaseFirst: data.rebaseFirst ?? !(data.forcePush ?? false),
           forcePush: data.forcePush ?? false,
+          pushLocalOnlyTags: data.pushLocalOnlyTags ?? true,
           setUpstream: data.setUpstream ?? false,
           squash: data.squash ?? false,
           squashMessage: data.squashMessage,
