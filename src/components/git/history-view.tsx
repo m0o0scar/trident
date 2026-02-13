@@ -1002,6 +1002,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [pullError, setPullError] = useState<string | null>(null);
   const [pullLoadingRemotes, setPullLoadingRemotes] = useState(false);
   const [pullLoadingBranches, setPullLoadingBranches] = useState(false);
+  const [isFetchingAllRemotes, setIsFetchingAllRemotes] = useState(false);
 
   // Checkout to local dialog state
   const [isCheckoutToLocalOpen, setIsCheckoutToLocalOpen] = useState(false);
@@ -2425,6 +2426,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   }
 
   const handleFetchFromAllRemotes = async () => {
+    setIsFetchingAllRemotes(true);
     try {
       await runGitAction({
         repoPath,
@@ -2433,6 +2435,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       });
     } catch (e) {
       console.error(e);
+    } finally {
+      setIsFetchingAllRemotes(false);
     }
   }
 
@@ -3672,6 +3676,19 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              <button
+                className="btn btn-sm gap-2"
+                onClick={() => void handleFetchFromAllRemotes()}
+                disabled={isFetchingAllRemotes || isPullOpen || isPushOpen}
+                title="Fetch latest changes from all remotes"
+              >
+                {isFetchingAllRemotes ? (
+                  <span className="loading loading-spinner loading-xs"></span>
+                ) : (
+                  <i className="iconoir-refresh text-[16px]" aria-hidden="true" />
+                )}
+                Fetch
+              </button>
               <button
                 className="btn btn-sm gap-2"
                 onClick={confirmPullCurrentBranch}
