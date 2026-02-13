@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useRef, useState, useLayoutEffect, useImperativeHandle, forwardRef, useEffect, useCallback } from 'react';
+import { useMemo, useRef, useState, useImperativeHandle, forwardRef, useEffect, useCallback } from 'react';
 import { Commit, BranchTrackingInfo } from '@/lib/types';
 import { generateGraphData } from '@/lib/graph-utils';
 import { cn } from '@/lib/utils';
 import { ContextMenu, ContextMenuItem } from '@/components/context-menu';
+import { getBranchTagColors } from '@/lib/branch-colors';
 
 
 const ROW_HEIGHT = 24; // Compact rows like Fork
@@ -91,10 +92,12 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     trackingInfo,
     getBranchTagContextMenuItems
 }, ref) {
-    const nodes = useMemo(() => generateGraphData(commits), [commits]);
+    const nodes = useMemo(
+        () => generateGraphData(commits, { localBranches }),
+        [commits, localBranches]
+    );
     const scrollRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
-    const [prevCount, setPrevCount] = useState(0);
     
     // Search state
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -142,11 +145,6 @@ export const GitGraph = forwardRef<GitGraphHandle, {
             return true;
         }
     }), [nodes]);
-
-    // Save scroll position
-    useLayoutEffect(() => {
-        setPrevCount(nodes?.length ?? 0);
-    }, [nodes?.length]);
 
     if (!nodes || nodes.length === 0) return null;
 
@@ -383,16 +381,17 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                                     tag.primaryRef === currentBranch ||
                                                     tag.isHead && tag.primaryRef === currentBranch
                                                 );
+                                                const tagColors = getBranchTagColors(tag.primaryRef);
 
                                                 const tagElement = (
                                                     <span
                                                         className={cn(
-                                                            "text-[10px] px-1.5 rounded-full border border-current whitespace-nowrap shrink-0",
-                                                            isCurrent && "font-bold text-base-content"
+                                                            "text-[10px] px-1.5 rounded-full whitespace-nowrap shrink-0",
+                                                            isCurrent && "font-bold"
                                                         )}
                                                         style={{
-                                                            color: isCurrent ? undefined : node.color,
-                                                            backgroundColor: `${node.color}15` // 10% opacity
+                                                            color: tagColors.textColor,
+                                                            backgroundColor: tagColors.backgroundColor
                                                         }}
                                                         title={tag.displayName}
                                                     >
@@ -400,7 +399,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                                     </span>
                                                 );
 
-                                                let branchMenuItems = getBranchTagContextMenuItems?.(tag.primaryRef) || [];
+                                                const branchMenuItems = getBranchTagContextMenuItems?.(tag.primaryRef) || [];
 
                                                 if (branchMenuItems.length === 0) {
                                                     return <span key={idx} className="shrink-0">{tagElement}</span>;
