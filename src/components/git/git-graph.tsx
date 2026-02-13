@@ -322,11 +322,19 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                     if (localBranches.includes(ref.name) && !isHidden(ref.name)) {
                                         const tracking = trackingInfo?.[ref.name];
                                         if (tracking && tracking.upstream) {
-                                            const upstreamIdx = rawRefs.findIndex((r, i) => i !== idx && !processedIndices.has(i) && r.name === tracking.upstream);
+                                            const normalizedUpstream = normalizeDecoratedRef(tracking.upstream.trim());
+                                            const upstreamCandidates = new Set([
+                                                normalizedUpstream,
+                                                normalizeDecoratedRef(`remotes/${normalizedUpstream}`),
+                                                normalizeDecoratedRef(`refs/remotes/${normalizedUpstream}`),
+                                            ]);
+                                            const upstreamIdx = rawRefs.findIndex(
+                                                (r, i) => i !== idx && !processedIndices.has(i) && upstreamCandidates.has(r.name)
+                                            );
 
                                             if (upstreamIdx !== -1) {
                                                 const upstreamRef = rawRefs[upstreamIdx];
-                                                const parts = tracking.upstream.split('/');
+                                                const parts = normalizedUpstream.split('/');
                                                 const remoteName = parts[0];
 
                                                 result.push({
