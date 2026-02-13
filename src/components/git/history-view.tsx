@@ -27,6 +27,9 @@ interface BranchTreeNode {
 
 const MIN_HISTORY_PANEL_HEIGHT = 100;
 const MAX_HISTORY_PANEL_HEIGHT = 900;
+const MIN_COMMIT_DETAILS_MESSAGE_RATIO = 0.15;
+const MAX_COMMIT_DETAILS_MESSAGE_RATIO = 0.75;
+const DEFAULT_COMMIT_DETAILS_MESSAGE_RATIO = 0.28;
 type MergeConflictStatus = 'checking' | 'no-conflict' | 'has-conflicts';
 type CommitRowSelectModifiers = { isMultiSelect: boolean; isRangeSelect: boolean };
 type BranchRowSelectModifiers = { isMultiSelect: boolean; isRangeSelect: boolean };
@@ -43,6 +46,10 @@ type ScriptExecutionState = {
 
 function clampHistoryPanelHeight(height: number): number {
   return Math.min(Math.max(height, MIN_HISTORY_PANEL_HEIGHT), MAX_HISTORY_PANEL_HEIGHT);
+}
+
+function clampCommitDetailsMessageRatio(ratio: number): number {
+  return Math.min(Math.max(ratio, MIN_COMMIT_DETAILS_MESSAGE_RATIO), MAX_COMMIT_DETAILS_MESSAGE_RATIO);
 }
 
 function buildCommitMessage(subject: string, body: string): string {
@@ -1250,9 +1257,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   // Resizable bottom panel state - load from global settings or fallback to localStorage
   const panelHeightStorageKey = 'git-web:history-panel-height';
+  const commitDetailsMessageRatioStorageKey = 'git-web:history-commit-details-message-ratio';
   const [panelHeight, setPanelHeight] = useState(300);
   const [isResizing, setIsResizing] = useState(false);
   const resizeRef = useRef<{ startY: number; startHeight: number } | null>(null);
+  const [commitDetailsMessageRatio, setCommitDetailsMessageRatio] = useState(DEFAULT_COMMIT_DETAILS_MESSAGE_RATIO);
+  const [isCommitDetailsRatioResizing, setIsCommitDetailsRatioResizing] = useState(false);
+  const commitDetailsContentRef = useRef<HTMLDivElement | null>(null);
   
   // Track if user has manually resized the panel to avoid sync loops
   const userHasResized = useRef(false);
@@ -1284,6 +1295,29 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       console.error('Failed to save panel height to localStorage:', e);
     }
   }, [panelHeight]);
+
+  // Load commit details message/diff ratio from localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(commitDetailsMessageRatioStorageKey);
+      if (!stored) return;
+      const parsed = parseFloat(stored);
+      if (!Number.isNaN(parsed)) {
+        setCommitDetailsMessageRatio(clampCommitDetailsMessageRatio(parsed));
+      }
+    } catch (e) {
+      console.error('Failed to load commit details ratio from localStorage:', e);
+    }
+  }, []);
+
+  // Persist commit details message/diff ratio in localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(commitDetailsMessageRatioStorageKey, String(commitDetailsMessageRatio));
+    } catch (e) {
+      console.error('Failed to save commit details ratio to localStorage:', e);
+    }
+  }, [commitDetailsMessageRatio]);
 
   // Sync to global settings when resizing stops
   useEffect(() => {
@@ -1324,6 +1358,41 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizing]);
+
+  const handleCommitDetailsRatioResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsCommitDetailsRatioResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isCommitDetailsRatioResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = commitDetailsContentRef.current;
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+      if (rect.height <= 0) return;
+
+      const nextRatio = clampCommitDetailsMessageRatio((e.clientY - rect.top) / rect.height);
+      setCommitDetailsMessageRatio(nextRatio);
+    };
+
+    const handleMouseUp = () => {
+      setIsCommitDetailsRatioResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isCommitDetailsRatioResizing]);
 
   useEffect(() => {
     if (!isBranchPopoverOpen) return;
@@ -4102,8 +4171,14 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             </div>
 
             {/* Combined commit message and changes content */}
-            <div className="flex-1 overflow-hidden bg-base-100 flex flex-col">
-              <div className="border-b border-base-300 bg-base-100 shrink-0 h-24 flex flex-col">
+            <div
+              ref={commitDetailsContentRef}
+              className="flex-1 overflow-hidden bg-base-100 grid"
+              style={{
+                gridTemplateRows: `${commitDetailsMessageRatio}fr 6px ${1 - commitDetailsMessageRatio}fr`,
+              }}
+            >
+              <div className="border-b border-base-300 bg-base-100 min-h-0 flex flex-col">
                 <div className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60">
                   Message
                 </div>
@@ -4112,6 +4187,15 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                     {log.all.find(c => c.hash === selectedHash)?.body || 'No additional message'}
                   </div>
                 </div>
+              </div>
+              <div
+                className={cn(
+                  'cursor-ns-resize flex items-center justify-center hover:bg-base-200/60 transition-colors',
+                  isCommitDetailsRatioResizing && 'bg-base-200/60'
+                )}
+                onMouseDown={handleCommitDetailsRatioResizeStart}
+              >
+                <div className="w-8 h-1 rounded-full bg-base-300" />
               </div>
               <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
                 <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60 border-b border-base-300 bg-base-100 shrink-0">
