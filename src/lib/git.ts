@@ -200,9 +200,10 @@ export class GitService {
   async getDiff(path: string): Promise<string> {
     // Get diff of working directory vs index (unstaged changes)
     // or index vs HEAD (staged changes)
-    // This is a complex topic. 
-    // For now, let's just get `git diff HEAD -- path`
-    return await this.git.diff(['HEAD', path]);
+    // This is a complex topic.
+    // Keep comparing against HEAD, but force pathspec parsing with `--`
+    // so deleted files (missing from working tree) are still treated as paths.
+    return await this.git.diff(['HEAD', '--', path]);
   }
 
   async getBranches() {
