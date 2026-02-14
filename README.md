@@ -17,73 +17,80 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - **Settings** - Configure default repository folder and preferences
 - **Dark/Light Mode** - Theme toggle for comfortable viewing
 
-## Feature Roadmap
+## Roadmap & TODO
 
-### Repository Management
-- [x] Open local repository
-- [x] List recent repositories
-- [x] Delete repository from list
-- [x] Shared repository storage across instances
-- [ ] Clone repository
-- [ ] Initialize new repository
+### Implemented
 
-### Working Directory & Staging
-- [x] View modified files status
-- [x] Stage/Unstage individual files
-- [x] Stage All files
-- [x] Discard changes (Clean)
-- [x] Stash changes
-- [x] Pop/Apply/Delete stash
+#### Repository Management
+- [x] Open local repositories from a filesystem browser
+- [x] List recent repositories and reopen quickly (Command Palette)
+- [x] Delete repositories from the app list (without deleting files)
+- [x] Shared repository/settings storage across app instances
+- [x] Set repository display name
+- [x] Configure default root folder for browsing repositories
 
-### Committing
-- [x] Write commit message
-- [x] Create commit
-- [ ] Amend last commit
-- [ ] Sign commits (GPG/SSH)
-- [ ] Co-author support
+#### Working Directory & Staging
+- [x] View working tree and index status
+- [x] Stage/unstage individual files
+- [x] Stage all / unstage all
+- [x] Discard unstaged changes and untracked files
+- [x] Stash changes with message
+- [x] List/apply/pop/drop stashes
+- [x] Inspect stash file lists and per-file stash diffs
 
-### Branching & Merging
-- [x] List local and remote branches
-- [x] Create branch
-- [x] Checkout branch
-- [x] Delete branch
-- [x] Rename branch
-- [x] Merge (Squash, Fast-forward options)
-- [x] Rebase (with auto-stash support)
-- [x] Squash changes (Pre-push)
-- [x] Reset branch to specific commit
+#### Committing
+- [x] Commit with subject + optional body
+- [x] Amend latest commit message (reword)
 
-### Remote Operations
-- [x] List remotes
-- [x] Fetch (All or specific remote)
-- [x] Pull (Rebase support)
-- [x] Push (Force push, Set Upstream)
-- [ ] Manage Remotes (Add/Edit/Remove)
+#### Branching, History & Graph
+- [x] Visual commit graph with branch lanes
+- [x] Branch visibility filters persisted per repository
+- [x] List local/remote branches with ahead/behind tracking info
+- [x] Create branch from current HEAD or selected ref
+- [x] Checkout local branch
+- [x] Checkout remote branch to new local tracking branch
+- [x] Delete local and remote branches
+- [x] Rename local branches
+- [x] Rename remote branches
+- [x] Merge with options (rebase-before-merge, squash, fast-forward)
+- [x] Rebase onto target branch (with optional auto-stash)
+- [x] Preflight conflict checks for merge/rebase
+- [x] Hard/soft/mixed reset to selected commit
+- [x] Cherry-pick single/multiple commits and abort cherry-pick
+- [x] Commit details and per-file commit diffs (split/inline)
 
-### History & Graph
-- [x] Visual commit graph (Lanes, Merges)
-- [x] Filter history by branch visibility
-- [x] View commit details (Message, Author, Date)
-- [x] View commit diffs (Side-by-side / Inline)
-- [x] Context menus for commits and branches
+#### Remote Operations
+- [x] Fetch default remote
+- [x] Fetch specific remote
+- [x] Fetch all remotes (prune)
+- [x] Pull from remote branch (rebase option)
+- [x] Push to remote branch (force, set-upstream, rebase-first, squash, local-tags)
 
-### Settings & Configuration
-- [x] Default root folder for repository browsing
-- [x] Dark/Light mode toggle
-- [x] Persist UI state (Sidebar, Panels, Filters)
+#### Tags, Credentials, and Automation
+- [x] Create local tag and optionally push to remote
+- [x] Delete local tag
+- [x] Delete remote tag
+- [x] Manage credentials (GitHub/GitLab) and associate per repository
+- [x] Run repository custom bash scripts from branch context menu (with live output/cancel)
 
-### Advanced / Other
-- [x] Command Palette (Cmd+K)
-- [x] Error reporting & copy
-- [x] Cherry-pick a single commit
-- [x] Cherry-pick multiple commits
+#### UX & Reliability
+- [x] Dark/light/system theme toggle
+- [x] Image diff support and binary file detection
+- [x] Large-diff protection to prevent UI freeze
+- [x] Persist key UI state (sidebar/panel sizes/folders/filters)
+- [x] Git error handling with actionable messages + lock file cleanup action
+
+### TODO
+- [ ] Clone repository from URL
+- [ ] Initialize a new repository
+- [ ] Manage remotes (add/edit/remove remote definitions)
 - [ ] Revert commits
-- [ ] Tags management
-- [ ] Submodules support
-- [ ] Interactive Rebase
-- [ ] Blame/Annotate view
-- [ ] Git LFS support
-- [ ] Diff syntax highlighting
+- [ ] Commit signing (GPG/SSH)
+- [ ] Co-author commit support
+- [ ] Interactive rebase UI
+- [ ] Blame/annotate view
+- [ ] Submodule management
+- [ ] Git LFS workflows
 
 ## Tech Stack
 
