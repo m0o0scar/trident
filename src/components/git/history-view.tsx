@@ -33,6 +33,7 @@ const DEFAULT_COMMIT_DETAILS_MESSAGE_RATIO = 0.28;
 type MergeConflictStatus = 'checking' | 'no-conflict' | 'has-conflicts';
 type CommitRowSelectModifiers = { isMultiSelect: boolean; isRangeSelect: boolean };
 type BranchRowSelectModifiers = { isMultiSelect: boolean; isRangeSelect: boolean };
+type BranchOperation = { sourceBranch: string; targetBranch: string };
 type ScriptExecutionStatus = 'idle' | 'starting' | 'running' | 'completed' | 'failed' | 'canceled';
 type ScriptExecutionState = {
   isOpen: boolean;
@@ -652,8 +653,8 @@ interface BranchMenuCallbacks {
   onDeleteBranches: (branches: string[]) => void;
   onRenameBranch: (branch: string) => void;
   onRenameRemoteBranch: (branch: string) => void;
-  onRebase: (targetBranch: string) => void;
-  onMerge: (targetBranch: string) => void;
+  onRebase: (operation: BranchOperation) => void;
+  onMerge: (operation: BranchOperation) => void;
   onPushToRemote: (branch: string) => void;
   onPullFromRemote: (branch: string) => void;
 }
@@ -733,8 +734,28 @@ function buildBranchContextMenuItems(
   if (isRemote) menuItems.push({ label: 'Rename branch', onClick: () => callbacks.onRenameRemoteBranch(branchRef) });
   if (!isRemote) menuItems.push({ label: 'Push to Remote', onClick: () => callbacks.onPushToRemote(branchRef) });
   if (!isRemote) menuItems.push({ label: 'Pull from Remote', onClick: () => callbacks.onPullFromRemote(branchRef) });
-  if (!isCurrent) menuItems.push({ label: `Rebase ${currentBranch} onto ${branchLeafName}`, onClick: () => callbacks.onRebase(branchRef) });
-  if (!isCurrent) menuItems.push({ label: `Merge ${currentBranch} into ${branchLeafName}`, onClick: () => callbacks.onMerge(branchRef) });
+  if (!isCurrent && currentBranch) {
+    menuItems.push({
+      label: `Rebase ${currentBranch} onto ${branchLeafName}`,
+      labelNode: <>Rebase <span className="font-bold">{currentBranch}</span> onto {branchLeafName}</>,
+      onClick: () => callbacks.onRebase({ sourceBranch: currentBranch, targetBranch: branchRef }),
+    });
+    menuItems.push({
+      label: `Rebase ${branchLeafName} onto ${currentBranch}`,
+      labelNode: <>Rebase {branchLeafName} onto <span className="font-bold">{currentBranch}</span></>,
+      onClick: () => callbacks.onRebase({ sourceBranch: branchRef, targetBranch: currentBranch }),
+    });
+    menuItems.push({
+      label: `Merge ${currentBranch} into ${branchLeafName}`,
+      labelNode: <>Merge <span className="font-bold">{currentBranch}</span> into {branchLeafName}</>,
+      onClick: () => callbacks.onMerge({ sourceBranch: currentBranch, targetBranch: branchRef }),
+    });
+    menuItems.push({
+      label: `Merge ${branchLeafName} into ${currentBranch}`,
+      labelNode: <>Merge {branchLeafName} into <span className="font-bold">{currentBranch}</span></>,
+      onClick: () => callbacks.onMerge({ sourceBranch: branchRef, targetBranch: currentBranch }),
+    });
+  }
   if (!isCurrent) {
     if (hasMultiSelection) {
       menuItems.push({
@@ -793,8 +814,8 @@ function BranchTreeItem({
   onDeleteBranch: (branch: string) => void;
   onRenameBranch: (branch: string) => void;
   onRenameRemoteBranch: (branch: string) => void;
-  onRebase: (targetBranch: string) => void;
-  onMerge: (targetBranch: string) => void;
+  onRebase: (operation: BranchOperation) => void;
+  onMerge: (operation: BranchOperation) => void;
   onPushToRemote: (branch: string) => void;
   onPullFromRemote: (branch: string) => void;
   getBranchContextMenuItems: (options: BranchMenuOptions) => ContextMenuItem[];
@@ -1007,7 +1028,6 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const { data: log, isLoading, isError, error, refetch, isFetching } = useGitLog(repoPath, limit);
   const { data: branchData, isLoading: isBranchesLoading } = useGitBranches(repoPath);
   const { data: statusData } = useGitStatus(repoPath);
-  const mergeDestinationBranch = branchData?.current ?? null;
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [selectedCommitHashes, setSelectedCommitHashes] = useState<string[]>([]);
   const [selectionAnchorHash, setSelectionAnchorHash] = useState<string | null>(null);
@@ -1059,6 +1079,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [isRenaming, setIsRenaming] = useState(false);
 
   const [isRebaseOpen, setIsRebaseOpen] = useState(false);
+  const [rebaseSourceBranch, setRebaseSourceBranch] = useState<string | null>(null);
   const [rebaseTargetBranch, setRebaseTargetBranch] = useState<string | null>(null);
   const [rebaseStashChanges, setRebaseStashChanges] = useState(true);
   const [isRebasing, setIsRebasing] = useState(false);
@@ -1066,6 +1087,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   const closeRebaseDialog = useCallback(() => {
     setIsRebaseOpen(false);
+    setRebaseSourceBranch(null);
     setRebaseTargetBranch(null);
     setRebaseConflictStatus('checking');
   }, []);
@@ -2291,7 +2313,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }
 
-  const confirmRebase = (targetBranch: string) => {
+  const confirmRebase = ({ sourceBranch, targetBranch }: BranchOperation) => {
+    setRebaseSourceBranch(sourceBranch);
     setRebaseTargetBranch(targetBranch);
     setRebaseStashChanges(true);
     setRebaseConflictStatus('checking');
@@ -2299,9 +2322,15 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   }
 
   const handleRebase = async () => {
-    if (!rebaseTargetBranch) return;
+    if (!rebaseSourceBranch || !rebaseTargetBranch) return;
     setIsRebasing(true);
     try {
+      await runGitAction({
+        repoPath,
+        action: 'checkout',
+        data: { branch: rebaseSourceBranch }
+      });
+
       await runGitAction({
         repoPath,
         action: 'rebase',
@@ -2316,7 +2345,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   }
 
   useEffect(() => {
-    const sourceBranch = mergeDestinationBranch;
+    const sourceBranch = rebaseSourceBranch;
     const ontoBranch = rebaseTargetBranch;
 
     if (!isRebaseOpen || !sourceBranch || !ontoBranch) {
@@ -2354,12 +2383,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     return () => {
       cancelled = true;
     };
-  }, [isRebaseOpen, mergeDestinationBranch, rebaseTargetBranch, repoPath, runGitAction]);
+  }, [isRebaseOpen, rebaseSourceBranch, rebaseTargetBranch, repoPath, runGitAction]);
 
-  const confirmMerge = (targetBranch: string) => {
-    if (!mergeDestinationBranch) return;
+  const confirmMerge = ({ sourceBranch, targetBranch }: BranchOperation) => {
     setMergeTargetBranch(targetBranch);
-    setMergeSourceBranch(mergeDestinationBranch);
+    setMergeSourceBranch(sourceBranch);
     setMergeRebaseBeforeMerge(false);
     setMergeSquash(false);
     setMergeFastForward(false);
@@ -3772,7 +3800,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <h3 className="font-bold text-lg">Rebase</h3>
             <p className="py-4 break-words">
                 Copy commits from one branch to another.<br/>
-                Are you sure to rebase <span className="font-bold break-all">{branchData?.current}</span> onto <span className="font-bold break-all">{rebaseTargetBranch}</span>?
+                Are you sure to rebase <span className="font-bold break-all">{rebaseSourceBranch}</span> onto <span className="font-bold break-all">{rebaseTargetBranch}</span>?
             </p>
             <div className="form-control">
                 <label className="label cursor-pointer justify-start gap-2">
@@ -3788,17 +3816,17 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             {rebaseConflictStatus === 'checking' ? (
               <div className="alert alert-info text-sm mt-4 py-2">
                 <span className="loading loading-spinner loading-xs"></span>
-                <span>Checking conflicts for rebasing <span className="font-bold break-all">{branchData?.current}</span> onto <span className="font-bold break-all">{rebaseTargetBranch}</span>...</span>
+                <span>Checking conflicts for rebasing <span className="font-bold break-all">{rebaseSourceBranch}</span> onto <span className="font-bold break-all">{rebaseTargetBranch}</span>...</span>
               </div>
             ) : rebaseConflictStatus === 'no-conflict' ? (
               <div className="alert alert-success text-sm mt-4 py-2">
                 <i className="iconoir-check-circle-solid text-[18px]" aria-hidden="true" />
-                <span>No conflict: rebasing <span className="font-bold break-all">{branchData?.current}</span> onto <span className="font-bold break-all">{rebaseTargetBranch}</span> will not cause conflicts.</span>
+                <span>No conflict: rebasing <span className="font-bold break-all">{rebaseSourceBranch}</span> onto <span className="font-bold break-all">{rebaseTargetBranch}</span> will not cause conflicts.</span>
               </div>
             ) : (
               <div className="alert alert-warning text-sm mt-4 py-2">
                 <i className="iconoir-warning-circle-solid text-[18px]" aria-hidden="true" />
-                <span>Conflicts detected: rebasing <span className="font-bold break-all">{branchData?.current}</span> onto <span className="font-bold break-all">{rebaseTargetBranch}</span> will cause conflicts.</span>
+                <span>Conflicts detected: rebasing <span className="font-bold break-all">{rebaseSourceBranch}</span> onto <span className="font-bold break-all">{rebaseTargetBranch}</span> will cause conflicts.</span>
               </div>
             )}
             <div className="modal-action">
