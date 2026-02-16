@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 
 export interface ContextMenuItem {
     label: string;
+    labelNode?: React.ReactNode;
     onClick?: () => void;
     danger?: boolean;
     children?: ContextMenuItem[];
@@ -164,7 +165,7 @@ export function ContextMenu({
                         hasChildren && "flex items-center justify-between gap-3"
                     )}
                 >
-                    <span>{item.label}</span>
+                    <span>{item.labelNode ?? item.label}</span>
                     {hasChildren && <i className="iconoir-nav-arrow-right text-[12px]" aria-hidden="true" />}
                 </a>
                 {hasChildren && (
