@@ -1,5 +1,5 @@
 import { simpleGit, SimpleGit, SimpleGitOptions } from 'simple-git';
-import { GitStatus, GitLog } from './types';
+import { GitStatus, GitLog, Commit } from './types';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, unlink } from 'node:fs/promises';
@@ -11,6 +11,10 @@ const execFileAsync = promisify(execFile);
 // Cache simple-git instances to avoid spawning too many processes if possible,
 // though simple-git is lightweight.
 const gitInstances: Record<string, SimpleGit> = {};
+
+interface LogEntry extends Omit<Commit, 'parents'> {
+  parents: string;
+}
 
 export function getGit(repoPath: string): SimpleGit {
   if (!gitInstances[repoPath]) {
@@ -63,7 +67,7 @@ export class GitService {
 
   async getLog(limit: number = 100): Promise<GitLog> {
     // Custom format to ensure we get parents and refs correctly
-    const log = await this.git.log({
+    const log = await this.git.log<LogEntry>({
       '--all': null,
       // Keep refs stable regardless of user-level git config (e.g. log.decorate=full).
       '--decorate': 'short',
@@ -85,7 +89,7 @@ export class GitService {
     // Parents in simple-git are usually just space separated string in the custom format result unless processed.
     // We might need to map it.
 
-    const commits = log.all.map((c: any) => ({
+    const commits = log.all.map((c) => ({
       ...c,
       parents: c.parents ? c.parents.split(' ').filter(Boolean) : []
     }));
