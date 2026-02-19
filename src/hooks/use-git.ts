@@ -386,6 +386,7 @@ interface GitActionPayload {
   repoPath: string;
   action: GitActionType;
   data?: any;
+  suppressErrorToast?: boolean;
 }
 
 async function cleanupLockFile(repoPath: string) {
@@ -424,7 +425,7 @@ export function useGitAction() {
     },
     onError: (error: Error, variables) => {
       // Show error toast for git operations (except read-only actions)
-      if (!READ_ONLY_ACTIONS.includes(variables.action)) {
+      if (!READ_ONLY_ACTIONS.includes(variables.action) && !variables.suppressErrorToast) {
         const operationName = actionOperationNames[variables.action] || variables.action;
 
         // Check for lock file error
