@@ -9,7 +9,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'create-tag', 'delete-branch', 'delete-remote-branch', 'delete-tag', 'delete-remote-tag', 'rename-branch', 'rename-remote-branch', 'rename-remote', 'add-remote', 'reset', 'revert', 'cherry-pick', 'cherry-pick-multiple', 'cherry-pick-abort', 'rebase', 'merge', 'check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'get-latest-commit-message', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword', 'discard', 'cleanup-lock-file']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'create-tag', 'delete-branch', 'delete-remote-branch', 'delete-remote', 'delete-tag', 'delete-remote-tag', 'rename-branch', 'rename-remote-branch', 'rename-remote', 'add-remote', 'reset', 'revert', 'cherry-pick', 'cherry-pick-multiple', 'cherry-pick-abort', 'rebase', 'merge', 'check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'get-latest-commit-message', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword', 'discard', 'cleanup-lock-file']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -175,6 +175,10 @@ export async function POST(request: Request) {
         
         const deleteCreds = await resolveCredentials(repoPath, git, data.remote);
         await git.deleteRemoteBranch(data.remote, data.branch, deleteCreds);
+        break;
+      case 'delete-remote':
+        if (!data?.name) throw new Error('Remote name is required to delete remote');
+        await git.deleteRemote(data.name);
         break;
       case 'delete-tag':
         if (!data?.tag) throw new Error('Tag name is required to delete tag');
