@@ -114,6 +114,16 @@ export class GitService {
     await this.git.raw(['fetch', '--all', '--prune']);
   }
 
+  async addRemote(name: string, url: string): Promise<void> {
+    const trimmedName = name.trim();
+    const trimmedUrl = url.trim();
+
+    if (!trimmedName) throw new Error('Remote name is required');
+    if (!trimmedUrl) throw new Error('Remote URL is required');
+
+    await this.git.raw(['remote', 'add', trimmedName, trimmedUrl]);
+  }
+
   async renameRemote(oldName: string, newName: string): Promise<void> {
     const trimmedOldName = oldName.trim();
     const trimmedNewName = newName.trim();
