@@ -1,13 +1,35 @@
 {
-  "name": "trident",
+  "name": "trident-git",
   "version": "0.2.0",
-  "private": true,
+  "private": false,
+  "description": "A modern, web-based Git client.",
+  "bin": {
+    "trident-git": "bin/trident-git.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "public",
+    "next.config.ts",
+    "postcss.config.mjs",
+    "tsconfig.json",
+    "eslint.config.mjs",
+    "README.md"
+  ],
   "scripts": {
     "dev": "npx gfport 3100 -- next dev --webpack -p {PORT}",
     "build": "next build --webpack",
     "start": "next start -p 3100",
-    "lint": "eslint"
+    "lint": "eslint",
+    "cli": "node ./bin/trident-git.mjs",
+    "pack:preview": "npm pack --dry-run"
   },
+  "keywords": [
+    "git",
+    "client",
+    "nextjs"
+  ],
+  "license": "MIT",
   "dependencies": {
     "@alexbruf/react-diff-viewer": "^3.1.5",
     "@tanstack/react-query": "^5.90.20",
