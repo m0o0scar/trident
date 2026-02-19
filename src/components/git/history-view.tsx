@@ -1081,6 +1081,9 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [remoteToRename, setRemoteToRename] = useState<string | null>(null);
   const [newRemoteNameForRename, setNewRemoteNameForRename] = useState('');
   const [isRenamingRemote, setIsRenamingRemote] = useState(false);
+  const [isDeleteRemoteOpen, setIsDeleteRemoteOpen] = useState(false);
+  const [remoteToDelete, setRemoteToDelete] = useState<string | null>(null);
+  const [isDeletingRemote, setIsDeletingRemote] = useState(false);
   const [isAddRemoteOpen, setIsAddRemoteOpen] = useState(false);
   const [newRemoteName, setNewRemoteName] = useState('origin');
   const [newRemoteUrl, setNewRemoteUrl] = useState('');
@@ -1200,6 +1203,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setNewRemoteNameForRename('');
   }, []);
 
+  const closeDeleteRemoteDialog = useCallback(() => {
+    setIsDeleteRemoteOpen(false);
+    setRemoteToDelete(null);
+  }, []);
+
   const closeAddRemoteDialog = useCallback(() => {
     setIsAddRemoteOpen(false);
     setNewRemoteName('origin');
@@ -1257,6 +1265,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
     if (isRenameRemoteOpen) {
       closeRenameRemoteDialog();
+      return;
+    }
+    if (isDeleteRemoteOpen) {
+      closeDeleteRemoteDialog();
       return;
     }
     if (isAddRemoteOpen) {
@@ -1317,6 +1329,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     closeRenameBranchDialog,
     isRenameRemoteOpen,
     closeRenameRemoteDialog,
+    isDeleteRemoteOpen,
+    closeDeleteRemoteDialog,
     isAddRemoteOpen,
     closeAddRemoteDialog,
     isCherryPickOpen,
@@ -1341,6 +1355,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     isCherryPickOpen ||
     isRenameOpen ||
     isRenameRemoteOpen ||
+    isDeleteRemoteOpen ||
     isAddRemoteOpen ||
     isRebaseOpen ||
     isMergeOpen ||
@@ -2317,6 +2332,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setIsRenameRemoteOpen(true);
   }
 
+  const confirmDeleteRemote = (remote: string) => {
+    if (!remote) return;
+    setRemoteToDelete(remote);
+    setIsDeleteRemoteOpen(true);
+  }
+
   const confirmAddRemote = () => {
     setNewRemoteName('origin');
     setNewRemoteUrl('');
@@ -2390,6 +2411,28 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       console.error(e);
     } finally {
       setIsRenamingRemote(false);
+    }
+  }
+
+  const handleDeleteRemote = async () => {
+    if (!remoteToDelete) return;
+    const trimmedRemoteName = remoteToDelete.trim();
+    if (!trimmedRemoteName) return;
+
+    setIsDeletingRemote(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'delete-remote',
+        data: {
+          name: trimmedRemoteName,
+        },
+      });
+      closeDeleteRemoteDialog();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsDeletingRemote(false);
     }
   }
 
@@ -3447,14 +3490,6 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               items={[
                 { label: 'Fetch from all remotes', onClick: handleFetchFromAllRemotes },
                 { label: 'Add remote', onClick: confirmAddRemote },
-                ...(remoteBranchTrees
-                  ? [{
-                      label: 'Delete',
-                      onClick: () => confirmDeleteBranches(Array.from(remoteBranchTrees.values()).flatMap((tree) => collectAllBranchRefs(tree))),
-                      danger: true,
-                      disabled: Array.from(remoteBranchTrees.values()).every((tree) => collectAllBranchRefs(tree).length === 0),
-                    }]
-                  : []),
               ]}
             >
               <GroupHeader
@@ -3485,7 +3520,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                       { label: 'Rename', onClick: () => confirmRenameRemote(remoteName) },
                       {
                         label: 'Delete',
-                        onClick: () => confirmDeleteBranches(collectAllBranchRefs(tree)),
+                        onClick: () => confirmDeleteRemote(remoteName),
                         danger: true,
                       },
                     ]}
@@ -3996,6 +4031,40 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           </div>
           <form method="dialog" className="modal-backdrop">
             <button onClick={closeRenameRemoteDialog}>
+              close
+            </button>
+          </form>
+        </dialog>
+      )}
+
+      {isDeleteRemoteOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Delete Remote</h3>
+            <p className="py-4 break-words">
+              Are you sure you want to delete remote <span className="font-bold break-all">{remoteToDelete}</span>?
+              This removes all tracking branches for that remote.
+            </p>
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={closeDeleteRemoteDialog}
+                disabled={isDeletingRemote}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-error"
+                onClick={handleDeleteRemote}
+                disabled={!remoteToDelete || isDeletingRemote}
+              >
+                {isDeletingRemote && <span className="loading loading-spinner loading-xs"></span>}
+                Delete
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={closeDeleteRemoteDialog}>
               close
             </button>
           </form>

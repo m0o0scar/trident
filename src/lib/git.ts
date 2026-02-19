@@ -136,6 +136,13 @@ export class GitService {
     await this.git.raw(['remote', 'rename', trimmedOldName, trimmedNewName]);
   }
 
+  async deleteRemote(name: string): Promise<void> {
+    const trimmedName = name.trim();
+    if (!trimmedName) throw new Error('Remote name is required to delete remote');
+
+    await this.git.raw(['remote', 'remove', trimmedName]);
+  }
+
   async pull(): Promise<void> {
     await this.git.pull();
   }
