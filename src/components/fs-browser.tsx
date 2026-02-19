@@ -13,14 +13,19 @@ interface FSItem {
 
 interface FSResponse {
   path: string;
+  isRepo: boolean;
   folders: FSItem[];
   parent: string;
+}
+
+interface SelectionMeta {
+  isRepo: boolean;
 }
 
 interface FileSystemBrowserProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelect: (path: string) => void;
+  onSelect: (path: string, meta: SelectionMeta) => void;
   initialPath?: string;
   title?: string;
   selectionMode?: 'repository' | 'folder';
@@ -161,7 +166,6 @@ export function FileSystemBrowser({
                     )}
                     
                     {data?.folders.map((item) => {
-                        const isSelectable = selectionMode === 'folder' || item.isRepo;
                         return (
                         <div 
                             key={item.path}
@@ -176,14 +180,12 @@ export function FileSystemBrowser({
                                 <span className={cn("text-sm font-mono", item.isRepo && "font-medium")}>{item.name}</span>
                             </div>
                             
-                            {isSelectable && (
-                                <button
-                                    className="btn btn-xs btn-outline"
-                                    onClick={(e) => { e.stopPropagation(); onSelect(item.path); onOpenChange(false); }}
-                                >
-                                    {selectionMode === 'folder' ? 'Use Folder' : 'Select'}
-                                </button>
-                            )}
+                            <button
+                                className="btn btn-xs btn-outline"
+                                onClick={(e) => { e.stopPropagation(); onSelect(item.path, { isRepo: selectionMode === 'folder' ? true : item.isRepo }); onOpenChange(false); }}
+                            >
+                                {selectionMode === 'folder' ? 'Use Folder' : 'Select'}
+                            </button>
                         </div>
                     )})}
                     
@@ -217,7 +219,7 @@ export function FileSystemBrowser({
                  )}
                </button>
              )}
-             <button className="btn btn-primary btn-sm" onClick={() => { onSelect(currentPath); onOpenChange(false); }}>
+             <button className="btn btn-primary btn-sm" onClick={() => { onSelect(currentPath, { isRepo: selectionMode === 'folder' ? true : !!data?.isRepo }); onOpenChange(false); }}>
                  {selectionMode === 'folder' ? 'Use Current Folder' : 'Select Current Folder'}
              </button>
            </div>

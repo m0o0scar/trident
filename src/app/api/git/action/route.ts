@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     switch (action) {
       case 'commit':
         if (!data?.message) throw new Error('Commit message is required');
-        await git.commit(data.message, data.files);
+        await git.commit(data.message, data.files, { initialBranch: data?.initialBranch });
         break;
       case 'push':
         // Try to resolve credentials

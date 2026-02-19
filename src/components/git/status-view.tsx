@@ -1,8 +1,8 @@
 'use client';
 
-import { useGitStatus, useGitAction } from '@/hooks/use-git';
+import { useGitStatus, useGitAction, useGitBranches } from '@/hooks/use-git';
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeBranchName } from '@/lib/utils';
 import { DiffView } from './diff-view';
 import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
 
@@ -196,6 +196,7 @@ function StatusFileTreeItem({
 
 export function StatusView({ repoPath }: { repoPath: string }) {
     const { data: status, isLoading, isError, error, refetch } = useGitStatus(repoPath);
+    const { data: branches } = useGitBranches(repoPath);
     const action = useGitAction();
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
@@ -203,6 +204,8 @@ export function StatusView({ repoPath }: { repoPath: string }) {
     const [stashDialogOpen, setStashDialogOpen] = useState(false);
     const [stashMessage, setStashMessage] = useState('');
     const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+    const [firstCommitDialogOpen, setFirstCommitDialogOpen] = useState(false);
+    const [initialBranchName, setInitialBranchName] = useState('main');
     const [collapsedChangeFolders, setCollapsedChangeFolders] = useState<Set<string>>(new Set());
     const [collapsedStagedFolders, setCollapsedStagedFolders] = useState<Set<string>>(new Set());
     
@@ -250,6 +253,8 @@ export function StatusView({ repoPath }: { repoPath: string }) {
     const files = status?.files ?? EMPTY_FILES;
     useEscapeDismiss(stashDialogOpen, () => setStashDialogOpen(false));
     useEscapeDismiss(discardDialogOpen, () => setDiscardDialogOpen(false));
+    useEscapeDismiss(firstCommitDialogOpen, () => setFirstCommitDialogOpen(false));
+    const isFirstCommit = !!branches && branches.branches.length === 0;
 
     // Group files
     const { staged, changes } = useMemo(() => {
@@ -364,6 +369,12 @@ export function StatusView({ repoPath }: { repoPath: string }) {
     const handleCommit = async () => {
         const trimmedSubject = subject.trim();
         if (!trimmedSubject) return;
+
+        if (isFirstCommit) {
+            setFirstCommitDialogOpen(true);
+            return;
+        }
+
         await action.mutateAsync({
             repoPath,
             action: 'commit',
@@ -372,6 +383,26 @@ export function StatusView({ repoPath }: { repoPath: string }) {
         setSubject('');
         setBody('');
         setSelectedFile(null);
+    };
+
+    const handleFirstCommitConfirm = async () => {
+        const trimmedSubject = subject.trim();
+        const trimmedBranchName = initialBranchName.trim();
+        if (!trimmedSubject || !trimmedBranchName) return;
+
+        await action.mutateAsync({
+            repoPath,
+            action: 'commit',
+            data: {
+                message: buildCommitMessage(trimmedSubject, body),
+                initialBranch: trimmedBranchName,
+            },
+        });
+
+        setSubject('');
+        setBody('');
+        setSelectedFile(null);
+        setFirstCommitDialogOpen(false);
     };
 
     const handleCommitShortcut = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -589,6 +620,45 @@ export function StatusView({ repoPath }: { repoPath: string }) {
                     </div>
                     <form method="dialog" className="modal-backdrop">
                         <button onClick={() => setDiscardDialogOpen(false)}>close</button>
+                    </form>
+                </dialog>
+            )}
+
+            {firstCommitDialogOpen && (
+                <dialog className="modal modal-open">
+                    <div className="modal-box">
+                        <h3 className="font-bold text-lg">First Commit Branch</h3>
+                        <p className="py-4 opacity-70">
+                            This repository has no commits yet. Choose the branch name for the first commit.
+                        </p>
+                        <div className="py-2">
+                            <input
+                                type="text"
+                                placeholder="Branch name"
+                                value={initialBranchName}
+                                onChange={(e) => setInitialBranchName(sanitizeBranchName(e.target.value))}
+                                autoFocus
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleFirstCommitConfirm();
+                                    }
+                                }}
+                                className="input input-bordered w-full"
+                            />
+                        </div>
+                        <div className="modal-action">
+                            <button className="btn" onClick={() => setFirstCommitDialogOpen(false)}>
+                                Cancel
+                            </button>
+                            <button className="btn btn-primary" onClick={handleFirstCommitConfirm} disabled={!initialBranchName.trim() || action.isPending}>
+                                {action.isPending && <span className="loading loading-spinner loading-xs"></span>}
+                                Commit to Branch
+                            </button>
+                        </div>
+                    </div>
+                    <form method="dialog" className="modal-backdrop">
+                        <button onClick={() => setFirstCommitDialogOpen(false)}>close</button>
                     </form>
                 </dialog>
             )}

@@ -21,7 +21,14 @@ export async function GET(request: Request) {
 
       const items = await fs.promises.readdir(currentPath, { withFileTypes: true });
       
-      // Let's verify if they are git repos
+      // Check whether the current folder is itself a git repo.
+      let isRepo = false;
+      try {
+        await fs.promises.access(path.join(currentPath, '.git'), fs.constants.F_OK);
+        isRepo = true;
+      } catch {}
+
+      // Let's verify if child folders are git repos.
       const directories = items.filter(item => item.isDirectory());
 
       const contents = [];
@@ -65,6 +72,7 @@ export async function GET(request: Request) {
 
       return NextResponse.json({
           path: currentPath,
+          isRepo,
           folders: contents,
           parent: path.dirname(currentPath)
       });
