@@ -135,22 +135,6 @@ export function FileSystemBrowser({
               </div>
           </div>
           <div className="flex items-center gap-2">
-            {selectionMode === 'folder' && (
-              <button
-                className="btn btn-sm btn-outline"
-                onClick={handleCreateFolder}
-                disabled={isCreatingFolder || isLoading || !currentPath}
-              >
-                {isCreatingFolder ? (
-                  <span className="flex items-center gap-2">
-                    <span className="loading loading-spinner loading-xs" />
-                    Creating...
-                  </span>
-                ) : (
-                  'New Folder'
-                )}
-              </button>
-            )}
             <button className="btn btn-sm btn-circle btn-ghost" onClick={() => onOpenChange(false)}>
               <i className="iconoir-xmark text-[16px]" aria-hidden="true" />
             </button>
@@ -216,9 +200,27 @@ export function FileSystemBrowser({
            <div className="text-xs opacity-70">
                {selectionMode === 'folder' ? 'Click folder to navigate or select it.' : 'Click folder to navigate.'}
            </div>
-           <button className="btn btn-primary btn-sm" onClick={() => { onSelect(currentPath); onOpenChange(false); }}>
-               {selectionMode === 'folder' ? 'Use Current Folder' : 'Select Current Folder'}
-           </button>
+           <div className="flex items-center gap-2">
+             {selectionMode === 'folder' && (
+               <button
+                 className="btn btn-sm btn-outline"
+                 onClick={handleCreateFolder}
+                 disabled={isCreatingFolder || isLoading || !currentPath}
+               >
+                 {isCreatingFolder ? (
+                   <span className="flex items-center gap-2">
+                     <span className="loading loading-spinner loading-xs" />
+                     Creating...
+                   </span>
+                 ) : (
+                   'New Folder'
+                 )}
+               </button>
+             )}
+             <button className="btn btn-primary btn-sm" onClick={() => { onSelect(currentPath); onOpenChange(false); }}>
+                 {selectionMode === 'folder' ? 'Use Current Folder' : 'Select Current Folder'}
+             </button>
+           </div>
         </div>
       </div>
       <form method="dialog" className="modal-backdrop">
