@@ -3,8 +3,7 @@
   "version": "0.2.0",
   "private": true,
   "scripts": {
-    "find-port": "node -e \"p=3100;var s=require('net').createServer;var c=()=>s().listen(p,()=>console.log(p)||process.exit()).on('error',()=>++p&&c());c()\"",
-    "dev": "next dev --webpack -p $(npm run find-port -s)",
+    "dev": "npx gfport 3100 -- next dev --webpack -p {PORT}",
     "build": "next build --webpack",
     "start": "next start -p 3100",
     "lint": "eslint"
@@ -32,6 +31,7 @@
     "@types/react-syntax-highlighter": "^15.5.13",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "gfport": "^1.0.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
