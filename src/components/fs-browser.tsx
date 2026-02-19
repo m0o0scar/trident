@@ -22,9 +22,17 @@ interface FileSystemBrowserProps {
   onSelect: (path: string) => void;
   initialPath?: string;
   title?: string;
+  selectionMode?: 'repository' | 'folder';
 }
 
-export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, title = 'Select Repository' }: FileSystemBrowserProps) {
+export function FileSystemBrowser({
+  open,
+  onOpenChange,
+  onSelect,
+  initialPath,
+  title = 'Select Repository',
+  selectionMode = 'repository',
+}: FileSystemBrowserProps) {
   const [currentPath, setCurrentPath] = useState<string>('');
   const [data, setData] = useState<FSResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -103,7 +111,9 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, t
                         </div>
                     )}
                     
-                    {data?.folders.map((item) => (
+                    {data?.folders.map((item) => {
+                        const isSelectable = selectionMode === 'folder' || item.isRepo;
+                        return (
                         <div 
                             key={item.path}
                             className={cn(
@@ -117,16 +127,16 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, t
                                 <span className={cn("text-sm font-mono", item.isRepo && "font-medium")}>{item.name}</span>
                             </div>
                             
-                            {item.isRepo && (
+                            {isSelectable && (
                                 <button
                                     className="btn btn-xs btn-outline"
                                     onClick={(e) => { e.stopPropagation(); onSelect(item.path); onOpenChange(false); }}
                                 >
-                                    Select
+                                    {selectionMode === 'folder' ? 'Use Folder' : 'Select'}
                                 </button>
                             )}
                         </div>
-                    ))}
+                    )})}
                     
                     {data?.folders.length === 0 && (
                         <div className="p-8 text-center opacity-70 text-sm">
@@ -139,10 +149,10 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, t
 
         <div className="p-4 border-t border-base-300 flex items-center justify-between bg-base-200/30">
            <div className="text-xs opacity-70">
-               Click folder to navigate.
+               {selectionMode === 'folder' ? 'Click folder to navigate or select it.' : 'Click folder to navigate.'}
            </div>
            <button className="btn btn-primary btn-sm" onClick={() => { onSelect(currentPath); onOpenChange(false); }}>
-               Select Current Folder
+               {selectionMode === 'folder' ? 'Use Current Folder' : 'Select Current Folder'}
            </button>
         </div>
       </div>
