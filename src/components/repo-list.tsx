@@ -331,15 +331,6 @@ export function RepoList() {
                 initialPath={defaultRootFolder}
             />
 
-            <FileSystemBrowser
-                open={cloneFolderBrowserOpen}
-                onOpenChange={setCloneFolderBrowserOpen}
-                onSelect={(path) => setCloneDestinationParent(path)}
-                initialPath={cloneDestinationParent || defaultRootFolder}
-                title="Select Destination Folder"
-                selectionMode="folder"
-            />
-
             <HomeSettingsModal
                 open={settingsOpen}
                 onOpenChange={setSettingsOpen}
@@ -455,6 +446,15 @@ export function RepoList() {
                     </form>
                 </dialog>
             )}
+
+            <FileSystemBrowser
+                open={cloneFolderBrowserOpen}
+                onOpenChange={setCloneFolderBrowserOpen}
+                onSelect={(path) => setCloneDestinationParent(path)}
+                initialPath={cloneDestinationParent || defaultRootFolder}
+                title="Select Destination Folder"
+                selectionMode="folder"
+            />
 
             {deleteDialogOpen && (
                 <dialog className="modal modal-open">
