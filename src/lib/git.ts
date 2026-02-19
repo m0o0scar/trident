@@ -587,6 +587,10 @@ export class GitService {
     await this.git.reset([`--${mode}`, commitHash]);
   }
 
+  async revert(commitHash: string): Promise<void> {
+    await this.git.raw(['revert', '--no-edit', commitHash]);
+  }
+
   async cherryPick(commitHash: string): Promise<void> {
     await this.git.raw(['cherry-pick', commitHash]);
   }
