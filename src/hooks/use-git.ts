@@ -126,11 +126,11 @@ export function useUpdateRepository() {
 export function useDeleteRepository() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ path }: { path: string }) => {
+    mutationFn: async ({ path, deleteLocalFolder = false }: { path: string; deleteLocalFolder?: boolean }) => {
       const res = await fetch(`${API_BASE}/repos`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path }),
+        body: JSON.stringify({ path, deleteLocalFolder }),
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
