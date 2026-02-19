@@ -8,17 +8,19 @@
   },
   "files": [
     "bin",
-    "src",
+    ".next/BUILD_ID",
+    ".next/server",
+    ".next/static",
+    ".next/*.json",
+    ".next/*.js",
     "public",
     "next.config.ts",
-    "postcss.config.mjs",
-    "tsconfig.json",
-    "eslint.config.mjs",
     "README.md"
   ],
   "scripts": {
     "dev": "npx gfport 3100 -- next dev --webpack -p {PORT}",
     "build": "next build --webpack",
+    "prepack": "rm -rf .next && npm run build",
     "start": "next start -p 3100",
     "lint": "eslint",
     "cli": "node ./bin/trident-git.mjs",

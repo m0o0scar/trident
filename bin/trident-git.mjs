@@ -2,6 +2,7 @@
 
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,7 +10,8 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const APP_ROOT = path.resolve(__dirname, "..");
-const NEXT_BIN = path.join(APP_ROOT, "node_modules", "next", "dist", "bin", "next");
+const require = createRequire(import.meta.url);
+const NEXT_BIN = require.resolve("next/dist/bin/next");
 const DEFAULT_PORT = 3100;
 
 function printHelp() {
@@ -106,16 +108,12 @@ function runNext(args) {
   });
 }
 
-async function ensureBuildExists() {
+function ensureBuildExists() {
   const buildIdPath = path.join(APP_ROOT, ".next", "BUILD_ID");
-  if (fs.existsSync(buildIdPath)) {
-    return;
-  }
-
-  console.log("No production build found. Building trident-git...");
-  const exitCode = await runNext(["build", "--webpack"]);
-  if (exitCode !== 0) {
-    process.exit(exitCode);
+  if (!fs.existsSync(buildIdPath)) {
+    throw new Error(
+      "No production build found in this package (.next/BUILD_ID is missing). The npm package must be published with prebuilt assets.",
+    );
   }
 }
 
@@ -140,7 +138,7 @@ async function main() {
       process.exit(await runNext(["dev", "--webpack", "-p", String(port)]));
     }
 
-    await ensureBuildExists();
+    ensureBuildExists();
     console.log(`Starting trident-git on http://localhost:${port}`);
     process.exit(await runNext(["start", "-p", String(port)]));
   } catch (error) {

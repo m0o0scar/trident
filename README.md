@@ -125,6 +125,8 @@ npx trident-git --port 3200
 npx trident-git --dev
 ```
 
+Published npm packages are expected to include a prebuilt `.next` output, so `npx trident-git` does not build on the end user's machine.
+
 ### Installation
 
 ```bash
