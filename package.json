@@ -14,7 +14,7 @@
     ".next/*.json",
     ".next/*.js",
     "public",
-    "next.config.ts",
+    "next.config.mjs",
     "README.md"
   ],
   "scripts": {
