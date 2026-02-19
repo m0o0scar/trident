@@ -8,6 +8,33 @@ import { tmpdir } from 'node:os';
 
 const execFileAsync = promisify(execFile);
 
+function normalizeRemoteUrlForHttpAuth(remoteUrl: string): string | null {
+  if (remoteUrl.startsWith('http://') || remoteUrl.startsWith('https://')) {
+    return remoteUrl;
+  }
+
+  // Support converting common SSH format to HTTPS for token-based auth.
+  // Example: git@github.com:owner/repo.git -> https://github.com/owner/repo.git
+  const sshMatch = remoteUrl.match(/^git@([^:]+):(.+)$/);
+  if (sshMatch) {
+    return `https://${sshMatch[1]}/${sshMatch[2]}`;
+  }
+
+  return null;
+}
+
+function withCredentialsInRemoteUrl(remoteUrl: string, credentials: { username: string; token: string }): string {
+  const normalized = normalizeRemoteUrlForHttpAuth(remoteUrl);
+  if (!normalized) {
+    return remoteUrl;
+  }
+
+  const urlObj = new URL(normalized);
+  urlObj.username = credentials.username;
+  urlObj.password = credentials.token;
+  return urlObj.toString();
+}
+
 // Cache simple-git instances to avoid spawning too many processes if possible,
 // though simple-git is lightweight.
 const gitInstances: Record<string, SimpleGit> = {};
@@ -39,6 +66,46 @@ export class GitService {
 
   private get git(): SimpleGit {
     return getGit(this.repoPath);
+  }
+
+  static async cloneRepository(
+    repoUrl: string,
+    destinationPath: string,
+    options: { credentials?: { username: string; token: string } } = {}
+  ): Promise<void> {
+    const trimmedRepoUrl = repoUrl.trim();
+    const trimmedDestinationPath = destinationPath.trim();
+
+    if (!trimmedRepoUrl) {
+      throw new Error('Repository URL is required');
+    }
+    if (!trimmedDestinationPath) {
+      throw new Error('Destination path is required');
+    }
+
+    const git = simpleGit({
+      binary: 'git',
+      maxConcurrentProcesses: 2,
+      trimmed: false,
+    });
+
+    git.env({
+      ...process.env,
+      GIT_TERMINAL_PROMPT: '0',
+      GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o StrictHostKeyChecking=no',
+    });
+
+    const cloneUrl = options.credentials
+      ? withCredentialsInRemoteUrl(trimmedRepoUrl, options.credentials)
+      : trimmedRepoUrl;
+
+    await git.clone(cloneUrl, trimmedDestinationPath);
+
+    // Never persist tokenized URL in cloned repository config.
+    if (cloneUrl !== trimmedRepoUrl) {
+      const clonedGit = getGit(trimmedDestinationPath);
+      await clonedGit.raw(['remote', 'set-url', 'origin', trimmedRepoUrl]);
+    }
   }
 
   async cleanupLockFile(): Promise<boolean> {

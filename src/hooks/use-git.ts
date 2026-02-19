@@ -73,6 +73,38 @@ export function useAddRepository() {
   });
 }
 
+interface CloneRepositoryParams {
+  repoUrl: string;
+  destinationParent: string;
+  folderName?: string;
+  credentialId?: string | null;
+}
+
+interface CloneRepositoryResponse extends Repository {
+  usedCredentialId: string | null;
+}
+
+export function useCloneRepository() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: CloneRepositoryParams): Promise<CloneRepositoryResponse> => {
+      const res = await fetch(`${API_BASE}/repos/clone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to clone repository');
+      }
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['repos'] });
+    },
+  });
+}
+
 export function useUpdateRepository() {
   const queryClient = useQueryClient();
   return useMutation({

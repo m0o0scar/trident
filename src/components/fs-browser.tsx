@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
+import { toast } from '@/hooks/use-toast';
 
 interface FSItem {
   name: string;
@@ -22,13 +23,22 @@ interface FileSystemBrowserProps {
   onSelect: (path: string) => void;
   initialPath?: string;
   title?: string;
+  selectionMode?: 'repository' | 'folder';
 }
 
-export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, title = 'Select Repository' }: FileSystemBrowserProps) {
+export function FileSystemBrowser({
+  open,
+  onOpenChange,
+  onSelect,
+  initialPath,
+  title = 'Select Repository',
+  selectionMode = 'repository',
+}: FileSystemBrowserProps) {
   const [currentPath, setCurrentPath] = useState<string>('');
   const [data, setData] = useState<FSResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   const loadPath = async (path?: string) => {
     setIsLoading(true);
@@ -67,6 +77,51 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, t
       loadPath(path);
   }
 
+  const handleCreateFolder = async () => {
+    if (selectionMode !== 'folder' || !currentPath || isCreatingFolder) {
+      return;
+    }
+
+    const folderNameInput = window.prompt('New folder name');
+    const folderName = folderNameInput?.trim() || '';
+    if (!folderName) {
+      return;
+    }
+
+    setIsCreatingFolder(true);
+    try {
+      const res = await fetch('/api/fs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: currentPath,
+          name: folderName,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(json.error || 'Failed to create folder');
+      }
+
+      await loadPath(currentPath);
+      toast({
+        type: 'success',
+        title: 'Folder created',
+        description: `Created "${folderName}" in ${currentPath}`,
+      });
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+      toast({
+        type: 'error',
+        title: 'Failed to create folder',
+        description: errorMessage,
+      });
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -79,9 +134,11 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, t
                 {currentPath || 'Loading...'}
               </div>
           </div>
-          <button className="btn btn-sm btn-circle btn-ghost" onClick={() => onOpenChange(false)}>
-            <i className="iconoir-xmark text-[16px]" aria-hidden="true" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button className="btn btn-sm btn-circle btn-ghost" onClick={() => onOpenChange(false)}>
+              <i className="iconoir-xmark text-[16px]" aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-hidden relative bg-base-100">
@@ -103,7 +160,9 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, t
                         </div>
                     )}
                     
-                    {data?.folders.map((item) => (
+                    {data?.folders.map((item) => {
+                        const isSelectable = selectionMode === 'folder' || item.isRepo;
+                        return (
                         <div 
                             key={item.path}
                             className={cn(
@@ -117,16 +176,16 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, t
                                 <span className={cn("text-sm font-mono", item.isRepo && "font-medium")}>{item.name}</span>
                             </div>
                             
-                            {item.isRepo && (
+                            {isSelectable && (
                                 <button
                                     className="btn btn-xs btn-outline"
                                     onClick={(e) => { e.stopPropagation(); onSelect(item.path); onOpenChange(false); }}
                                 >
-                                    Select
+                                    {selectionMode === 'folder' ? 'Use Folder' : 'Select'}
                                 </button>
                             )}
                         </div>
-                    ))}
+                    )})}
                     
                     {data?.folders.length === 0 && (
                         <div className="p-8 text-center opacity-70 text-sm">
@@ -139,11 +198,29 @@ export function FileSystemBrowser({ open, onOpenChange, onSelect, initialPath, t
 
         <div className="p-4 border-t border-base-300 flex items-center justify-between bg-base-200/30">
            <div className="text-xs opacity-70">
-               Click folder to navigate.
+               {selectionMode === 'folder' ? 'Click folder to navigate or select it.' : 'Click folder to navigate.'}
            </div>
-           <button className="btn btn-primary btn-sm" onClick={() => { onSelect(currentPath); onOpenChange(false); }}>
-               Select Current Folder
-           </button>
+           <div className="flex items-center gap-2">
+             {selectionMode === 'folder' && (
+               <button
+                 className="btn btn-sm btn-outline"
+                 onClick={handleCreateFolder}
+                 disabled={isCreatingFolder || isLoading || !currentPath}
+               >
+                 {isCreatingFolder ? (
+                   <span className="flex items-center gap-2">
+                     <span className="loading loading-spinner loading-xs" />
+                     Creating...
+                   </span>
+                 ) : (
+                   'New Folder'
+                 )}
+               </button>
+             )}
+             <button className="btn btn-primary btn-sm" onClick={() => { onSelect(currentPath); onOpenChange(false); }}>
+                 {selectionMode === 'folder' ? 'Use Current Folder' : 'Select Current Folder'}
+             </button>
+           </div>
         </div>
       </div>
       <form method="dialog" className="modal-backdrop">

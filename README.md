@@ -81,7 +81,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] Git error handling with actionable messages + lock file cleanup action
 
 ### TODO
-- [ ] Clone repository from URL
+- [x] Clone repository from URL
 - [ ] Initialize a new repository
 - [ ] Manage remotes (add/edit/remove remote definitions)
 - [x] Revert commits

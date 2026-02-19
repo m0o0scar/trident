@@ -36,7 +36,7 @@ export async function GET(request: Request) {
                   // Check for .git directory inside
                   await fs.promises.access(path.join(itemPath, '.git'), fs.constants.F_OK);
                   isRepo = true;
-              } catch (e) {}
+              } catch {}
 
               return {
                   name: item.name,
@@ -71,5 +71,49 @@ export async function GET(request: Request) {
       
   } catch (error) {
       return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const rawParentPath = typeof body?.path === 'string' ? body.path : '';
+    const rawFolderName = typeof body?.name === 'string' ? body.name : '';
+
+    const parentPath = rawParentPath.trim();
+    const folderName = rawFolderName.trim();
+
+    if (!parentPath) {
+      return NextResponse.json({ error: 'Path is required' }, { status: 400 });
+    }
+    if (!folderName) {
+      return NextResponse.json({ error: 'Folder name is required' }, { status: 400 });
+    }
+    if (folderName === '.' || folderName === '..') {
+      return NextResponse.json({ error: 'Invalid folder name' }, { status: 400 });
+    }
+    if (folderName.includes('/') || folderName.includes('\\') || path.basename(folderName) !== folderName) {
+      return NextResponse.json({ error: 'Folder name cannot include path separators' }, { status: 400 });
+    }
+
+    const parentStat = await fs.promises.stat(parentPath);
+    if (!parentStat.isDirectory()) {
+      return NextResponse.json({ error: 'Path is not a directory' }, { status: 400 });
+    }
+
+    const folderPath = path.join(parentPath, folderName);
+
+    if (fs.existsSync(folderPath)) {
+      return NextResponse.json({ error: 'Folder already exists' }, { status: 400 });
+    }
+
+    await fs.promises.mkdir(folderPath);
+
+    return NextResponse.json({
+      path: folderPath,
+      name: folderName,
+    });
+  } catch (error) {
+    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }
