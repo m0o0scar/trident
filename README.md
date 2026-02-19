@@ -84,7 +84,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [ ] Clone repository from URL
 - [ ] Initialize a new repository
 - [ ] Manage remotes (add/edit/remove remote definitions)
-- [ ] Revert commits
+- [x] Revert commits
 - [ ] Commit signing (GPG/SSH)
 - [ ] Co-author commit support
 - [ ] Interactive rebase UI

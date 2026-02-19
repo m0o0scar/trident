@@ -1156,6 +1156,9 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [resetCommitHash, setResetCommitHash] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
+  const [isRevertOpen, setIsRevertOpen] = useState(false);
+  const [commitToRevert, setCommitToRevert] = useState<{ hash: string; message: string } | null>(null);
+  const [isReverting, setIsReverting] = useState(false);
 
   const [isRewordOpen, setIsRewordOpen] = useState(false);
   const [commitToReword, setCommitToReword] = useState<{ hash: string; subject: string; body: string; branch: string } | null>(null);
@@ -1271,6 +1274,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       setIsResetOpen(false);
       return;
     }
+    if (isRevertOpen) {
+      setIsRevertOpen(false);
+      setCommitToRevert(null);
+      return;
+    }
     if (isBranchPopoverOpen) {
       setIsBranchPopoverOpen(false);
       return;
@@ -1301,6 +1309,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     isRewordOpen,
     closeRewordDialog,
     isResetOpen,
+    isRevertOpen,
     isBranchPopoverOpen,
     scriptExecution.isOpen,
     isScriptExecutionFinished,
@@ -1308,6 +1317,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   const isAnyPopupOpen =
     isResetOpen ||
+    isRevertOpen ||
     isRewordOpen ||
     isDeleteOpen ||
     isDeleteTagOpen ||
@@ -2944,6 +2954,29 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   };
 
+  const confirmRevertCommit = (commitHash: string, commitMessage: string) => {
+    setCommitToRevert({ hash: commitHash, message: commitMessage });
+    setIsRevertOpen(true);
+  };
+
+  const handleConfirmRevert = async () => {
+    if (!commitToRevert) return;
+    setIsReverting(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'revert',
+        data: { commitHash: commitToRevert.hash }
+      });
+      setIsRevertOpen(false);
+      setCommitToRevert(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsReverting(false);
+    }
+  };
+
   const confirmRewordCommit = (hash: string, subject: string, body: string, branch: string) => {
     setCommitToReword({ hash, subject, body, branch });
     setNewMessageSubject(subject);
@@ -3504,6 +3537,48 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           </div>
           <form method="dialog" className="modal-backdrop">
             <button onClick={() => setIsResetOpen(false)}>close</button>
+          </form>
+        </dialog>
+      )}
+
+      {isRevertOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Revert Commit</h3>
+            <p className="py-4 break-words">
+              Are you sure you want to revert commit <span className="font-mono bg-base-200 px-1 rounded">{commitToRevert?.hash.substring(0, 7)}</span> on <span className="font-bold break-all">{branchData?.current || 'current'}</span>?
+            </p>
+            {commitToRevert?.message && (
+              <div className="rounded border border-base-300 bg-base-200/40 px-3 py-2 text-xs break-words">
+                {commitToRevert.message}
+              </div>
+            )}
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={() => {
+                  setIsRevertOpen(false);
+                  setCommitToRevert(null);
+                }}
+                disabled={isReverting}
+              >
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleConfirmRevert} disabled={isReverting}>
+                {isReverting && <span className="loading loading-spinner loading-xs"></span>}
+                Revert
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button
+              onClick={() => {
+                setIsRevertOpen(false);
+                setCommitToRevert(null);
+              }}
+            >
+              close
+            </button>
           </form>
         </dialog>
       )}
@@ -4474,6 +4549,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               selectedHashes={selectedCommitHashSet}
               onSelectCommit={handleSelectCommit}
               onResetToCommit={handleResetToCommit}
+              onRevertCommit={confirmRevertCommit}
               onCreateTag={confirmCreateTag}
               onCherryPickCommit={confirmCherryPickCommit}
               onCherryPickSelectedCommits={confirmCherryPickSelectedCommits}
