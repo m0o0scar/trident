@@ -108,6 +108,21 @@ export class GitService {
     }
   }
 
+  static async initializeRepository(directoryPath: string): Promise<void> {
+    const trimmedPath = directoryPath.trim();
+    if (!trimmedPath) {
+      throw new Error('Path is required');
+    }
+
+    const git = simpleGit({
+      baseDir: trimmedPath,
+      binary: 'git',
+      maxConcurrentProcesses: 2,
+      trimmed: false,
+    });
+    await git.init();
+  }
+
   async cleanupLockFile(): Promise<boolean> {
     const lockFilePath = join(this.repoPath, '.git', 'index.lock');
     try {
