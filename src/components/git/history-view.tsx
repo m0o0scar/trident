@@ -60,6 +60,13 @@ function buildCommitMessage(subject: string, body: string): string {
   return normalizedBody.trim() ? `${trimmedSubject}\n\n${normalizedBody}` : trimmedSubject;
 }
 
+function formatCommitMessageForDisplay(message: string): string {
+  return message
+    .replace(/\r\n/g, '\n')
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n');
+}
+
 async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -1789,6 +1796,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   const selectedCommitHashSet = useMemo(() => new Set(selectedCommitHashes), [selectedCommitHashes]);
   const filteredCommitHashes = useMemo(() => filteredCommits.map((commit) => commit.hash), [filteredCommits]);
+  const selectedCommit = useMemo(
+    () => (selectedHash ? log?.all.find((commit) => commit.hash === selectedHash) : null),
+    [log?.all, selectedHash]
+  );
 
   useEffect(() => {
     if (filteredCommitHashes.length === 0) {
@@ -4801,7 +4812,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <div className="flex flex-row items-center py-2 px-4 border-b border-base-300 bg-base-100 shrink-0 justify-between gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <span className="text-sm font-bold truncate">
-                  {log.all.find(c => c.hash === selectedHash)?.message}
+                  {selectedCommit?.message}
                 </span>
                 <span className="text-xs font-mono opacity-50 shrink-0">
                   {selectedHash.substring(0, 7)}
@@ -4832,7 +4843,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 </div>
                 <div className="px-4 pb-3 overflow-auto flex-1 min-h-0">
                   <div className="text-xs opacity-70 whitespace-pre-wrap font-mono">
-                    {log.all.find(c => c.hash === selectedHash)?.body || 'No additional message'}
+                    {selectedCommit
+                      ? formatCommitMessageForDisplay(
+                          selectedCommit.body?.trim()
+                            ? `${selectedCommit.message}\n\n${selectedCommit.body}`
+                            : selectedCommit.message
+                        )
+                      : 'No additional message'}
                   </div>
                 </div>
               </div>
