@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
+import { toast } from '@/hooks/use-toast';
 
 interface FSItem {
   name: string;
@@ -37,6 +38,7 @@ export function FileSystemBrowser({
   const [data, setData] = useState<FSResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   const loadPath = async (path?: string) => {
     setIsLoading(true);
@@ -75,6 +77,51 @@ export function FileSystemBrowser({
       loadPath(path);
   }
 
+  const handleCreateFolder = async () => {
+    if (selectionMode !== 'folder' || !currentPath || isCreatingFolder) {
+      return;
+    }
+
+    const folderNameInput = window.prompt('New folder name');
+    const folderName = folderNameInput?.trim() || '';
+    if (!folderName) {
+      return;
+    }
+
+    setIsCreatingFolder(true);
+    try {
+      const res = await fetch('/api/fs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: currentPath,
+          name: folderName,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(json.error || 'Failed to create folder');
+      }
+
+      await loadPath(currentPath);
+      toast({
+        type: 'success',
+        title: 'Folder created',
+        description: `Created "${folderName}" in ${currentPath}`,
+      });
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'Unknown error';
+      toast({
+        type: 'error',
+        title: 'Failed to create folder',
+        description: errorMessage,
+      });
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -87,9 +134,27 @@ export function FileSystemBrowser({
                 {currentPath || 'Loading...'}
               </div>
           </div>
-          <button className="btn btn-sm btn-circle btn-ghost" onClick={() => onOpenChange(false)}>
-            <i className="iconoir-xmark text-[16px]" aria-hidden="true" />
-          </button>
+          <div className="flex items-center gap-2">
+            {selectionMode === 'folder' && (
+              <button
+                className="btn btn-sm btn-outline"
+                onClick={handleCreateFolder}
+                disabled={isCreatingFolder || isLoading || !currentPath}
+              >
+                {isCreatingFolder ? (
+                  <span className="flex items-center gap-2">
+                    <span className="loading loading-spinner loading-xs" />
+                    Creating...
+                  </span>
+                ) : (
+                  'New Folder'
+                )}
+              </button>
+            )}
+            <button className="btn btn-sm btn-circle btn-ghost" onClick={() => onOpenChange(false)}>
+              <i className="iconoir-xmark text-[16px]" aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-hidden relative bg-base-100">
