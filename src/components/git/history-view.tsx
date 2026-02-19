@@ -1081,6 +1081,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [remoteToRename, setRemoteToRename] = useState<string | null>(null);
   const [newRemoteNameForRename, setNewRemoteNameForRename] = useState('');
   const [isRenamingRemote, setIsRenamingRemote] = useState(false);
+  const [isAddRemoteOpen, setIsAddRemoteOpen] = useState(false);
+  const [newRemoteName, setNewRemoteName] = useState('origin');
+  const [newRemoteUrl, setNewRemoteUrl] = useState('');
+  const [isAddingRemote, setIsAddingRemote] = useState(false);
 
   const [isRebaseOpen, setIsRebaseOpen] = useState(false);
   const [rebaseSourceBranch, setRebaseSourceBranch] = useState<string | null>(null);
@@ -1196,6 +1200,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setNewRemoteNameForRename('');
   }, []);
 
+  const closeAddRemoteDialog = useCallback(() => {
+    setIsAddRemoteOpen(false);
+    setNewRemoteName('origin');
+    setNewRemoteUrl('');
+  }, []);
+
   const closeRewordDialog = useCallback(() => {
     setIsRewordOpen(false);
     setCommitToReword(null);
@@ -1247,6 +1257,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
     if (isRenameRemoteOpen) {
       closeRenameRemoteDialog();
+      return;
+    }
+    if (isAddRemoteOpen) {
+      closeAddRemoteDialog();
       return;
     }
     if (isCherryPickOpen) {
@@ -1303,6 +1317,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     closeRenameBranchDialog,
     isRenameRemoteOpen,
     closeRenameRemoteDialog,
+    isAddRemoteOpen,
+    closeAddRemoteDialog,
     isCherryPickOpen,
     isDeleteOpen,
     isDeleteTagOpen,
@@ -1325,6 +1341,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     isCherryPickOpen ||
     isRenameOpen ||
     isRenameRemoteOpen ||
+    isAddRemoteOpen ||
     isRebaseOpen ||
     isMergeOpen ||
     isPushOpen ||
@@ -1518,9 +1535,6 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   const selectedBranchSet = useMemo(() => new Set(selectedBranchRefs), [selectedBranchRefs]);
 
-  // Check if we have any remote branches
-  const hasRemotes = remoteBranchTrees && remoteBranchTrees.size > 0;
-  
   const repository = useRepository(repoPath);
   const updateRepository = useUpdateRepository();
   const customBranchScripts = useMemo(() => {
@@ -2303,6 +2317,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setIsRenameRemoteOpen(true);
   }
 
+  const confirmAddRemote = () => {
+    setNewRemoteName('origin');
+    setNewRemoteUrl('');
+    setIsAddRemoteOpen(true);
+  }
+
   const handleRenameBranch = async () => {
     if (!branchToRename || !newBranchNameForRename) return;
     const isSameName = remoteBranchToRename
@@ -2370,6 +2390,29 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       console.error(e);
     } finally {
       setIsRenamingRemote(false);
+    }
+  }
+
+  const handleAddRemote = async () => {
+    const trimmedName = newRemoteName.trim();
+    const trimmedUrl = newRemoteUrl.trim();
+    if (!trimmedName || !trimmedUrl) return;
+
+    setIsAddingRemote(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'add-remote',
+        data: {
+          name: trimmedName,
+          url: trimmedUrl,
+        },
+      });
+      closeAddRemoteDialog();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsAddingRemote(false);
     }
   }
 
@@ -3399,99 +3442,98 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             </>
           )}
 
-          {(hasRemotes || isBranchesLoading) && (
-            <>
-              <ContextMenu
-                items={[
-                  { label: 'Fetch from all remotes', onClick: handleFetchFromAllRemotes },
-                  ...(remoteBranchTrees
-                    ? [{
-                        label: 'Delete',
-                        onClick: () => confirmDeleteBranches(Array.from(remoteBranchTrees.values()).flatMap((tree) => collectAllBranchRefs(tree))),
-                        danger: true,
-                        disabled: Array.from(remoteBranchTrees.values()).every((tree) => collectAllBranchRefs(tree).length === 0),
-                      }]
-                    : []),
-                ]}
-              >
-                <GroupHeader
-                  name="Remotes"
-                  groupPath="__remotes__"
-                  icon={<i className="iconoir-globe text-[14px]" aria-hidden="true" />}
-                  isExpanded={remotesGroupExpanded}
-                  onToggle={handleToggleRemotesGroup}
-                  visibilityMap={visibilityMap}
-                  onToggleVisibility={handleToggleVisibility}
-                />
-              </ContextMenu>
-              {remotesGroupExpanded && isBranchesLoading && !remoteBranchTrees && (
-                <div className="flex items-center gap-2 px-2 py-2 text-sm opacity-70" style={{ paddingLeft: '20px' }}>
-                  <span className="loading loading-spinner loading-xs"></span>
-                  <span>Loading remotes...</span>
-                </div>
-              )}
-              {remotesGroupExpanded && remoteBranchTrees && Array.from(remoteBranchTrees.entries()).map(([remoteName, tree]) => {
-                const remoteGroupPath = `__remotes__/${remoteName}`;
-                const isRemoteExpanded = expandedFolders.has(remoteGroupPath);
+          <>
+            <ContextMenu
+              items={[
+                { label: 'Fetch from all remotes', onClick: handleFetchFromAllRemotes },
+                { label: 'Add remote', onClick: confirmAddRemote },
+                ...(remoteBranchTrees
+                  ? [{
+                      label: 'Delete',
+                      onClick: () => confirmDeleteBranches(Array.from(remoteBranchTrees.values()).flatMap((tree) => collectAllBranchRefs(tree))),
+                      danger: true,
+                      disabled: Array.from(remoteBranchTrees.values()).every((tree) => collectAllBranchRefs(tree).length === 0),
+                    }]
+                  : []),
+              ]}
+            >
+              <GroupHeader
+                name="Remotes"
+                groupPath="__remotes__"
+                icon={<i className="iconoir-globe text-[14px]" aria-hidden="true" />}
+                isExpanded={remotesGroupExpanded}
+                onToggle={handleToggleRemotesGroup}
+                visibilityMap={visibilityMap}
+                onToggleVisibility={handleToggleVisibility}
+              />
+            </ContextMenu>
+            {remotesGroupExpanded && isBranchesLoading && !remoteBranchTrees && (
+              <div className="flex items-center gap-2 px-2 py-2 text-sm opacity-70" style={{ paddingLeft: '20px' }}>
+                <span className="loading loading-spinner loading-xs"></span>
+                <span>Loading remotes...</span>
+              </div>
+            )}
+            {remotesGroupExpanded && remoteBranchTrees && Array.from(remoteBranchTrees.entries()).map(([remoteName, tree]) => {
+              const remoteGroupPath = `__remotes__/${remoteName}`;
+              const isRemoteExpanded = expandedFolders.has(remoteGroupPath);
 
-                return (
-                  <div key={remoteName}>
-                    <ContextMenu
-                      items={[
-                        { label: `Fetch from ${remoteName}`, onClick: () => handleFetchFromRemote(remoteName) },
-                        { label: 'Rename', onClick: () => confirmRenameRemote(remoteName) },
-                        {
-                          label: 'Delete',
-                          onClick: () => confirmDeleteBranches(collectAllBranchRefs(tree)),
-                          danger: true,
-                        },
-                      ]}
-                    >
-                      <GroupHeader
-                        name={remoteName}
-                        groupPath={remoteGroupPath}
-                        icon={<i className="iconoir-globe text-[14px] opacity-50" aria-hidden="true" />}
-                        isExpanded={isRemoteExpanded}
-                        onToggle={() => toggleFolder(remoteGroupPath)}
-                        visibilityMap={visibilityMap}
-                        onToggleVisibility={handleToggleVisibility}
-                        depth={1}
-                      />
-                    </ContextMenu>
-                    {isRemoteExpanded && (
-                      <BranchTreeItem
-                        node={tree}
-                        currentBranch={branchData?.current}
-                        expandedFolders={expandedFolders}
-                        onToggleFolder={toggleFolder}
-                        onCheckout={handleCheckout}
-                        onCheckoutToLocal={confirmCheckoutToLocal}
-                        onCreateBranch={() => confirmCreateBranch()}
-                        onDeleteBranch={confirmDeleteBranch}
-                        onRenameBranch={confirmRenameBranch}
-                        onRenameRemoteBranch={confirmRenameRemoteBranch}
-                        onRebase={confirmRebase}
-                        onMerge={confirmMerge}
-                        onPushToRemote={confirmPushToRemote}
-                        onPullFromRemote={confirmPullFromRemote}
-                        getBranchContextMenuItems={getBranchContextMenuItems}
-                        onBranchClick={handleBranchClick}
-                        onBranchContextMenu={handleBranchContextMenu}
-                        onDeleteBranchGroup={confirmDeleteBranches}
-                        selectedBranches={selectedBranchSet}
-                        visibilityMap={visibilityMap}
-                        onToggleVisibility={handleToggleVisibility}
-                        depth={2}
-                        groupPath={remoteGroupPath}
-                        isRemote={true}
-                        trackingInfo={branchData?.trackingInfo}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </>
-          )}
+              return (
+                <div key={remoteName}>
+                  <ContextMenu
+                    items={[
+                      { label: `Fetch from ${remoteName}`, onClick: () => handleFetchFromRemote(remoteName) },
+                      { label: 'Rename', onClick: () => confirmRenameRemote(remoteName) },
+                      {
+                        label: 'Delete',
+                        onClick: () => confirmDeleteBranches(collectAllBranchRefs(tree)),
+                        danger: true,
+                      },
+                    ]}
+                  >
+                    <GroupHeader
+                      name={remoteName}
+                      groupPath={remoteGroupPath}
+                      icon={<i className="iconoir-globe text-[14px] opacity-50" aria-hidden="true" />}
+                      isExpanded={isRemoteExpanded}
+                      onToggle={() => toggleFolder(remoteGroupPath)}
+                      visibilityMap={visibilityMap}
+                      onToggleVisibility={handleToggleVisibility}
+                      depth={1}
+                    />
+                  </ContextMenu>
+                  {isRemoteExpanded && (
+                    <BranchTreeItem
+                      node={tree}
+                      currentBranch={branchData?.current}
+                      expandedFolders={expandedFolders}
+                      onToggleFolder={toggleFolder}
+                      onCheckout={handleCheckout}
+                      onCheckoutToLocal={confirmCheckoutToLocal}
+                      onCreateBranch={() => confirmCreateBranch()}
+                      onDeleteBranch={confirmDeleteBranch}
+                      onRenameBranch={confirmRenameBranch}
+                      onRenameRemoteBranch={confirmRenameRemoteBranch}
+                      onRebase={confirmRebase}
+                      onMerge={confirmMerge}
+                      onPushToRemote={confirmPushToRemote}
+                      onPullFromRemote={confirmPullFromRemote}
+                      getBranchContextMenuItems={getBranchContextMenuItems}
+                      onBranchClick={handleBranchClick}
+                      onBranchContextMenu={handleBranchContextMenu}
+                      onDeleteBranchGroup={confirmDeleteBranches}
+                      selectedBranches={selectedBranchSet}
+                      visibilityMap={visibilityMap}
+                      onToggleVisibility={handleToggleVisibility}
+                      depth={2}
+                      groupPath={remoteGroupPath}
+                      isRemote={true}
+                      trackingInfo={branchData?.trackingInfo}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </>
         </div>
       </div>
     </div>
@@ -3954,6 +3996,74 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           </div>
           <form method="dialog" className="modal-backdrop">
             <button onClick={closeRenameRemoteDialog}>
+              close
+            </button>
+          </form>
+        </dialog>
+      )}
+
+      {isAddRemoteOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Add Remote</h3>
+            <p className="py-4 break-words">
+              Add a new remote by providing a name and URL. Press <kbd className="kbd kbd-sm">Cmd</kbd>+<kbd className="kbd kbd-sm">Enter</kbd> to confirm.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="label pt-0">
+                  <span className="label-text">Remote name</span>
+                </label>
+                <input
+                  type="text"
+                  className="input input-bordered w-full"
+                  value={newRemoteName}
+                  onChange={(e) => setNewRemoteName(e.target.value)}
+                  placeholder="origin"
+                  disabled={isAddingRemote}
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="label pt-0">
+                  <span className="label-text">Remote URL</span>
+                </label>
+                <input
+                  type="text"
+                  className="input input-bordered w-full"
+                  value={newRemoteUrl}
+                  onChange={(e) => setNewRemoteUrl(e.target.value)}
+                  placeholder="https://github.com/owner/repo.git"
+                  disabled={isAddingRemote}
+                  onKeyDown={(e) => {
+                    const shortcutPressed = e.key === 'Enter' && (e.metaKey || e.ctrlKey);
+                    if (shortcutPressed && newRemoteName.trim() && newRemoteUrl.trim() && !isAddingRemote) {
+                      handleAddRemote();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={closeAddRemoteDialog}
+                disabled={isAddingRemote}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleAddRemote}
+                disabled={!newRemoteName.trim() || !newRemoteUrl.trim() || isAddingRemote}
+              >
+                {isAddingRemote && <span className="loading loading-spinner loading-xs"></span>}
+                Add
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={closeAddRemoteDialog}>
               close
             </button>
           </form>
