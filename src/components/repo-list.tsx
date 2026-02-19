@@ -219,10 +219,10 @@ export function RepoList() {
         setDeleteDialogOpen(true);
     };
 
-    const handleDeleteConfirm = async () => {
+    const handleDeleteConfirm = async (deleteLocalFolder: boolean) => {
         if (!repoToDelete) return;
         try {
-            await deleteRepo.mutateAsync({ path: repoToDelete.path });
+            await deleteRepo.mutateAsync({ path: repoToDelete.path, deleteLocalFolder });
             setDeleteDialogOpen(false);
             setRepoToDelete(null);
         } catch (error) {
@@ -462,11 +462,12 @@ export function RepoList() {
                         <h3 className="font-bold text-lg">Delete Repository</h3>
                         <p className="py-4 break-words">
                             Are you sure you want to remove <strong className="break-all">{repoToDelete?.displayName}</strong> from the list? 
-                            This will only remove it from your repository list, not delete the files from your file system.
+                            Choose whether to only remove it from your repository list, or also delete its local folder.
                         </p>
                         <div className="modal-action">
-                            <button className="btn" onClick={() => setDeleteDialogOpen(false)}>Cancel</button>
-                            <button className="btn btn-error" onClick={handleDeleteConfirm}>Delete</button>
+                            <button className="btn" onClick={() => setDeleteDialogOpen(false)} disabled={deleteRepo.isPending}>Cancel</button>
+                            <button className="btn btn-error btn-outline" onClick={() => handleDeleteConfirm(false)} disabled={deleteRepo.isPending}>Delete Repo</button>
+                            <button className="btn btn-error" onClick={() => handleDeleteConfirm(true)} disabled={deleteRepo.isPending}>Delete Repo &amp; Folder</button>
                         </div>
                     </div>
                     <form method="dialog" className="modal-backdrop">

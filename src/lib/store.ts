@@ -90,7 +90,18 @@ export function updateRepository(repoPath: string, updates: Partial<Repository>)
   return updatedRepo;
 }
 
-export function removeRepository(repoPath: string): void {
+export function removeRepository(repoPath: string, options?: { deleteLocalFolder?: boolean }): void {
+  const { deleteLocalFolder = false } = options || {};
+
+  if (deleteLocalFolder) {
+    const resolvedRepoPath = path.resolve(repoPath);
+    const rootPath = path.parse(resolvedRepoPath).root;
+    if (resolvedRepoPath === rootPath) {
+      throw new Error('Refusing to delete a filesystem root path');
+    }
+    fs.rmSync(resolvedRepoPath, { recursive: true, force: true });
+  }
+
   let repos = getRepositories();
   repos = repos.filter(r => r.path !== repoPath);
   fs.writeFileSync(DATA_FILE, JSON.stringify(repos, null, 2));

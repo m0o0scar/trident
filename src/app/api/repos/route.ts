@@ -67,13 +67,14 @@ export async function PUT(request: Request) {
 
 const deleteRepoSchema = z.object({
   path: z.string().min(1),
+  deleteLocalFolder: z.boolean().optional().default(false),
 });
 
 export async function DELETE(request: Request) {
   try {
     const body = await request.json();
-    const { path } = deleteRepoSchema.parse(body);
-    removeRepository(path);
+    const { path, deleteLocalFolder } = deleteRepoSchema.parse(body);
+    removeRepository(path, { deleteLocalFolder });
     return NextResponse.json({ success: true });
   } catch (error) {
     if (error instanceof z.ZodError) {
