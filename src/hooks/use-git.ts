@@ -55,11 +55,11 @@ export function useRepository(repoPath: string | null) {
 export function useAddRepository() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ path, name }: { path: string; name?: string }) => {
+    mutationFn: async ({ path, name, initializeIfNeeded }: { path: string; name?: string; initializeIfNeeded?: boolean }) => {
       const res = await fetch(`${API_BASE}/repos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path, name }),
+        body: JSON.stringify({ path, name, initializeIfNeeded }),
       });
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));

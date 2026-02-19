@@ -54,6 +54,8 @@ export function RepoList() {
     const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
     const [cloneFolderBrowserOpen, setCloneFolderBrowserOpen] = useState(false);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [initRepoDialogOpen, setInitRepoDialogOpen] = useState(false);
+    const [selectedNonRepoPath, setSelectedNonRepoPath] = useState<string | null>(null);
     const [repoToDelete, setRepoToDelete] = useState<{ path: string; displayName: string } | null>(null);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [defaultRootFolder, setDefaultRootFolder] = useState<string | undefined>(undefined);
@@ -69,6 +71,11 @@ export function RepoList() {
     };
     useEscapeDismiss(deleteDialogOpen, () => setDeleteDialogOpen(false));
     useEscapeDismiss(cloneDialogOpen, closeCloneDialog);
+    useEscapeDismiss(initRepoDialogOpen, () => {
+        setInitRepoDialogOpen(false);
+        setSelectedNonRepoPath(null);
+        setBrowserOpen(true);
+    });
 
     // Load settings on mount
     useEffect(() => {
@@ -133,6 +140,41 @@ export function RepoList() {
                 });
             }
         }
+    };
+
+    const handleRepoSelection = (path: string, meta: { isRepo: boolean }) => {
+        if (!path) return;
+        if (meta.isRepo) {
+            handleAdd(path);
+            return;
+        }
+
+        setSelectedNonRepoPath(path);
+        setInitRepoDialogOpen(true);
+    };
+
+    const handleConfirmInitRepo = async () => {
+        if (!selectedNonRepoPath) return;
+
+        try {
+            await addRepo.mutateAsync({ path: selectedNonRepoPath, initializeIfNeeded: true });
+            setInitRepoDialogOpen(false);
+            setSelectedNonRepoPath(null);
+            router.push(`/workspace?path=${encodeURIComponent(selectedNonRepoPath)}`);
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            toast({
+                type: 'error',
+                title: 'Failed to initialize repository',
+                description: errorMessage,
+            });
+        }
+    };
+
+    const handleCancelInitRepo = () => {
+        setInitRepoDialogOpen(false);
+        setSelectedNonRepoPath(null);
+        setBrowserOpen(true);
     };
 
     const openCloneDialog = () => {
@@ -327,7 +369,7 @@ export function RepoList() {
             <FileSystemBrowser
                 open={browserOpen}
                 onOpenChange={setBrowserOpen}
-                onSelect={(path) => handleAdd(path)}
+                onSelect={handleRepoSelection}
                 initialPath={defaultRootFolder}
             />
 
@@ -455,6 +497,35 @@ export function RepoList() {
                 title="Select Destination Folder"
                 selectionMode="folder"
             />
+
+            {initRepoDialogOpen && (
+                <dialog className="modal modal-open">
+                    <div className="modal-box max-w-xl">
+                        <h3 className="font-bold text-lg">Initialize New Repository?</h3>
+                        <p className="py-4">
+                            <span className="break-all font-mono text-sm">{selectedNonRepoPath}</span>
+                            <br />
+                            This folder is not a Git repository. Initialize it as a new local Git repository and open it in workspace?
+                        </p>
+                        <div className="modal-action">
+                            <button className="btn" onClick={handleCancelInitRepo} disabled={addRepo.isPending}>No</button>
+                            <button className="btn btn-primary" onClick={handleConfirmInitRepo} disabled={addRepo.isPending}>
+                                {addRepo.isPending ? (
+                                    <span className="flex items-center gap-2">
+                                        <span className="loading loading-spinner loading-xs" />
+                                        Initializing...
+                                    </span>
+                                ) : (
+                                    'Yes, Initialize'
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                    <form method="dialog" className="modal-backdrop">
+                        <button onClick={handleCancelInitRepo}>close</button>
+                    </form>
+                </dialog>
+            )}
 
             {deleteDialogOpen && (
                 <dialog className="modal modal-open">

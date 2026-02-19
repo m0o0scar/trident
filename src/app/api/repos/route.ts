@@ -1,7 +1,10 @@
 
 import { NextResponse } from 'next/server';
 import { getRepositories, addRepository, updateRepository, removeRepository } from '@/lib/store';
+import { GitService } from '@/lib/git';
 import { z } from 'zod';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 const customScriptSchema = z.object({
   id: z.string().min(1),
@@ -20,6 +23,7 @@ const addRepoSchema = z.object({
   path: z.string().min(1),
   name: z.string().optional(),
   displayName: z.string().nullable().optional(),
+  initializeIfNeeded: z.boolean().optional().default(false),
 });
 
 const updateRepoSchema = z.object({
@@ -40,8 +44,26 @@ const updateRepoSchema = z.object({
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { path, name, displayName } = addRepoSchema.parse(body);
-    const repo = addRepository(path, name, displayName);
+    const { path: repoPath, name, displayName, initializeIfNeeded } = addRepoSchema.parse(body);
+
+    if (initializeIfNeeded) {
+      const stat = await fs.stat(repoPath);
+      if (!stat.isDirectory()) {
+        return NextResponse.json({ error: 'Path is not a directory' }, { status: 400 });
+      }
+
+      let isGitRepo = false;
+      try {
+        await fs.access(path.join(repoPath, '.git'));
+        isGitRepo = true;
+      } catch {}
+
+      if (!isGitRepo) {
+        await GitService.initializeRepository(repoPath);
+      }
+    }
+
+    const repo = addRepository(repoPath, name, displayName);
     return NextResponse.json(repo);
   } catch (error) {
      if (error instanceof z.ZodError) {
