@@ -9,7 +9,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'create-tag', 'delete-branch', 'delete-remote-branch', 'delete-tag', 'delete-remote-tag', 'rename-branch', 'rename-remote-branch', 'reset', 'cherry-pick', 'cherry-pick-multiple', 'cherry-pick-abort', 'rebase', 'merge', 'check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'get-latest-commit-message', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword', 'discard', 'cleanup-lock-file']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'create-tag', 'delete-branch', 'delete-remote-branch', 'delete-tag', 'delete-remote-tag', 'rename-branch', 'rename-remote-branch', 'rename-remote', 'reset', 'cherry-pick', 'cherry-pick-multiple', 'cherry-pick-abort', 'rebase', 'merge', 'check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'get-latest-commit-message', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword', 'discard', 'cleanup-lock-file']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -210,6 +210,11 @@ export async function POST(request: Request) {
 
         const renameCreds = await resolveCredentials(repoPath, git, data.remote);
         await git.renameRemoteBranch(data.remote, data.oldName, data.newName, renameCreds);
+        break;
+      case 'rename-remote':
+        if (!data?.oldName) throw new Error('Old remote name is required to rename remote');
+        if (!data?.newName) throw new Error('New remote name is required to rename remote');
+        await git.renameRemote(data.oldName, data.newName);
         break;
       case 'reset':
         if (!data?.commitHash) throw new Error('Commit hash is required for reset');

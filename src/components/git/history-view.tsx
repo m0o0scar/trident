@@ -1077,6 +1077,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [newBranchNameForRename, setNewBranchNameForRename] = useState('');
   const [renameTrackingRemoteBranch, setRenameTrackingRemoteBranch] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
+  const [isRenameRemoteOpen, setIsRenameRemoteOpen] = useState(false);
+  const [remoteToRename, setRemoteToRename] = useState<string | null>(null);
+  const [newRemoteNameForRename, setNewRemoteNameForRename] = useState('');
+  const [isRenamingRemote, setIsRenamingRemote] = useState(false);
 
   const [isRebaseOpen, setIsRebaseOpen] = useState(false);
   const [rebaseSourceBranch, setRebaseSourceBranch] = useState<string | null>(null);
@@ -1174,6 +1178,21 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [didCopyScriptOutput, setDidCopyScriptOutput] = useState(false);
   const isScriptExecutionRunning = scriptExecution.status === 'starting' || scriptExecution.status === 'running';
   const isScriptExecutionFinished = scriptExecution.status === 'completed' || scriptExecution.status === 'failed' || scriptExecution.status === 'canceled';
+
+  const closeRenameBranchDialog = useCallback(() => {
+    setIsRenameOpen(false);
+    setBranchToRename(null);
+    setRemoteBranchToRename(null);
+    setNewBranchNameForRename('');
+    setRenameTrackingRemoteBranch(false);
+  }, []);
+
+  const closeRenameRemoteDialog = useCallback(() => {
+    setIsRenameRemoteOpen(false);
+    setRemoteToRename(null);
+    setNewRemoteNameForRename('');
+  }, []);
+
   const closeRewordDialog = useCallback(() => {
     setIsRewordOpen(false);
     setCommitToReword(null);
@@ -1220,11 +1239,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       return;
     }
     if (isRenameOpen) {
-      setIsRenameOpen(false);
-      setBranchToRename(null);
-      setRemoteBranchToRename(null);
-      setNewBranchNameForRename('');
-      setRenameTrackingRemoteBranch(false);
+      closeRenameBranchDialog();
+      return;
+    }
+    if (isRenameRemoteOpen) {
+      closeRenameRemoteDialog();
       return;
     }
     if (isCherryPickOpen) {
@@ -1273,6 +1292,9 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     closeRebaseDialog,
     isRebaseOpen,
     isRenameOpen,
+    closeRenameBranchDialog,
+    isRenameRemoteOpen,
+    closeRenameRemoteDialog,
     isCherryPickOpen,
     isDeleteOpen,
     isDeleteTagOpen,
@@ -1292,6 +1314,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     isAbortCherryPickOpen ||
     isCherryPickOpen ||
     isRenameOpen ||
+    isRenameRemoteOpen ||
     isRebaseOpen ||
     isMergeOpen ||
     isPushOpen ||
@@ -2264,6 +2287,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setIsRenameOpen(true);
   }
 
+  const confirmRenameRemote = (remote: string) => {
+    setRemoteToRename(remote);
+    setNewRemoteNameForRename(remote);
+    setIsRenameRemoteOpen(true);
+  }
+
   const handleRenameBranch = async () => {
     if (!branchToRename || !newBranchNameForRename) return;
     const isSameName = remoteBranchToRename
@@ -2271,11 +2300,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       : branchToRename === newBranchNameForRename;
 
     if (isSameName) {
-      setIsRenameOpen(false);
-      setBranchToRename(null);
-      setRemoteBranchToRename(null);
-      setNewBranchNameForRename('');
-      setRenameTrackingRemoteBranch(false);
+      closeRenameBranchDialog();
       return;
     }
     setIsRenaming(true);
@@ -2301,15 +2326,40 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           }
         });
       }
-      setIsRenameOpen(false);
-      setBranchToRename(null);
-      setRemoteBranchToRename(null);
-      setNewBranchNameForRename('');
-      setRenameTrackingRemoteBranch(false);
+      closeRenameBranchDialog();
     } catch (e) {
       console.error(e);
     } finally {
       setIsRenaming(false);
+    }
+  }
+
+  const handleRenameRemote = async () => {
+    if (!remoteToRename) return;
+    const trimmedOldName = remoteToRename.trim();
+    const trimmedNewName = newRemoteNameForRename.trim();
+    if (!trimmedOldName || !trimmedNewName) return;
+
+    if (trimmedOldName === trimmedNewName) {
+      closeRenameRemoteDialog();
+      return;
+    }
+
+    setIsRenamingRemote(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'rename-remote',
+        data: {
+          oldName: trimmedOldName,
+          newName: trimmedNewName,
+        },
+      });
+      closeRenameRemoteDialog();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsRenamingRemote(false);
     }
   }
 
@@ -3356,6 +3406,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                     <ContextMenu
                       items={[
                         { label: `Fetch from ${remoteName}`, onClick: () => handleFetchFromRemote(remoteName) },
+                        { label: 'Rename', onClick: () => confirmRenameRemote(remoteName) },
                         {
                           label: 'Delete',
                           onClick: () => confirmDeleteBranches(collectAllBranchRefs(tree)),
@@ -3751,13 +3802,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <div className="modal-action">
               <button
                 className="btn"
-                onClick={() => {
-                  setIsRenameOpen(false);
-                  setBranchToRename(null);
-                  setRemoteBranchToRename(null);
-                  setNewBranchNameForRename('');
-                  setRenameTrackingRemoteBranch(false);
-                }}
+                onClick={closeRenameBranchDialog}
                 disabled={isRenaming}
               >
                 Cancel
@@ -3779,15 +3824,61 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             </div>
           </div>
           <form method="dialog" className="modal-backdrop">
-            <button
-              onClick={() => {
-                setIsRenameOpen(false);
-                setBranchToRename(null);
-                setRemoteBranchToRename(null);
-                setNewBranchNameForRename('');
-                setRenameTrackingRemoteBranch(false);
+            <button onClick={closeRenameBranchDialog}>
+              close
+            </button>
+          </form>
+        </dialog>
+      )}
+
+      {isRenameRemoteOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Rename Remote</h3>
+            <p className="py-4 break-words">
+              Enter a new name for remote <span className="font-bold break-all">{remoteToRename}</span>. Press <kbd className="kbd kbd-sm">Cmd</kbd>+<kbd className="kbd kbd-sm">Enter</kbd> to confirm.
+            </p>
+            <input
+              type="text"
+              className="input input-bordered w-full"
+              value={newRemoteNameForRename}
+              onChange={(e) => setNewRemoteNameForRename(e.target.value)}
+              placeholder="New remote name"
+              disabled={isRenamingRemote}
+              autoFocus
+              onKeyDown={(e) => {
+                const shortcutPressed = e.key === 'Enter' && (e.metaKey || e.ctrlKey);
+                const trimmedNewName = newRemoteNameForRename.trim();
+                const sameName = trimmedNewName === (remoteToRename ?? '').trim();
+                if (shortcutPressed && trimmedNewName && !sameName && !isRenamingRemote) {
+                  handleRenameRemote();
+                }
               }}
-            >
+            />
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={closeRenameRemoteDialog}
+                disabled={isRenamingRemote}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleRenameRemote}
+                disabled={
+                  !newRemoteNameForRename.trim() ||
+                  newRemoteNameForRename.trim() === (remoteToRename ?? '').trim() ||
+                  isRenamingRemote
+                }
+              >
+                {isRenamingRemote && <span className="loading loading-spinner loading-xs"></span>}
+                Rename
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button onClick={closeRenameRemoteDialog}>
               close
             </button>
           </form>

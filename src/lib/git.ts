@@ -114,6 +114,17 @@ export class GitService {
     await this.git.raw(['fetch', '--all', '--prune']);
   }
 
+  async renameRemote(oldName: string, newName: string): Promise<void> {
+    const trimmedOldName = oldName.trim();
+    const trimmedNewName = newName.trim();
+
+    if (!trimmedOldName) throw new Error('Old remote name is required');
+    if (!trimmedNewName) throw new Error('New remote name is required');
+    if (trimmedOldName === trimmedNewName) return;
+
+    await this.git.raw(['remote', 'rename', trimmedOldName, trimmedNewName]);
+  }
+
   async pull(): Promise<void> {
     await this.git.pull();
   }
