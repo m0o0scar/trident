@@ -465,9 +465,9 @@ export function RepoList() {
                             Choose whether to only remove it from your repository list, or also delete its local folder.
                         </p>
                         <div className="modal-action">
-                            <button className="btn" onClick={() => setDeleteDialogOpen(false)} disabled={deleteRepo.isPending}>cancel</button>
-                            <button className="btn btn-error btn-outline" onClick={() => handleDeleteConfirm(false)} disabled={deleteRepo.isPending}>delete repo</button>
-                            <button className="btn btn-error" onClick={() => handleDeleteConfirm(true)} disabled={deleteRepo.isPending}>delete repo and folder</button>
+                            <button className="btn" onClick={() => setDeleteDialogOpen(false)} disabled={deleteRepo.isPending}>Cancel</button>
+                            <button className="btn btn-error btn-outline" onClick={() => handleDeleteConfirm(false)} disabled={deleteRepo.isPending}>Delete Repo</button>
+                            <button className="btn btn-error" onClick={() => handleDeleteConfirm(true)} disabled={deleteRepo.isPending}>Delete Repo &amp; Folder</button>
                         </div>
                     </div>
                     <form method="dialog" className="modal-backdrop">
