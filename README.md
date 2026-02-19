@@ -111,6 +111,22 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - Node.js 18+
 - Git installed and available in PATH
 
+### Run with npx
+
+```bash
+npx trident-git
+```
+
+This launches the app on an available local port (default `3100`).  
+You can also pass options:
+
+```bash
+npx trident-git --port 3200
+npx trident-git --dev
+```
+
+Published npm packages are expected to include a prebuilt `.next` output, so `npx trident-git` does not build on the end user's machine.
+
 ### Installation
 
 ```bash
@@ -176,6 +192,8 @@ src/
 | `npm run build` | Build for production |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
+| `npm run cli` | Start through the packaged CLI launcher |
+| `npm run pack:preview` | Preview npm package contents |
 
 ## License
 

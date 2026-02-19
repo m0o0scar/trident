@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   // Disable Turbopack for production builds as keytar is a native module
   // that requires webpack's externals configuration
   experimental: {
@@ -11,20 +10,20 @@ const nextConfig: NextConfig = {
     if (isServer) {
       // Externalize keytar - it's a native module that should be loaded at runtime
       config.externals = config.externals || [];
-      config.externals.push('keytar');
+      config.externals.push("keytar");
     }
     return config;
   },
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: 'www.google.com',
-        pathname: '/s2/favicons',
+        protocol: "https",
+        hostname: "www.google.com",
+        pathname: "/s2/favicons",
       },
     ],
   },
-  serverExternalPackages: ['keytar'],
+  serverExternalPackages: ["keytar"],
 };
 
 export default nextConfig;
