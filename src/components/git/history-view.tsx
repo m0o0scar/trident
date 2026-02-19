@@ -10,6 +10,7 @@ import { ContextMenu, ContextMenuItem } from '@/components/context-menu';
 import { GroupedDiffViewer } from './grouped-diff-viewer';
 import { ImageDiffView } from './image-diff-view';
 import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
+import { toast } from '@/hooks/use-toast';
 
 
 // Visibility state for branches/folders
@@ -2211,6 +2212,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     if (branchesToDelete.length === 0) return;
     setIsDeleting(true);
     try {
+      const deleteRequests = new Map<string, { branchRef: string; run: () => Promise<unknown> }>();
+      const addDeleteRequest = (key: string, branchRef: string, run: () => Promise<unknown>) => {
+        if (deleteRequests.has(key)) return;
+        deleteRequests.set(key, { branchRef, run });
+      };
+
       const trackingRemotesToDelete = new Set<string>();
       if (deleteRemoteBranch) {
         for (const branchRef of branchesToDelete) {
@@ -2223,18 +2230,18 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       }
 
       for (const upstream of trackingRemotesToDelete) {
-        try {
-          const [remote, ...branchParts] = upstream.split('/');
-          const branch = branchParts.join('/');
-          if (remote && branch) {
-            await runGitAction({
+        const [remote, ...branchParts] = upstream.split('/');
+        const branch = branchParts.join('/');
+        if (remote && branch) {
+          const branchRef = `${remote}/${branch}`;
+          addDeleteRequest(`remote:${branchRef}`, branchRef, () =>
+            runGitAction({
               repoPath,
               action: 'delete-remote-branch',
-              data: { remote, branch }
-            });
-          }
-        } catch (error) {
-          console.error('Failed to delete remote branch:', error);
+              data: { remote, branch },
+              suppressErrorToast: true,
+            })
+          );
         }
       }
 
@@ -2244,19 +2251,55 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           if (parts.length >= 3) {
             const remote = parts[1];
             const branch = parts.slice(2).join('/');
-            await runGitAction({
-              repoPath,
-              action: 'delete-remote-branch',
-              data: { remote, branch }
-            });
+            const remoteBranchRef = `${remote}/${branch}`;
+            addDeleteRequest(`remote:${remoteBranchRef}`, remoteBranchRef, () =>
+              runGitAction({
+                repoPath,
+                action: 'delete-remote-branch',
+                data: { remote, branch },
+                suppressErrorToast: true,
+              })
+            );
           }
           continue;
         }
 
-        await runGitAction({
-          repoPath,
-          action: 'delete-branch',
-          data: { branch: branchRef }
+        addDeleteRequest(`local:${branchRef}`, branchRef, () =>
+          runGitAction({
+            repoPath,
+            action: 'delete-branch',
+            data: { branch: branchRef },
+            suppressErrorToast: true,
+          })
+        );
+      }
+
+      const requests = Array.from(deleteRequests.values());
+      const results = await Promise.allSettled(requests.map((request) => request.run()));
+      const failedBranches = results.flatMap((result, index) => {
+        if (result.status === 'fulfilled') return [];
+        const failedBranch = requests[index].branchRef;
+        console.error(`Failed to delete branch "${failedBranch}":`, result.reason);
+        return [failedBranch];
+      });
+
+      if (failedBranches.length > 0) {
+        toast({
+          type: 'error',
+          title: failedBranches.length === 1
+            ? 'Failed to Delete 1 Branch'
+            : `Failed to Delete ${failedBranches.length} Branches`,
+          description: (
+            <div>
+              <div>The following branches could not be deleted:</div>
+              <ul className="mt-1 max-h-40 overflow-y-auto list-disc pl-5">
+                {failedBranches.map((branch) => (
+                  <li key={branch} className="break-all">{branch}</li>
+                ))}
+              </ul>
+            </div>
+          ),
+          duration: 10000,
         });
       }
 
