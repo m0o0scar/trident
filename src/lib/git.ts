@@ -234,7 +234,35 @@ export class GitService {
     }
   }
 
-  async commit(message: string, files?: string[]): Promise<void> {
+  private async hasHeadCommit(): Promise<boolean> {
+    try {
+      await this.git.revparse(['--verify', 'HEAD']);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async validateBranchName(branch: string): Promise<void> {
+    await this.git.raw(['check-ref-format', '--branch', branch]);
+  }
+
+  private async ensureInitialBranchForFirstCommit(initialBranch?: string): Promise<void> {
+    if (!initialBranch) return;
+    if (await this.hasHeadCommit()) return;
+
+    const branch = initialBranch.trim();
+    if (!branch) {
+      throw new Error('Initial branch name is required for first commit');
+    }
+
+    await this.validateBranchName(branch);
+    await this.git.raw(['symbolic-ref', 'HEAD', `refs/heads/${branch}`]);
+  }
+
+  async commit(message: string, files?: string[], options: { initialBranch?: string } = {}): Promise<void> {
+    await this.ensureInitialBranchForFirstCommit(options.initialBranch);
+
     if (files && files.length > 0) {
       await this.git.add(files);
     }
@@ -263,6 +291,10 @@ export class GitService {
 
   // Get raw file content for diffing
   async getFileContent(path: string, ref: string = 'HEAD'): Promise<string> {
+    if (ref === 'HEAD' && !(await this.hasHeadCommit())) {
+      return '';
+    }
+
     try {
       return await this.git.show([`${ref}:${path}`]);
     } catch (e) {
@@ -290,10 +322,22 @@ export class GitService {
   }
 
   async getFileContentBuffer(path: string, ref: string = 'HEAD'): Promise<Buffer | null> {
+    if (ref === 'HEAD' && !(await this.hasHeadCommit())) {
+      return null;
+    }
     return this.getBlobFromRef(`${ref}:${path}`);
   }
 
   async getDiff(path: string): Promise<string> {
+    if (!(await this.hasHeadCommit())) {
+      // In repos without commits, show both staged and unstaged file changes.
+      const [stagedDiff, unstagedDiff] = await Promise.all([
+        this.git.diff(['--cached', '--', path]),
+        this.git.diff(['--', path]),
+      ]);
+      return [stagedDiff, unstagedDiff].filter(Boolean).join('\n');
+    }
+
     // Get diff of working directory vs index (unstaged changes)
     // or index vs HEAD (staged changes)
     // This is a complex topic.
