@@ -122,6 +122,7 @@ export class GitService {
     if (!trimmedUrl) throw new Error('Remote URL is required');
 
     await this.git.raw(['remote', 'add', trimmedName, trimmedUrl]);
+    await this.git.raw(['fetch', '--prune', trimmedName]);
   }
 
   async renameRemote(oldName: string, newName: string): Promise<void> {
@@ -313,6 +314,9 @@ export class GitService {
     const remoteUrls: Record<string, string> = {};
     for (const r of remoteList) {
         remoteUrls[r.name] = r.refs.fetch || r.refs.push;
+        if (!remotes[r.name]) {
+          remotes[r.name] = [];
+        }
     }
 
     return {
