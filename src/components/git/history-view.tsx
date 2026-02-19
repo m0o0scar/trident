@@ -5,7 +5,7 @@ import { Repository, RepositoryCustomScript, BranchTrackingInfo } from '@/lib/ty
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from 'next-themes';
-import { cn, sanitizeBranchName, isFileBinary, isImageFile } from '@/lib/utils';
+import { cn, sanitizeBranchName, isFileBinary, isImageFile, getChangedLineCountFromDiff } from '@/lib/utils';
 import { ContextMenu, ContextMenuItem } from '@/components/context-menu';
 import { GroupedDiffViewer } from './grouped-diff-viewer';
 import { ImageDiffView } from './image-diff-view';
@@ -290,19 +290,9 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
   const MAX_DIFF_SIZE = 100 * 1024; // 100KB
   const MAX_DIFF_LINES = 3000;
 
-  const leftContent = data.left || '';
-  const rightContent = data.right || '';
-  
-  // Use actual diff for size and line count if available
-  const contentSize = data.diff ? data.diff.length : (leftContent.length + rightContent.length);
-  
-  const lineCount = data.diff 
-    ? data.diff.split('\n').filter(line => 
-        (line.startsWith('+') || line.startsWith('-')) && 
-        !line.startsWith('+++') && 
-        !line.startsWith('---')
-      ).length 
-    : (leftContent.match(/\n/g) || []).length + (rightContent.match(/\n/g) || []).length;
+  const diffContent = data.diff || '';
+  const contentSize = diffContent.length;
+  const lineCount = getChangedLineCountFromDiff(diffContent);
 
   const isLargeDiff = (contentSize > MAX_DIFF_SIZE || lineCount > MAX_DIFF_LINES);
 
@@ -313,7 +303,7 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
         <div className="space-y-2">
           <h3 className="font-bold text-lg">Large Diff Detected</h3>
           <p className="opacity-70">
-            This diff is large ({Math.round(contentSize / 1024)}KB, ~{lineCount} lines) and may freeze your browser if rendered.
+            This diff is large ({Math.round(contentSize / 1024)}KB, ~{lineCount} changed lines) and may freeze your browser if rendered.
           </p>
         </div>
         <button className="btn btn-outline" onClick={() => setRenderAnyway(true)}>

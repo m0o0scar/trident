@@ -223,6 +223,26 @@ export function getImageMimeType(filePath: string): string {
 }
 
 /**
+ * Counts changed lines in a unified git patch.
+ * Includes added/removed lines and skips file header markers.
+ */
+export function getChangedLineCountFromDiff(diff: string | null | undefined): number {
+  if (!diff) return 0;
+
+  return diff.split('\n').reduce((count, line) => {
+    if (line.startsWith('+++ ') || line.startsWith('--- ')) {
+      return count;
+    }
+
+    if (line.startsWith('+') || line.startsWith('-')) {
+      return count + 1;
+    }
+
+    return count;
+  }, 0);
+}
+
+/**
  * Sanitizes a branch name by replacing illegal Git branch name characters with "-".
  * Git branch names cannot contain:
  * - Space, ~, ^, :, ?, *, [, \, control characters
