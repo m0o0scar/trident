@@ -475,11 +475,18 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
                 />
                 <button
                   type="button"
-                  className="btn btn-ghost btn-xs h-5 min-h-0 px-2 text-[10px] uppercase tracking-wider"
+                  className="btn btn-ghost btn-xs btn-square"
                   onClick={() => setIsFullPageDiff((prev) => !prev)}
+                  aria-label={isFullPageDiff ? 'Exit full-page diff view' : 'Expand diff viewer to full page'}
                   title={isFullPageDiff ? 'Exit full-page diff view' : 'Expand diff viewer to full page'}
                 >
-                  {isFullPageDiff ? 'Exit Full Page' : 'Full Page'}
+                  <i
+                    className={cn(
+                      isFullPageDiff ? 'iconoir-collapse' : 'iconoir-maximize',
+                      'text-[14px]'
+                    )}
+                    aria-hidden="true"
+                  />
                 </button>
               </div>
             </div>
