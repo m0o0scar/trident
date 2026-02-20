@@ -336,6 +336,7 @@ function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { rep
 function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitHash: string }) {
   const { data, isLoading } = useCommitDiff(repoPath, commitHash);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [isFullPageDiff, setIsFullPageDiff] = useState(false);
   const [collapsedFoldersByCommit, setCollapsedFoldersByCommit] = useState<Record<string, Set<string>>>({});
   const fileTree = useMemo(() => buildCommitFileTree(data?.files ?? []), [data?.files]);
   const allFolderPaths = useMemo(() => collectCommitFolderPaths(fileTree), [fileTree]);
@@ -379,6 +380,19 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
     }
   }, [data?.files, selectedFile]);
 
+  useEscapeDismiss(isFullPageDiff, () => setIsFullPageDiff(false));
+
+  useEffect(() => {
+    if (!isFullPageDiff) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isFullPageDiff]);
+
   const expandedFolders = useMemo(() => {
     const expanded = new Set<string>();
 
@@ -420,7 +434,12 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
   }
 
   return (
-    <div className="flex h-full">
+    <div
+      className={cn(
+        'flex h-full',
+        isFullPageDiff && 'fixed inset-0 z-[80] h-auto bg-base-100 shadow-2xl'
+      )}
+    >
       {/* File list */}
       <div className="w-64 border-r border-base-300 flex flex-col bg-base-200/30 shrink-0">
         <div className="px-3 py-2 text-xs font-bold opacity-70 border-b border-base-300 bg-base-100">
@@ -454,6 +473,14 @@ function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitH
                   onChange={(e) => setSplitView(e.target.checked)}
                   className="toggle toggle-xs toggle-primary"
                 />
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs h-5 min-h-0 px-2 text-[10px] uppercase tracking-wider"
+                  onClick={() => setIsFullPageDiff((prev) => !prev)}
+                  title={isFullPageDiff ? 'Exit full-page diff view' : 'Expand diff viewer to full page'}
+                >
+                  {isFullPageDiff ? 'Exit Full Page' : 'Full Page'}
+                </button>
               </div>
             </div>
             <div className="flex-1 overflow-auto diff-viewer-wrapper">
