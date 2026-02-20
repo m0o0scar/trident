@@ -6,7 +6,7 @@ export default function Home() {
   return (
     <>
       <a
-        href="https://github.com/m0o0scar/viba"
+        href="https://github.com/m0o0scar/trident"
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Open Viba GitHub repository"
