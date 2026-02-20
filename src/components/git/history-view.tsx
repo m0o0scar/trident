@@ -1,6 +1,7 @@
 'use client';
 
 import { useGitLog, useGitBranches, useGitStatus, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, useRepository, useUpdateRepository, useSettings, useUpdateSettings } from '@/hooks/use-git';
+import { useQueryClient } from '@tanstack/react-query';
 import { Repository, RepositoryCustomScript, BranchTrackingInfo } from '@/lib/types';
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -1053,6 +1054,7 @@ function BranchTreeItem({
 }
 
 export function HistoryView({ repoPath }: { repoPath: string }) {
+  const queryClient = useQueryClient();
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
   
@@ -1220,6 +1222,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [didCopyScriptOutput, setDidCopyScriptOutput] = useState(false);
   const isScriptExecutionRunning = scriptExecution.status === 'starting' || scriptExecution.status === 'running';
   const isScriptExecutionFinished = scriptExecution.status === 'completed' || scriptExecution.status === 'failed' || scriptExecution.status === 'canceled';
+
+  useEffect(() => {
+    if (isScriptExecutionFinished && scriptExecution.executionId) {
+      queryClient.invalidateQueries({ queryKey: ['git', repoPath] });
+    }
+  }, [isScriptExecutionFinished, scriptExecution.executionId, queryClient, repoPath]);
 
   const closeRenameBranchDialog = useCallback(() => {
     setIsRenameOpen(false);
