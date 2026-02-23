@@ -1323,7 +1323,8 @@ export class GitService {
 
   // Stash operations
   async stash(message?: string): Promise<void> {
-    const args = ['push'];
+    // Include untracked files so stash works for "new file" only changes from the UI.
+    const args = ['push', '--include-untracked'];
     if (message) {
       args.push('-m', message);
     }
