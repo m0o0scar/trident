@@ -31,6 +31,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
   // Fetch git status to get uncommitted changes count
   const { data: gitStatus } = useGitStatus(repoPath || null);
   const changesCount = gitStatus?.files?.length ?? 0;
+  const currentBranch = gitStatus?.current?.trim();
   const repoDisplayName = repository
     ? getRepositoryDisplayName(repository)
     : (repoPath ? getRepoFolderName(repoPath) : '');
@@ -68,6 +69,11 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
     const p = new URLSearchParams(searchParams.toString());
     // Clean up tab if it exists from previous version, though we are moving away from it.
     p.delete('tab');
+    if (repoPath && currentBranch) {
+      p.set('branch', currentBranch);
+    } else if (!repoPath) {
+      p.delete('branch');
+    }
     return `/workspace${subPath}?${p.toString()}`;
   };
 

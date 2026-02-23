@@ -18,6 +18,7 @@ import { GroupHeader } from './group-header';
 import { BranchMenuOptions, BranchOperation, buildBranchContextMenuItems } from './branch-context-menu';
 import { BranchRowSelectModifiers, BranchTreeItem } from './branch-tree-item';
 import { CommitRowSelectModifiers } from './commit-row-select-modifiers';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 
 
 const MIN_HISTORY_PANEL_HEIGHT = 100;
@@ -113,10 +114,17 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const queryClient = useQueryClient();
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const requestedBranchFromQuery = (searchParams.get('branch') ?? '').trim();
+  const initialBranchCheckoutAttemptKeyRef = useRef<string | null>(null);
+  const isCheckingOutRequestedBranchRef = useRef(false);
   
   const [limit, setLimit] = useState(100);
   const { data: log, isLoading, isError, error, refetch, isFetching } = useGitLog(repoPath, limit);
   const { data: branchData, isLoading: isBranchesLoading } = useGitBranches(repoPath);
+  const activeBranchFromData = branchData?.current?.trim() ?? '';
   const { data: statusData } = useGitStatus(repoPath);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [selectedCommitHashes, setSelectedCommitHashes] = useState<string[]>([]);
@@ -136,6 +144,71 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   }, [repoPath, selectSingleCommit]);
 
   const { mutateAsync: runGitAction } = useGitAction();
+
+  useEffect(() => {
+    initialBranchCheckoutAttemptKeyRef.current = null;
+    isCheckingOutRequestedBranchRef.current = false;
+  }, [repoPath]);
+
+  useEffect(() => {
+    if (!requestedBranchFromQuery || !branchData) return;
+
+    const requestKey = `${repoPath}:${requestedBranchFromQuery}`;
+    if (initialBranchCheckoutAttemptKeyRef.current === requestKey) return;
+
+    if (branchData.current === requestedBranchFromQuery) {
+      initialBranchCheckoutAttemptKeyRef.current = requestKey;
+      return;
+    }
+
+    if (!branchData.branches.includes(requestedBranchFromQuery)) {
+      initialBranchCheckoutAttemptKeyRef.current = requestKey;
+      toast({
+        type: 'error',
+        title: 'Branch Not Found',
+        description: `Branch "${requestedBranchFromQuery}" does not exist in this repository.`,
+      });
+      return;
+    }
+
+    initialBranchCheckoutAttemptKeyRef.current = requestKey;
+    isCheckingOutRequestedBranchRef.current = true;
+
+    void (async () => {
+      try {
+        await runGitAction({
+          repoPath,
+          action: 'checkout',
+          data: { branch: requestedBranchFromQuery },
+        });
+      } catch (e) {
+        console.error(e);
+      } finally {
+        isCheckingOutRequestedBranchRef.current = false;
+      }
+    })();
+  }, [branchData, repoPath, requestedBranchFromQuery, runGitAction]);
+
+  useEffect(() => {
+    if (!activeBranchFromData || isCheckingOutRequestedBranchRef.current) return;
+
+    const requestKey = `${repoPath}:${requestedBranchFromQuery}`;
+    const hasPendingRequestedCheckout = Boolean(
+      requestedBranchFromQuery &&
+      requestedBranchFromQuery !== activeBranchFromData &&
+      initialBranchCheckoutAttemptKeyRef.current !== requestKey
+    );
+    if (hasPendingRequestedCheckout) return;
+
+    const queryBranch = (searchParams.get('branch') ?? '').trim();
+    if (queryBranch === activeBranchFromData) return;
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set('branch', activeBranchFromData);
+    const nextQuery = nextParams.toString();
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+  }, [activeBranchFromData, pathname, repoPath, requestedBranchFromQuery, router, searchParams]);
+
   const [iscreateBranchOpen, setIsCreateBranchOpen] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
   const [createBranchFromRef, setCreateBranchFromRef] = useState<string | null>(null);
