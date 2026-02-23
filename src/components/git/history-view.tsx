@@ -28,6 +28,24 @@ const MAX_COMMIT_DETAILS_MESSAGE_RATIO = 0.75;
 const DEFAULT_COMMIT_DETAILS_MESSAGE_RATIO = 0.28;
 type MergeConflictStatus = 'checking' | 'no-conflict' | 'has-conflicts';
 
+let hasAppliedReloadBranchQueryBootstrapForCurrentDocument = false;
+
+function shouldApplyReloadBranchQueryBootstrap(): boolean {
+  if (typeof window === 'undefined') return false;
+
+  const navigationEntry = window.performance
+    .getEntriesByType('navigation')
+    .at(0) as PerformanceNavigationTiming | undefined;
+  const isReloadNavigation = navigationEntry?.type === 'reload';
+
+  if (!isReloadNavigation || hasAppliedReloadBranchQueryBootstrapForCurrentDocument) {
+    return false;
+  }
+
+  hasAppliedReloadBranchQueryBootstrapForCurrentDocument = true;
+  return true;
+}
+
 type ScriptExecutionStatus = 'idle' | 'starting' | 'running' | 'completed' | 'failed' | 'canceled';
 type ScriptExecutionState = {
   isOpen: boolean;
@@ -117,10 +135,15 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const shouldApplyInitialBranchQueryRef = useRef(shouldApplyReloadBranchQueryBootstrap());
   const requestedBranchFromQuery = (searchParams.get('branch') ?? '').trim();
   const initialBranchQuerySnapshotRepoPathRef = useRef<string | null>(null);
-  const hadInitialBranchQueryRef = useRef(searchParams.has('branch'));
-  const initialRequestedBranchRef = useRef<string | null>(requestedBranchFromQuery || null);
+  const hadInitialBranchQueryRef = useRef(
+    shouldApplyInitialBranchQueryRef.current && searchParams.has('branch')
+  );
+  const initialRequestedBranchRef = useRef<string | null>(
+    shouldApplyInitialBranchQueryRef.current ? requestedBranchFromQuery || null : null
+  );
   const initialBranchCheckoutAttemptKeyRef = useRef<string | null>(null);
   const initialBranchHeadSelectionAttemptKeyRef = useRef<string | null>(null);
   const isCheckingOutRequestedBranchRef = useRef(false);
@@ -172,14 +195,17 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     if (initialBranchQuerySnapshotRepoPathRef.current === repoPath) return;
 
     initialBranchQuerySnapshotRepoPathRef.current = repoPath;
-    hadInitialBranchQueryRef.current = searchParams.has('branch');
-    initialRequestedBranchRef.current = requestedBranchFromQuery || null;
+    const hasInitialBranchQuery =
+      shouldApplyInitialBranchQueryRef.current && searchParams.has('branch');
+    hadInitialBranchQueryRef.current = hasInitialBranchQuery;
+    initialRequestedBranchRef.current = hasInitialBranchQuery ? requestedBranchFromQuery || null : null;
     initialBranchCheckoutAttemptKeyRef.current = null;
     initialBranchHeadSelectionAttemptKeyRef.current = null;
     isCheckingOutRequestedBranchRef.current = false;
   }, [repoPath, requestedBranchFromQuery, searchParams]);
 
   useEffect(() => {
+    if (!shouldApplyInitialBranchQueryRef.current) return;
     if (!requestedBranchFromQuery || !branchData) return;
 
     const requestKey = `${repoPath}:${requestedBranchFromQuery}`;
@@ -223,6 +249,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
     const requestKey = `${repoPath}:${requestedBranchFromQuery}`;
     const hasPendingRequestedCheckout = Boolean(
+      shouldApplyInitialBranchQueryRef.current &&
       requestedBranchFromQuery &&
       requestedBranchFromQuery !== activeBranchFromData &&
       initialBranchCheckoutAttemptKeyRef.current !== requestKey
