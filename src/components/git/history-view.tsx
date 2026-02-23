@@ -149,6 +149,25 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
   const { mutateAsync: runGitAction } = useGitAction();
 
+  const openConflictResolver = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    const query = params.toString();
+    router.push(query ? `/workspace/conflicts?${query}` : '/workspace/conflicts');
+  }, [router, searchParams]);
+
+  const isMergeOrRebaseConflictError = useCallback((error: unknown) => {
+    if (!(error instanceof Error)) return false;
+    const message = error.message.toLowerCase();
+    return (
+      message.includes('conflict') ||
+      message.includes('could not apply') ||
+      message.includes('fix conflicts') ||
+      message.includes('resolve all conflicts') ||
+      message.includes('merge --continue') ||
+      message.includes('rebase --continue')
+    );
+  }, []);
+
   useEffect(() => {
     if (initialBranchQuerySnapshotRepoPathRef.current === repoPath) return;
 
@@ -1789,6 +1808,16 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       });
       closeRebaseDialog();
     } catch (e) {
+      if (isMergeOrRebaseConflictError(e)) {
+        closeRebaseDialog();
+        openConflictResolver();
+        toast({
+          type: 'warning',
+          title: 'Rebase Conflict Detected',
+          description: 'Redirected to the conflict resolver. Resolve conflicted files, then continue or abort.',
+          duration: 12000,
+        });
+      }
       console.error(e);
     } finally {
       setIsRebasing(false);
@@ -1897,6 +1926,16 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       });
       closeMergeDialog();
     } catch (e) {
+      if (isMergeOrRebaseConflictError(e)) {
+        closeMergeDialog();
+        openConflictResolver();
+        toast({
+          type: 'warning',
+          title: 'Merge Conflict Detected',
+          description: 'Redirected to the conflict resolver. Resolve conflicted files, then continue or abort.',
+          duration: 12000,
+        });
+      }
       console.error(e);
     } finally {
       setIsMerging(false);

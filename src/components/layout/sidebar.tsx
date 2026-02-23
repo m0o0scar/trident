@@ -31,6 +31,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
   // Fetch git status to get uncommitted changes count
   const { data: gitStatus } = useGitStatus(repoPath || null);
   const changesCount = gitStatus?.files?.length ?? 0;
+  const conflictsCount = gitStatus?.conflicted?.length ?? 0;
   const currentBranch = gitStatus?.current?.trim();
   const repoDisplayName = repository
     ? getRepositoryDisplayName(repository)
@@ -77,9 +78,10 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
     return `/workspace${subPath}?${p.toString()}`;
   };
 
-  const isActive = (view: 'status' | 'history' | 'custom-scripts' | 'settings' | 'stashes') => {
+  const isActive = (view: 'status' | 'history' | 'conflicts' | 'custom-scripts' | 'settings' | 'stashes') => {
     if (view === 'status') return pathname === '/workspace/changes';
     if (view === 'history') return pathname === '/workspace' || pathname.startsWith('/workspace/history');
+    if (view === 'conflicts') return pathname.startsWith('/workspace/conflicts');
     if (view === 'custom-scripts') return pathname.startsWith('/workspace/custom-scripts');
     if (view === 'settings') return pathname.startsWith('/workspace/settings');
     if (view === 'stashes') return pathname.startsWith('/workspace/stashes');
@@ -195,6 +197,31 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
                       Changes
                       {changesCount > 0 && <span className="badge badge-sm">{changesCount}</span>}
                   </span>
+              )}
+            </Link>
+
+            <Link
+              href={getHref('/conflicts')}
+              className={cn(
+                "btn btn-ghost w-full justify-start font-normal",
+                isCollapsed ? "px-0 justify-center" : "",
+                isActive('conflicts') && "btn-active font-medium"
+              )}
+              title={isCollapsed ? `Conflicts${conflictsCount > 0 ? ` (${conflictsCount})` : ''}` : undefined}
+            >
+              <div className={cn("relative flex items-center", !isCollapsed && "mr-2")}>
+                <i className="iconoir-warning-triangle text-[20px]" aria-hidden="true" />
+                {isCollapsed && conflictsCount > 0 && (
+                  <span className="absolute -top-1 -right-1 badge badge-error badge-xs scale-75">
+                    {conflictsCount > 99 ? '99+' : conflictsCount}
+                  </span>
+                )}
+              </div>
+              {!isCollapsed && (
+                <span className="flex-1 flex justify-between items-center">
+                  Conflicts
+                  {conflictsCount > 0 && <span className="badge badge-sm badge-error">{conflictsCount}</span>}
+                </span>
               )}
             </Link>
 

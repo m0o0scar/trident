@@ -9,6 +9,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - **Repository Management** - Add, delete, and manage multiple local Git repositories
 - **Visual Commit Graph** - Fork-style commit visualization with branch lanes
 - **Branch Operations** - Create, checkout, delete, rename, rebase, and merge branches
+- **Conflict Resolver** - Detect merge/rebase conflicts and resolve them with a dedicated workflow
 - **Change Staging** - Stage/unstage files individually or all at once
 - **Stash Support** - Stash, reapply, and delete stashed changes
 - **Diff Viewer** - Syntax-highlighted diff view for reviewing changes
@@ -55,6 +56,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] Merge with options (rebase-before-merge, squash, fast-forward)
 - [x] Rebase onto target branch (with optional auto-stash)
 - [x] Preflight conflict checks for merge/rebase
+- [x] Conflict resolver page for merge/rebase (stage resolved files, continue/abort)
 - [x] Hard/soft/mixed reset to selected commit
 - [x] Cherry-pick single/multiple commits and abort cherry-pick
 - [x] Commit details and per-file commit diffs (split/inline)

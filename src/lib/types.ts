@@ -100,3 +100,12 @@ export interface BranchTrackingInfo {
   ahead: number;
   behind: number;
 }
+
+export type GitConflictOperation = 'merge' | 'rebase' | null;
+
+export interface GitConflictState {
+  operation: GitConflictOperation;
+  conflictedFiles: string[];
+  hasConflicts: boolean;
+  canContinue: boolean;
+}

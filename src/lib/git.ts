@@ -1,9 +1,9 @@
 import { simpleGit, SimpleGit, SimpleGitOptions } from 'simple-git';
-import { GitStatus, GitLog, GitWorktree } from './types';
+import { GitStatus, GitLog, GitWorktree, GitConflictState } from './types';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, unlink } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { mkdtemp, unlink, access, readFile, writeFile } from 'node:fs/promises';
+import { join, resolve, relative, isAbsolute, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const execFileAsync = promisify(execFile);
@@ -66,6 +66,16 @@ export class GitService {
 
   private get git(): SimpleGit {
     return getGit(this.repoPath);
+  }
+
+  private resolveFilePathWithinRepo(filePath: string): string {
+    const resolvedRepoPath = resolve(this.repoPath);
+    const resolvedFilePath = resolve(resolvedRepoPath, filePath);
+    const rel = relative(resolvedRepoPath, resolvedFilePath);
+    if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+      throw new Error(`File path is outside repository: ${filePath}`);
+    }
+    return resolvedFilePath;
   }
 
   static async cloneRepository(
@@ -141,6 +151,53 @@ export class GitService {
     // except we might want to sanitize paths.
     // For now, we return it as is, casting to our interface (which matches simple-git mostly).
     return status as unknown as GitStatus;
+  }
+
+  private async hasRef(ref: string): Promise<boolean> {
+    try {
+      await this.git.revparse(['--verify', ref]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async gitPathExists(gitPathName: string): Promise<boolean> {
+    try {
+      const gitPath = (await this.git.raw(['rev-parse', '--git-path', gitPathName])).trim();
+      if (!gitPath) return false;
+      await access(gitPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getConflictState(): Promise<GitConflictState> {
+    const status = await this.git.status();
+    const conflictedFiles = status.conflicted ?? [];
+    const hasConflicts = conflictedFiles.length > 0;
+
+    const [hasMergeHead, hasRebaseHead, hasRebaseApply, hasRebaseMerge] = await Promise.all([
+      this.hasRef('MERGE_HEAD'),
+      this.hasRef('REBASE_HEAD'),
+      this.gitPathExists('rebase-apply'),
+      this.gitPathExists('rebase-merge'),
+    ]);
+
+    let operation: GitConflictState['operation'] = null;
+    if (hasRebaseHead || hasRebaseApply || hasRebaseMerge) {
+      operation = 'rebase';
+    } else if (hasMergeHead) {
+      operation = 'merge';
+    }
+
+    return {
+      operation,
+      conflictedFiles,
+      hasConflicts,
+      canContinue: Boolean(operation) && !hasConflicts,
+    };
   }
 
   async getLog(limit: number = 100): Promise<GitLog> {
@@ -341,6 +398,49 @@ export class GitService {
       return null;
     }
     return this.getBlobFromRef(`${ref}:${path}`);
+  }
+
+  async getConflictFileVersions(path: string): Promise<{ ours: string; theirs: string; current: string }> {
+    const [oursBuffer, theirsBuffer] = await Promise.all([
+      this.getBlobFromRef(`:2:${path}`),
+      this.getBlobFromRef(`:3:${path}`),
+    ]);
+
+    let current = '';
+    try {
+      const fullPath = this.resolveFilePathWithinRepo(path);
+      current = await readFile(fullPath, 'utf-8');
+    } catch {
+      current = '';
+    }
+
+    return {
+      ours: oursBuffer ? oursBuffer.toString('utf-8') : '',
+      theirs: theirsBuffer ? theirsBuffer.toString('utf-8') : '',
+      current,
+    };
+  }
+
+  async resolveConflictFile(
+    path: string,
+    strategy: 'ours' | 'theirs' | 'manual',
+    options: { content?: string; stage?: boolean } = {}
+  ): Promise<void> {
+    const { content, stage = true } = options;
+
+    if (strategy === 'ours' || strategy === 'theirs') {
+      await this.git.raw(['checkout', `--${strategy}`, '--', path]);
+    } else {
+      if (typeof content !== 'string') {
+        throw new Error('Content is required for manual conflict resolution');
+      }
+      const fullPath = this.resolveFilePathWithinRepo(path);
+      await writeFile(fullPath, content, 'utf-8');
+    }
+
+    if (stage) {
+      await this.git.add([path]);
+    }
   }
 
   async getDiff(path: string): Promise<string> {
@@ -854,6 +954,22 @@ export class GitService {
     await this.git.raw(['cherry-pick', '--abort']);
   }
 
+  async continueMerge(): Promise<void> {
+    await this.git.raw(['merge', '--continue']);
+  }
+
+  async abortMerge(): Promise<void> {
+    await this.git.raw(['merge', '--abort']);
+  }
+
+  async continueRebase(): Promise<void> {
+    await this.git.raw(['rebase', '--continue']);
+  }
+
+  async abortRebase(): Promise<void> {
+    await this.git.raw(['rebase', '--abort']);
+  }
+
   async rebase(ontoBranch: string, stashChanges: boolean = true): Promise<void> {
     if (stashChanges) {
       // Stash any local changes before rebasing
@@ -1090,16 +1206,34 @@ export class GitService {
     await this.git.revparse(['--verify', sourceBranch]);
     await this.git.revparse(['--verify', mergeTargetBranch]);
 
+    const hasMergeTreeConflictMarkers = (output: string): boolean => {
+      const normalized = output.toLowerCase();
+      if (
+        normalized.includes('conflict') ||
+        normalized.includes('changed in both') ||
+        normalized.includes('added in both') ||
+        normalized.includes('removed in both') ||
+        output.includes('<<<<<<<')
+      ) {
+        return true;
+      }
+
+      // Some git versions emit conflicted index stage entries in merge-tree output.
+      return /^[0-9]{6}\s+[0-9a-f]{40,64}\s+[123]\t/m.test(output);
+    };
+
     try {
-      // Modern Git: non-destructive conflict detection using exit code.
-      await this.git.raw(['merge-tree', '--write-tree', mergeTargetBranch, sourceBranch]);
-      return false;
+      // Modern Git: non-destructive conflict detection.
+      // Some Git versions may still return exit code 0 even when output includes conflicts,
+      // so we inspect output instead of relying only on exit code.
+      const mergeTreeOutput = await this.git.raw(['merge-tree', '--write-tree', mergeTargetBranch, sourceBranch]);
+      return hasMergeTreeConflictMarkers(mergeTreeOutput);
     } catch (e) {
       const errorOutput = e as { message?: string; stdout?: string; stderr?: string };
       const rawOutput = `${errorOutput.message ?? ''}\n${errorOutput.stdout ?? ''}\n${errorOutput.stderr ?? ''}`;
       const normalizedOutput = rawOutput.toLowerCase();
 
-      if (normalizedOutput.includes('conflict')) {
+      if (hasMergeTreeConflictMarkers(rawOutput)) {
         return true;
       }
 
@@ -1108,7 +1242,9 @@ export class GitService {
         normalizedOutput.includes('usage: git merge-tree');
 
       if (!isWriteTreeUnsupported) {
-        throw e;
+        // Be conservative for write-tree errors that are not clearly a capability issue.
+        // False positives are preferable to missing real conflicts.
+        return true;
       }
     }
 
