@@ -20,6 +20,14 @@ export interface Repository {
   visibilityMap?: Record<string, 'visible' | 'hidden'>;
   localGroupExpanded?: boolean;
   remotesGroupExpanded?: boolean;
+  worktreesGroupExpanded?: boolean;
+}
+
+export interface GitWorktree {
+  path: string;
+  branch: string | null;
+  head: string | null;
+  isCurrent: boolean;
 }
 
 export interface AppSettings {
@@ -92,4 +100,3 @@ export interface BranchTrackingInfo {
   ahead: number;
   behind: number;
 }
-
