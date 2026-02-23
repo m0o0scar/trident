@@ -208,6 +208,52 @@ export function useGitConflictState(repoPath: string | null) {
   });
 }
 
+export interface GitConflictFileVersions {
+  ours: string;
+  theirs: string;
+  current: string;
+}
+
+export function useGitConflictFileVersions(repoPath: string | null, filePath: string | null) {
+  return useQuery<GitConflictFileVersions>({
+    queryKey: ['git', repoPath, 'conflict-file-versions', filePath],
+    queryFn: async () => {
+      if (!repoPath || !filePath) {
+        return { ours: '', theirs: '', current: '' };
+      }
+
+      const res = await fetch(`${API_BASE}/git/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repoPath,
+          action: 'get-conflict-file-versions',
+          data: { path: filePath },
+        }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const err = new Error(errorData.error || 'Failed to fetch conflict file versions') as GitError;
+        err.status = res.status;
+        throw err;
+      }
+      const data = await res.json();
+      return {
+        ours: typeof data.ours === 'string' ? data.ours : '',
+        theirs: typeof data.theirs === 'string' ? data.theirs : '',
+        current: typeof data.current === 'string' ? data.current : '',
+      };
+    },
+    enabled: !!repoPath && !!filePath,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
+    retry: (failureCount, error: GitError) => {
+      if (error.status === 404 || error.status === 400) return false;
+      return failureCount < 3;
+    },
+  });
+}
+
 export function useGitLog(repoPath: string | null, limit: number = 50) {
   return useQuery<GitLog>({
     queryKey: ['git', repoPath, 'log', limit],
@@ -441,7 +487,7 @@ export function useStashFileDiff(repoPath: string | null, stashIndex: number | n
 }
 
 // Actions
-export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'create-tag' | 'delete-branch' | 'delete-worktree' | 'delete-remote-branch' | 'delete-remote' | 'delete-tag' | 'delete-remote-tag' | 'rename-branch' | 'rename-remote-branch' | 'rename-remote' | 'add-remote' | 'reset' | 'revert' | 'cherry-pick' | 'cherry-pick-multiple' | 'cherry-pick-abort' | 'rebase' | 'merge' | 'check-merge-conflicts' | 'check-rebase-conflicts' | 'get-conflict-state' | 'continue-merge' | 'abort-merge' | 'continue-rebase' | 'abort-rebase' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'get-latest-commit-message' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop' | 'reword' | 'discard' | 'cleanup-lock-file';
+export type GitActionType = 'commit' | 'push' | 'pull' | 'fetch' | 'stage' | 'unstage' | 'checkout' | 'checkout-to-local' | 'branch' | 'create-tag' | 'delete-branch' | 'delete-worktree' | 'delete-remote-branch' | 'delete-remote' | 'delete-tag' | 'delete-remote-tag' | 'rename-branch' | 'rename-remote-branch' | 'rename-remote' | 'add-remote' | 'reset' | 'revert' | 'cherry-pick' | 'cherry-pick-multiple' | 'cherry-pick-abort' | 'rebase' | 'merge' | 'check-merge-conflicts' | 'check-rebase-conflicts' | 'get-conflict-state' | 'get-conflict-file-versions' | 'resolve-conflict-file' | 'continue-merge' | 'abort-merge' | 'continue-rebase' | 'abort-rebase' | 'get-remotes' | 'get-remote-branches' | 'get-tracking-branch' | 'get-latest-commit-message' | 'push-to-remote' | 'pull-from-remote' | 'stash' | 'stash-apply' | 'stash-drop' | 'stash-pop' | 'reword' | 'discard' | 'cleanup-lock-file';
 
 // Map action types to human-readable operation names
 const actionOperationNames: Record<GitActionType, string> = {
@@ -475,6 +521,8 @@ const actionOperationNames: Record<GitActionType, string> = {
   'check-merge-conflicts': 'Check Merge Conflicts',
   'check-rebase-conflicts': 'Check Rebase Conflicts',
   'get-conflict-state': 'Get Conflict State',
+  'get-conflict-file-versions': 'Get Conflict File Versions',
+  'resolve-conflict-file': 'Resolve Conflict File',
   'continue-merge': 'Continue Merge',
   'abort-merge': 'Abort Merge',
   'continue-rebase': 'Continue Rebase',
@@ -498,6 +546,7 @@ const READ_ONLY_ACTIONS: readonly GitActionType[] = [
   'check-merge-conflicts',
   'check-rebase-conflicts',
   'get-conflict-state',
+  'get-conflict-file-versions',
   'get-remotes',
   'get-remote-branches',
   'get-tracking-branch',

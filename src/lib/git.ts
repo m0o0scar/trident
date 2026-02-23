@@ -2,8 +2,8 @@ import { simpleGit, SimpleGit, SimpleGitOptions } from 'simple-git';
 import { GitStatus, GitLog, GitWorktree, GitConflictState } from './types';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, unlink, access } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { mkdtemp, unlink, access, readFile, writeFile } from 'node:fs/promises';
+import { join, resolve, relative, isAbsolute, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const execFileAsync = promisify(execFile);
@@ -66,6 +66,16 @@ export class GitService {
 
   private get git(): SimpleGit {
     return getGit(this.repoPath);
+  }
+
+  private resolveFilePathWithinRepo(filePath: string): string {
+    const resolvedRepoPath = resolve(this.repoPath);
+    const resolvedFilePath = resolve(resolvedRepoPath, filePath);
+    const rel = relative(resolvedRepoPath, resolvedFilePath);
+    if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
+      throw new Error(`File path is outside repository: ${filePath}`);
+    }
+    return resolvedFilePath;
   }
 
   static async cloneRepository(
@@ -388,6 +398,49 @@ export class GitService {
       return null;
     }
     return this.getBlobFromRef(`${ref}:${path}`);
+  }
+
+  async getConflictFileVersions(path: string): Promise<{ ours: string; theirs: string; current: string }> {
+    const [oursBuffer, theirsBuffer] = await Promise.all([
+      this.getBlobFromRef(`:2:${path}`),
+      this.getBlobFromRef(`:3:${path}`),
+    ]);
+
+    let current = '';
+    try {
+      const fullPath = this.resolveFilePathWithinRepo(path);
+      current = await readFile(fullPath, 'utf-8');
+    } catch {
+      current = '';
+    }
+
+    return {
+      ours: oursBuffer ? oursBuffer.toString('utf-8') : '',
+      theirs: theirsBuffer ? theirsBuffer.toString('utf-8') : '',
+      current,
+    };
+  }
+
+  async resolveConflictFile(
+    path: string,
+    strategy: 'ours' | 'theirs' | 'manual',
+    options: { content?: string; stage?: boolean } = {}
+  ): Promise<void> {
+    const { content, stage = true } = options;
+
+    if (strategy === 'ours' || strategy === 'theirs') {
+      await this.git.raw(['checkout', `--${strategy}`, '--', path]);
+    } else {
+      if (typeof content !== 'string') {
+        throw new Error('Content is required for manual conflict resolution');
+      }
+      const fullPath = this.resolveFilePathWithinRepo(path);
+      await writeFile(fullPath, content, 'utf-8');
+    }
+
+    if (stage) {
+      await this.git.add([path]);
+    }
   }
 
   async getDiff(path: string): Promise<string> {
