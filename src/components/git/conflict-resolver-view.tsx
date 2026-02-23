@@ -209,7 +209,7 @@ export function ConflictResolverView({ repoPath }: { repoPath: string }) {
       description: `The ${operationLabel(operation).toLowerCase()} operation was aborted.`,
     });
 
-    router.push(buildWorkspaceHref('/changes'));
+    router.push(buildWorkspaceHref());
   };
 
   const handleContinue = async () => {

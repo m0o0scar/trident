@@ -1810,16 +1810,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     } catch (e) {
       if (isMergeOrRebaseConflictError(e)) {
         closeRebaseDialog();
+        openConflictResolver();
         toast({
           type: 'warning',
           title: 'Rebase Conflict Detected',
-          description: 'Resolve conflicted files, then continue or abort in the conflict resolver.',
+          description: 'Redirected to the conflict resolver. Resolve conflicted files, then continue or abort.',
           duration: 12000,
-          action: (
-            <button className="btn btn-sm btn-warning" onClick={openConflictResolver}>
-              Open Resolver
-            </button>
-          ),
         });
       }
       console.error(e);
@@ -1932,16 +1928,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     } catch (e) {
       if (isMergeOrRebaseConflictError(e)) {
         closeMergeDialog();
+        openConflictResolver();
         toast({
           type: 'warning',
           title: 'Merge Conflict Detected',
-          description: 'Resolve conflicted files, then continue or abort in the conflict resolver.',
+          description: 'Redirected to the conflict resolver. Resolve conflicted files, then continue or abort.',
           duration: 12000,
-          action: (
-            <button className="btn btn-sm btn-warning" onClick={openConflictResolver}>
-              Open Resolver
-            </button>
-          ),
         });
       }
       console.error(e);
