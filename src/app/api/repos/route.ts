@@ -38,6 +38,7 @@ const updateRepoSchema = z.object({
     visibilityMap: z.record(z.string(), z.enum(['visible', 'hidden'])).optional(),
     localGroupExpanded: z.boolean().optional(),
     remotesGroupExpanded: z.boolean().optional(),
+    worktreesGroupExpanded: z.boolean().optional(),
   }),
 });
 

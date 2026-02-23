@@ -1,9 +1,9 @@
 import { simpleGit, SimpleGit, SimpleGitOptions } from 'simple-git';
-import { GitStatus, GitLog } from './types';
+import { GitStatus, GitLog, GitWorktree } from './types';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, unlink } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const execFileAsync = promisify(execFile);
@@ -361,6 +361,85 @@ export class GitService {
     return await this.git.diff(['HEAD', '--', path]);
   }
 
+  private parseWorktreeEntries(rawWorktreeOutput: string): GitWorktree[] {
+    const worktrees: Array<Omit<GitWorktree, 'isCurrent'> & { detached: boolean }> = [];
+    let currentEntry: { path: string; branch: string | null; head: string | null; detached: boolean } | null = null;
+
+    for (const line of rawWorktreeOutput.split('\n')) {
+      if (line.startsWith('worktree ')) {
+        if (currentEntry) {
+          worktrees.push(currentEntry);
+        }
+        currentEntry = {
+          path: line.slice('worktree '.length).trim(),
+          branch: null,
+          head: null,
+          detached: false,
+        };
+        continue;
+      }
+
+      if (!currentEntry) continue;
+
+      if (line.startsWith('branch ')) {
+        const branchRef = line.slice('branch '.length).trim();
+        currentEntry.branch = branchRef.startsWith('refs/heads/')
+          ? branchRef.slice('refs/heads/'.length)
+          : branchRef || null;
+        continue;
+      }
+
+      if (line.startsWith('HEAD ')) {
+        currentEntry.head = line.slice('HEAD '.length).trim() || null;
+        continue;
+      }
+
+      if (line === 'detached') {
+        currentEntry.detached = true;
+      }
+    }
+
+    if (currentEntry) {
+      worktrees.push(currentEntry);
+    }
+
+    const normalizedRepoPath = resolve(this.repoPath);
+    const uniqueByPath = new Map<string, GitWorktree>();
+    for (const entry of worktrees) {
+      const normalizedPath = resolve(entry.path);
+      if (uniqueByPath.has(normalizedPath)) continue;
+      uniqueByPath.set(normalizedPath, {
+        path: entry.path,
+        branch: entry.detached ? null : entry.branch,
+        head: entry.head,
+        isCurrent: normalizedPath === normalizedRepoPath,
+      });
+    }
+
+    return Array.from(uniqueByPath.values()).sort((a, b) => {
+      if (a.isCurrent && !b.isCurrent) return -1;
+      if (!a.isCurrent && b.isCurrent) return 1;
+      return a.path.localeCompare(b.path);
+    });
+  }
+
+  async getWorktrees(currentBranch: string): Promise<GitWorktree[]> {
+    try {
+      const rawOutput = await this.git.raw(['worktree', 'list', '--porcelain']);
+      const parsed = this.parseWorktreeEntries(rawOutput);
+      if (parsed.length > 0) return parsed;
+    } catch (error) {
+      console.warn('Failed to list git worktrees:', error);
+    }
+
+    return [{
+      path: this.repoPath,
+      branch: currentBranch || null,
+      head: null,
+      isCurrent: true,
+    }];
+  }
+
   async getBranches() {
     // 1. Get current branch (HEAD)
     let currentBranch = '';
@@ -451,6 +530,7 @@ export class GitService {
           remotes[r.name] = [];
         }
     }
+    const worktrees = await this.getWorktrees(currentBranch);
 
     return {
       branches,
@@ -459,6 +539,7 @@ export class GitService {
       remotes, // { "origin": ["main", "feature"], "upstream": ["main"] }
       remoteUrls,
       trackingInfo, // { "main": { upstream: "origin/main", ahead: 5, behind: 1 } }
+      worktrees,
     };
   }
 

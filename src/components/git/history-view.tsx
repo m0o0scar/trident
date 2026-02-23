@@ -742,9 +742,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     ));
   }, [repository?.customScripts]);
 
-  // Group expanded state (for "Branches" and "Remotes" group headers)
+  // Group expanded state (for "Branches", "Remotes", and "Worktrees" group headers)
   const [localGroupExpanded, setLocalGroupExpanded] = useState(true);
   const [remotesGroupExpanded, setRemotesGroupExpanded] = useState(true);
+  const [worktreesGroupExpanded, setWorktreesGroupExpanded] = useState(true);
 
   // Visibility state for branches/folders
   const [visibilityMap, setVisibilityMap] = useState<VisibilityMap>({});
@@ -783,6 +784,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       lastInitializedRepo.current = repository.path;
       if (repository.localGroupExpanded !== undefined) setLocalGroupExpanded(repository.localGroupExpanded);
       if (repository.remotesGroupExpanded !== undefined) setRemotesGroupExpanded(repository.remotesGroupExpanded);
+      if (repository.worktreesGroupExpanded !== undefined) setWorktreesGroupExpanded(repository.worktreesGroupExpanded);
       if (repository.expandedFolders) setExpandedFolders(new Set(repository.expandedFolders));
       if (repository.visibilityMap) setVisibilityMap(repository.visibilityMap as VisibilityMap);
     }
@@ -807,6 +809,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setRemotesGroupExpanded(newValue);
     saveSettings({ remotesGroupExpanded: newValue });
   }, [remotesGroupExpanded, saveSettings]);
+
+  const handleToggleWorktreesGroup = useCallback(() => {
+    const newValue = !worktreesGroupExpanded;
+    setWorktreesGroupExpanded(newValue);
+    saveSettings({ worktreesGroupExpanded: newValue });
+  }, [saveSettings, worktreesGroupExpanded]);
 
   // Toggle folder expansion
   const toggleFolder = useCallback((path: string) => {
@@ -2279,6 +2287,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }, [isOpeningRepoFolder, repoPath]);
 
+  const handleOpenWorktreeInNewTab = useCallback((worktreePath: string) => {
+    const targetPath = `/workspace?path=${encodeURIComponent(worktreePath)}`;
+    window.open(targetPath, '_blank', 'noopener,noreferrer');
+  }, []);
+
   const handleFetchFromRemote = async (remote: string) => {
     try {
       await runGitAction({
@@ -2694,6 +2707,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     if (!localBranchTree) return [];
     return collectAllBranchRefs(localBranchTree).filter((branchRef) => branchRef !== currentBranch);
   }, [localBranchTree, currentBranch]);
+  const worktrees = branchData?.worktrees ?? [];
 
   const branchTreePopoverContent = (
     <div className="w-[22rem] max-w-[calc(100vw-2rem)] flex flex-col border border-base-300 bg-base-100 rounded-box shadow-xl overflow-hidden">
@@ -2855,6 +2869,54 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 </div>
               );
             })}
+          </>
+
+          <>
+            <div
+              className="group flex items-center gap-1 px-2 py-1.5 text-sm rounded-md cursor-pointer hover:bg-base-200 transition-colors font-medium"
+              onClick={handleToggleWorktreesGroup}
+            >
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                <span className="text-xs opacity-70">{worktreesGroupExpanded ? '▼' : '▶'}</span>
+                <i className="iconoir-folder text-[14px]" aria-hidden="true" />
+                <span className="truncate min-w-0 flex-1">Worktrees</span>
+              </div>
+              <span className="text-xs opacity-60">{worktrees.length}</span>
+            </div>
+            {worktreesGroupExpanded && isBranchesLoading && worktrees.length === 0 && (
+              <div className="flex items-center gap-2 px-2 py-2 text-sm opacity-70" style={{ paddingLeft: '20px' }}>
+                <span className="loading loading-spinner loading-xs"></span>
+                <span>Loading worktrees...</span>
+              </div>
+            )}
+            {worktreesGroupExpanded && !isBranchesLoading && worktrees.length === 0 && (
+              <div className="px-2 py-2 text-sm opacity-70" style={{ paddingLeft: '20px' }}>
+                No worktrees found
+              </div>
+            )}
+            {worktreesGroupExpanded && worktrees.map((worktree) => (
+              <button
+                key={worktree.path}
+                type="button"
+                className="group flex w-full items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer transition-colors hover:bg-base-200 text-left"
+                style={{ paddingLeft: '20px' }}
+                onClick={() => handleOpenWorktreeInNewTab(worktree.path)}
+                title={worktree.path}
+              >
+                <i className={`iconoir-folder text-[14px] shrink-0 ${worktree.isCurrent ? 'text-primary' : 'opacity-60'}`} aria-hidden="true" />
+                <span className="truncate min-w-0 flex-1">{worktree.path}</span>
+                {worktree.branch && (
+                  <span className="shrink-0 text-xs opacity-60">
+                    {worktree.branch}
+                  </span>
+                )}
+                {worktree.isCurrent && (
+                  <span className="shrink-0 text-xs text-primary font-medium">
+                    current
+                  </span>
+                )}
+              </button>
+            ))}
           </>
         </div>
       </div>

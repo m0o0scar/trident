@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { GitStatus, GitLog, Repository, AppSettings, FileDiffPayload, BranchTrackingInfo, GitError } from '@/lib/types';
+import { GitStatus, GitLog, Repository, AppSettings, FileDiffPayload, BranchTrackingInfo, GitError, GitWorktree } from '@/lib/types';
 import { showGitErrorToast } from './use-toast';
 
 const API_BASE = '/api';
@@ -197,7 +197,8 @@ export function useGitBranches(repoPath: string | null) {
     branchCommits: Record<string, string>, 
     remotes: Record<string, string[]>,
     remoteUrls: Record<string, string>,
-    trackingInfo: Record<string, BranchTrackingInfo>
+    trackingInfo: Record<string, BranchTrackingInfo>,
+    worktrees: GitWorktree[],
   }>({
     queryKey: ['git', repoPath, 'branches'],
     queryFn: async () => {
