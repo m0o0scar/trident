@@ -7,7 +7,6 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const execFileAsync = promisify(execFile);
-const EMPTY_TREE_HASH = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
 function normalizeRemoteUrlForHttpAuth(remoteUrl: string): string | null {
   if (remoteUrl.startsWith('http://') || remoteUrl.startsWith('https://')) {
@@ -872,15 +871,6 @@ export class GitService {
       });
   }
 
-  private async getCommitParentOrEmptyTree(commitHash: string): Promise<string> {
-    try {
-      return (await this.git.revparse([`${commitHash}^`])).trim();
-    } catch {
-      // Root commit has no parent; compare against empty tree to include it in the range.
-      return EMPTY_TREE_HASH;
-    }
-  }
-
   async getCommitRangeRefs(oldestCommitHash: string, latestCommitHash: string): Promise<{ fromRef: string; toRef: string }> {
     const oldest = oldestCommitHash.trim();
     const latest = latestCommitHash.trim();
@@ -889,8 +879,8 @@ export class GitService {
       throw new Error('Both oldest and latest commit hashes are required');
     }
 
-    const fromRef = await this.getCommitParentOrEmptyTree(oldest);
-    return { fromRef, toRef: latest };
+    // Exclude the oldest selected commit itself by comparing its tree with the latest selected commit.
+    return { fromRef: oldest, toRef: latest };
   }
 
   async getCommitDiff(commitHash: string): Promise<{ files: { path: string; additions: number; deletions: number; status: string }[]; diff: string }> {
