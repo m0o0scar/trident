@@ -665,6 +665,28 @@ export class GitService {
     await this.git.deleteLocalBranch(branch, true);
   }
 
+  async deleteWorktree(worktreePath: string): Promise<void> {
+    const targetPath = worktreePath.trim();
+    if (!targetPath) {
+      throw new Error('Worktree path is required');
+    }
+
+    const resolvedTargetPath = resolve(targetPath);
+    const resolvedCurrentRepoPath = resolve(this.repoPath);
+    if (resolvedTargetPath === resolvedCurrentRepoPath) {
+      throw new Error('Cannot delete the current worktree');
+    }
+
+    const worktrees = await this.getWorktrees('');
+    const isKnownWorktree = worktrees.some((worktree) => resolve(worktree.path) === resolvedTargetPath);
+    if (!isKnownWorktree) {
+      throw new Error(`Worktree not found: ${targetPath}`);
+    }
+
+    await this.git.raw(['worktree', 'remove', targetPath]);
+    await this.git.raw(['worktree', 'prune']);
+  }
+
   async deleteRemoteBranch(remote: string, branch: string, credentials?: { username: string; token: string }): Promise<void> {
     let targetRemote = remote;
 

@@ -233,6 +233,9 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [branchesToDelete, setBranchesToDelete] = useState<string[]>([]);
   const [deleteRemoteBranch, setDeleteRemoteBranch] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleteWorktreeOpen, setIsDeleteWorktreeOpen] = useState(false);
+  const [worktreeToDelete, setWorktreeToDelete] = useState<string | null>(null);
+  const [isDeletingWorktree, setIsDeletingWorktree] = useState(false);
   const [isDeleteTagOpen, setIsDeleteTagOpen] = useState(false);
   const [tagToDelete, setTagToDelete] = useState<string | null>(null);
   const [deleteRemoteTag, setDeleteRemoteTag] = useState(false);
@@ -466,6 +469,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       setDeleteRemoteBranch(false);
       return;
     }
+    if (isDeleteWorktreeOpen) {
+      setIsDeleteWorktreeOpen(false);
+      setWorktreeToDelete(null);
+      return;
+    }
     if (isDeleteTagOpen) {
       setIsDeleteTagOpen(false);
       setTagToDelete(null);
@@ -515,6 +523,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     closeAddRemoteDialog,
     isCherryPickOpen,
     isDeleteOpen,
+    isDeleteWorktreeOpen,
     isDeleteTagOpen,
     isRewordOpen,
     closeRewordDialog,
@@ -530,6 +539,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     isRevertOpen ||
     isRewordOpen ||
     isDeleteOpen ||
+    isDeleteWorktreeOpen ||
     isDeleteTagOpen ||
     isAbortCherryPickOpen ||
     isCherryPickOpen ||
@@ -1421,6 +1431,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     confirmDeleteBranches([branch]);
   };
 
+  const confirmDeleteWorktree = useCallback((path: string) => {
+    const targetPath = path.trim();
+    if (!targetPath) return;
+    setWorktreeToDelete(targetPath);
+    setIsDeleteWorktreeOpen(true);
+  }, []);
+
   const closeDeleteTagDialog = useCallback(() => {
     setIsDeleteTagOpen(false);
     setTagToDelete(null);
@@ -1568,6 +1585,25 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       console.error(e);
     } finally {
       setIsDeletingTag(false);
+    }
+  };
+
+  const handleDeleteWorktree = async () => {
+    if (!worktreeToDelete) return;
+
+    setIsDeletingWorktree(true);
+    try {
+      await runGitAction({
+        repoPath,
+        action: 'delete-worktree',
+        data: { path: worktreeToDelete },
+      });
+      setIsDeleteWorktreeOpen(false);
+      setWorktreeToDelete(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsDeletingWorktree(false);
     }
   };
 
@@ -2905,33 +2941,51 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 No worktrees found
               </div>
             )}
-            {worktreesGroupExpanded && worktrees.map((worktree) => (
-              <button
-                key={worktree.path}
-                type="button"
-                className={cn(
-                  "group flex w-full items-center gap-2 px-2 py-1.5 text-sm rounded-md transition-colors text-left",
-                  worktree.isCurrent ? "cursor-default opacity-85" : "cursor-pointer hover:bg-base-200"
-                )}
-                style={{ paddingLeft: '20px' }}
-                onClick={() => handleOpenWorktreeInNewTab(worktree.path, worktree.isCurrent)}
-                title={worktree.path}
-                disabled={worktree.isCurrent}
-              >
-                <i className={`iconoir-folder text-[14px] shrink-0 ${worktree.isCurrent ? 'text-primary' : 'opacity-60'}`} aria-hidden="true" />
-                <span className="truncate min-w-0 flex-1">{worktree.path}</span>
-                {worktree.branch && (
-                  <span className="shrink-0 text-xs opacity-60">
-                    {worktree.branch}
-                  </span>
-                )}
-                {worktree.isCurrent && (
-                  <span className="shrink-0 text-xs text-primary font-medium">
-                    current
-                  </span>
-                )}
-              </button>
-            ))}
+            {worktreesGroupExpanded && worktrees.map((worktree) => {
+              const row = (
+                <button
+                  type="button"
+                  className={cn(
+                    "group flex w-full items-center gap-2 px-2 py-1.5 text-sm rounded-md transition-colors text-left",
+                    worktree.isCurrent ? "cursor-default opacity-85" : "cursor-pointer hover:bg-base-200"
+                  )}
+                  style={{ paddingLeft: '20px' }}
+                  onClick={() => handleOpenWorktreeInNewTab(worktree.path, worktree.isCurrent)}
+                  title={worktree.path}
+                  disabled={worktree.isCurrent}
+                >
+                  <i className={`iconoir-folder text-[14px] shrink-0 ${worktree.isCurrent ? 'text-primary' : 'opacity-60'}`} aria-hidden="true" />
+                  <span className="truncate min-w-0 flex-1">{worktree.path}</span>
+                  {worktree.branch && (
+                    <span className="shrink-0 text-xs opacity-60">
+                      {worktree.branch}
+                    </span>
+                  )}
+                  {worktree.isCurrent && (
+                    <span className="shrink-0 text-xs text-primary font-medium">
+                      current
+                    </span>
+                  )}
+                </button>
+              );
+
+              if (worktree.isCurrent) {
+                return <div key={worktree.path}>{row}</div>;
+              }
+
+              return (
+                <ContextMenu
+                  key={worktree.path}
+                  items={[{
+                    label: 'Delete worktree',
+                    onClick: () => confirmDeleteWorktree(worktree.path),
+                    danger: true,
+                  }]}
+                >
+                  {row}
+                </ContextMenu>
+              );
+            })}
           </>
         </div>
       </div>
@@ -3128,6 +3182,50 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           </div>
           <form method="dialog" className="modal-backdrop">
             <button onClick={() => { setIsDeleteOpen(false); setBranchesToDelete([]); setDeleteRemoteBranch(false); }}>close</button>
+          </form>
+        </dialog>
+      )}
+
+      {isDeleteWorktreeOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <h3 className="font-bold text-lg">Delete Worktree</h3>
+            <p className="py-4 break-words">
+              Are you sure you want to delete the worktree <span className="font-bold break-all">{worktreeToDelete}</span>?
+            </p>
+            <p className="text-sm text-error break-words">
+              This will remove the worktree from git and remove its working directory.
+            </p>
+            <div className="modal-action">
+              <button
+                className="btn"
+                onClick={() => {
+                  setIsDeleteWorktreeOpen(false);
+                  setWorktreeToDelete(null);
+                }}
+                disabled={isDeletingWorktree}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn btn-error"
+                onClick={() => void handleDeleteWorktree()}
+                disabled={isDeletingWorktree || !worktreeToDelete}
+              >
+                {isDeletingWorktree && <span className="loading loading-spinner loading-xs"></span>}
+                Delete
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button
+              onClick={() => {
+                setIsDeleteWorktreeOpen(false);
+                setWorktreeToDelete(null);
+              }}
+            >
+              close
+            </button>
           </form>
         </dialog>
       )}
