@@ -150,6 +150,8 @@ function GroupedInlineDiff({
     [oldValue, newValue, linesOffset]
   );
 
+  // Compute changed-row indexes from rendered line data because upstream diffLines
+  // counters can drift for paired removed+added rows.
   const changedLineIndexes = useMemo(() => {
     const changedIndexes: number[] = [];
     lineInformation.forEach((line, sourceIndex) => {
