@@ -360,10 +360,6 @@ export function ConflictResolverView({ repoPath }: { repoPath: string }) {
               Abort
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <button className="btn btn-ghost btn-sm" onClick={() => router.push(buildWorkspaceHref('/changes'))}>Changes</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => router.push(buildWorkspaceHref())}>History</button>
-          </div>
         </div>
       </div>
 
