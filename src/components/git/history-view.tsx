@@ -348,6 +348,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [pullLoadingBranches, setPullLoadingBranches] = useState(false);
   const [isFetchingAllRemotes, setIsFetchingAllRemotes] = useState(false);
   const [isOpeningRepoFolder, setIsOpeningRepoFolder] = useState(false);
+  const [isOpeningRepoTerminal, setIsOpeningRepoTerminal] = useState(false);
 
   // Checkout to local dialog state
   const [isCheckoutToLocalOpen, setIsCheckoutToLocalOpen] = useState(false);
@@ -2362,6 +2363,32 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }, [isOpeningRepoFolder, repoPath]);
 
+  const handleOpenRepoTerminal = useCallback(async () => {
+    if (isOpeningRepoTerminal) return;
+
+    setIsOpeningRepoTerminal(true);
+    try {
+      const response = await fetch('/api/fs/open-terminal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: repoPath }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to open terminal');
+      }
+    } catch (error) {
+      toast({
+        type: 'error',
+        title: 'Failed to Open Terminal',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } finally {
+      setIsOpeningRepoTerminal(false);
+    }
+  }, [isOpeningRepoTerminal, repoPath]);
+
   const handleOpenWorktreeInNewTab = useCallback((worktreePath: string, isCurrentWorktree: boolean) => {
     if (isCurrentWorktree) return;
 
@@ -4213,7 +4240,20 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               </button>
             </div>
           </div>
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-2">
+            <button
+              className="btn btn-sm gap-2"
+              onClick={() => void handleOpenRepoTerminal()}
+              disabled={isOpeningRepoTerminal}
+              title="Open terminal in repository folder"
+            >
+              {isOpeningRepoTerminal ? (
+                <span className="loading loading-spinner loading-xs"></span>
+              ) : (
+                <i className="iconoir-terminal text-[16px]" aria-hidden="true" />
+              )}
+              Open Terminal
+            </button>
             <button
               className="btn btn-sm gap-2"
               onClick={() => void handleOpenRepoFolder()}
