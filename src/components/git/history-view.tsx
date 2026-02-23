@@ -4031,15 +4031,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   <>
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-bold truncate">
-                        Latest: {selectedCommitRange.latestCommit.message}
+                        {selectedCommitRange.latestHash.substring(0, 7)}: {selectedCommitRange.latestCommit.message}
                       </div>
                       <div className="text-sm font-bold truncate opacity-75">
-                        Oldest: {selectedCommitRange.oldestCommit.message}
+                        {selectedCommitRange.oldestHash.substring(0, 7)}: {selectedCommitRange.oldestCommit.message}
                       </div>
-                    </div>
-                    <div className="text-xs font-mono opacity-50 shrink-0 text-right">
-                      <div>{selectedCommitRange.latestHash.substring(0, 7)}</div>
-                      <div>{selectedCommitRange.oldestHash.substring(0, 7)}</div>
                     </div>
                   </>
                 ) : (
