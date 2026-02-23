@@ -124,7 +124,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [limit, setLimit] = useState(100);
   const { data: log, isLoading, isError, error, refetch, isFetching } = useGitLog(repoPath, limit);
   const { data: branchData, isLoading: isBranchesLoading } = useGitBranches(repoPath);
-  const currentBranch = branchData?.current?.trim() ?? '';
+  const activeBranchFromData = branchData?.current?.trim() ?? '';
   const { data: statusData } = useGitStatus(repoPath);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [selectedCommitHashes, setSelectedCommitHashes] = useState<string[]>([]);
@@ -190,24 +190,24 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   }, [branchData, repoPath, requestedBranchFromQuery, runGitAction]);
 
   useEffect(() => {
-    if (!currentBranch || isCheckingOutRequestedBranchRef.current) return;
+    if (!activeBranchFromData || isCheckingOutRequestedBranchRef.current) return;
 
     const requestKey = `${repoPath}:${requestedBranchFromQuery}`;
     const hasPendingRequestedCheckout = Boolean(
       requestedBranchFromQuery &&
-      requestedBranchFromQuery !== currentBranch &&
+      requestedBranchFromQuery !== activeBranchFromData &&
       initialBranchCheckoutAttemptKeyRef.current !== requestKey
     );
     if (hasPendingRequestedCheckout) return;
 
     const queryBranch = (searchParams.get('branch') ?? '').trim();
-    if (queryBranch === currentBranch) return;
+    if (queryBranch === activeBranchFromData) return;
 
     const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set('branch', currentBranch);
+    nextParams.set('branch', activeBranchFromData);
     const nextQuery = nextParams.toString();
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
-  }, [currentBranch, pathname, repoPath, requestedBranchFromQuery, router, searchParams]);
+  }, [activeBranchFromData, pathname, repoPath, requestedBranchFromQuery, router, searchParams]);
 
   const [iscreateBranchOpen, setIsCreateBranchOpen] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
