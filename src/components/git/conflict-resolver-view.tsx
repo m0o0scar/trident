@@ -5,6 +5,8 @@ import { useState, useCallback } from 'react';
 import { cn, isFileBinary } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { GroupedDiffViewer } from './grouped-diff-viewer';
+import { useTheme } from 'next-themes';
 
 type ResolveStrategy = 'ours' | 'theirs' | 'manual';
 
@@ -30,6 +32,7 @@ function ConflictEditor({
   const [resolvedContent, setResolvedContent] = useState(
     versions.current || versions.ours || versions.theirs || ''
   );
+  const { resolvedTheme } = useTheme();
 
   if (isBinary) {
     return (
@@ -73,21 +76,18 @@ function ConflictEditor({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 grid grid-cols-2 gap-0 border-b border-base-300">
-        <div className="min-h-0 border-r border-base-300 flex flex-col">
-          <div className="px-3 py-2 text-xs font-bold uppercase tracking-wider bg-base-200/60 border-b border-base-300">Ours</div>
-          <textarea
-            value={versions.ours}
-            readOnly
-            className="textarea textarea-ghost h-full w-full rounded-none resize-none font-mono text-xs leading-5"
-          />
+      <div className="flex-1 min-h-0 border-b border-base-300 flex flex-col">
+        <div className="grid grid-cols-2 gap-0 border-b border-base-300">
+          <div className="px-3 py-2 text-xs font-bold uppercase tracking-wider bg-base-200/60 border-r border-base-300">Ours</div>
+          <div className="px-3 py-2 text-xs font-bold uppercase tracking-wider bg-base-200/60">Theirs</div>
         </div>
-        <div className="min-h-0 flex flex-col">
-          <div className="px-3 py-2 text-xs font-bold uppercase tracking-wider bg-base-200/60 border-b border-base-300">Theirs</div>
-          <textarea
-            value={versions.theirs}
-            readOnly
-            className="textarea textarea-ghost h-full w-full rounded-none resize-none font-mono text-xs leading-5"
+        <div className="flex-1 min-h-0 overflow-auto diff-viewer-wrapper">
+          <GroupedDiffViewer
+            oldValue={versions.ours}
+            newValue={versions.theirs}
+            splitView={true}
+            useDarkTheme={resolvedTheme === 'dark'}
+            showDiffOnly={false}
           />
         </div>
       </div>
