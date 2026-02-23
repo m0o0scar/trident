@@ -1206,16 +1206,34 @@ export class GitService {
     await this.git.revparse(['--verify', sourceBranch]);
     await this.git.revparse(['--verify', mergeTargetBranch]);
 
+    const hasMergeTreeConflictMarkers = (output: string): boolean => {
+      const normalized = output.toLowerCase();
+      if (
+        normalized.includes('conflict') ||
+        normalized.includes('changed in both') ||
+        normalized.includes('added in both') ||
+        normalized.includes('removed in both') ||
+        output.includes('<<<<<<<')
+      ) {
+        return true;
+      }
+
+      // Some git versions emit conflicted index stage entries in merge-tree output.
+      return /^[0-9]{6}\s+[0-9a-f]{40,64}\s+[123]\t/m.test(output);
+    };
+
     try {
-      // Modern Git: non-destructive conflict detection using exit code.
-      await this.git.raw(['merge-tree', '--write-tree', mergeTargetBranch, sourceBranch]);
-      return false;
+      // Modern Git: non-destructive conflict detection.
+      // Some Git versions may still return exit code 0 even when output includes conflicts,
+      // so we inspect output instead of relying only on exit code.
+      const mergeTreeOutput = await this.git.raw(['merge-tree', '--write-tree', mergeTargetBranch, sourceBranch]);
+      return hasMergeTreeConflictMarkers(mergeTreeOutput);
     } catch (e) {
       const errorOutput = e as { message?: string; stdout?: string; stderr?: string };
       const rawOutput = `${errorOutput.message ?? ''}\n${errorOutput.stdout ?? ''}\n${errorOutput.stderr ?? ''}`;
       const normalizedOutput = rawOutput.toLowerCase();
 
-      if (normalizedOutput.includes('conflict')) {
+      if (hasMergeTreeConflictMarkers(rawOutput)) {
         return true;
       }
 
@@ -1224,7 +1242,9 @@ export class GitService {
         normalizedOutput.includes('usage: git merge-tree');
 
       if (!isWriteTreeUnsupported) {
-        throw e;
+        // Be conservative for write-tree errors that are not clearly a capability issue.
+        // False positives are preferable to missing real conflicts.
+        return true;
       }
     }
 
