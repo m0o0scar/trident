@@ -325,6 +325,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [pullLoadingRemotes, setPullLoadingRemotes] = useState(false);
   const [pullLoadingBranches, setPullLoadingBranches] = useState(false);
   const [isFetchingAllRemotes, setIsFetchingAllRemotes] = useState(false);
+  const [isOpeningRepoFolder, setIsOpeningRepoFolder] = useState(false);
 
   // Checkout to local dialog state
   const [isCheckoutToLocalOpen, setIsCheckoutToLocalOpen] = useState(false);
@@ -2252,6 +2253,32 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }
 
+  const handleOpenRepoFolder = useCallback(async () => {
+    if (isOpeningRepoFolder) return;
+
+    setIsOpeningRepoFolder(true);
+    try {
+      const response = await fetch('/api/fs/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: repoPath }),
+      });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to open repository folder');
+      }
+    } catch (error) {
+      toast({
+        type: 'error',
+        title: 'Failed to Open Repo Folder',
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    } finally {
+      setIsOpeningRepoFolder(false);
+    }
+  }, [isOpeningRepoFolder, repoPath]);
+
   const handleFetchFromRemote = async (remote: string) => {
     try {
       await runGitAction({
@@ -3912,8 +3939,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 bg-base-100">
-        <div className="h-[57px] flex items-center px-6 border-b border-base-300 shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
+        <div className="h-[57px] flex items-center justify-between gap-3 px-6 border-b border-base-300 shrink-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <h1 className="font-bold text-lg">History</h1>
             <div className="relative" ref={branchPopoverRef}>
               <button
@@ -3971,6 +3998,21 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 Push
               </button>
             </div>
+          </div>
+          <div className="shrink-0">
+            <button
+              className="btn btn-sm gap-2"
+              onClick={() => void handleOpenRepoFolder()}
+              disabled={isOpeningRepoFolder}
+              title="Open repository folder in Finder"
+            >
+              {isOpeningRepoFolder ? (
+                <span className="loading loading-spinner loading-xs"></span>
+              ) : (
+                <i className="iconoir-folder text-[16px]" aria-hidden="true" />
+              )}
+              Open Repo Folder
+            </button>
           </div>
         </div>
 
