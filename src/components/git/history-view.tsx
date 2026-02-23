@@ -2287,9 +2287,20 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   }, [isOpeningRepoFolder, repoPath]);
 
-  const handleOpenWorktreeInNewTab = useCallback((worktreePath: string) => {
-    const targetPath = `/workspace?path=${encodeURIComponent(worktreePath)}`;
-    window.open(targetPath, '_blank', 'noopener,noreferrer');
+  const handleOpenWorktreeInNewTab = useCallback((worktreePath: string, isCurrentWorktree: boolean) => {
+    if (isCurrentWorktree) return;
+
+    let origin = window.location.origin;
+    try {
+      if (window.top?.location?.origin) {
+        origin = window.top.location.origin;
+      }
+    } catch {
+      // Ignore cross-origin access errors and keep current window origin.
+    }
+
+    const targetUrl = `${origin}/workspace?path=${encodeURIComponent(worktreePath)}`;
+    window.open(targetUrl, '_blank', 'noopener,noreferrer');
   }, []);
 
   const handleFetchFromRemote = async (remote: string) => {
@@ -2898,10 +2909,14 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               <button
                 key={worktree.path}
                 type="button"
-                className="group flex w-full items-center gap-2 px-2 py-1.5 text-sm rounded-md cursor-pointer transition-colors hover:bg-base-200 text-left"
+                className={cn(
+                  "group flex w-full items-center gap-2 px-2 py-1.5 text-sm rounded-md transition-colors text-left",
+                  worktree.isCurrent ? "cursor-default opacity-85" : "cursor-pointer hover:bg-base-200"
+                )}
                 style={{ paddingLeft: '20px' }}
-                onClick={() => handleOpenWorktreeInNewTab(worktree.path)}
+                onClick={() => handleOpenWorktreeInNewTab(worktree.path, worktree.isCurrent)}
                 title={worktree.path}
+                disabled={worktree.isCurrent}
               >
                 <i className={`iconoir-folder text-[14px] shrink-0 ${worktree.isCurrent ? 'text-primary' : 'opacity-60'}`} aria-hidden="true" />
                 <span className="truncate min-w-0 flex-1">{worktree.path}</span>
