@@ -9,7 +9,7 @@ import fs from 'node:fs';
 
 const actionSchema = z.object({
   repoPath: z.string(),
-  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'create-tag', 'delete-branch', 'delete-worktree', 'delete-remote-branch', 'delete-remote', 'delete-tag', 'delete-remote-tag', 'rename-branch', 'rename-remote-branch', 'rename-remote', 'add-remote', 'reset', 'revert', 'cherry-pick', 'cherry-pick-multiple', 'cherry-pick-abort', 'rebase', 'merge', 'check-merge-conflicts', 'check-rebase-conflicts', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'get-latest-commit-message', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword', 'discard', 'cleanup-lock-file']),
+  action: z.enum(['commit', 'push', 'pull', 'stage', 'unstage', 'fetch', 'checkout', 'checkout-to-local', 'branch', 'create-tag', 'delete-branch', 'delete-worktree', 'delete-remote-branch', 'delete-remote', 'delete-tag', 'delete-remote-tag', 'rename-branch', 'rename-remote-branch', 'rename-remote', 'add-remote', 'reset', 'revert', 'cherry-pick', 'cherry-pick-multiple', 'cherry-pick-abort', 'rebase', 'merge', 'check-merge-conflicts', 'check-rebase-conflicts', 'get-conflict-state', 'continue-merge', 'abort-merge', 'continue-rebase', 'abort-rebase', 'get-remotes', 'get-remote-branches', 'get-tracking-branch', 'get-latest-commit-message', 'push-to-remote', 'pull-from-remote', 'stash', 'stash-list', 'stash-apply', 'stash-drop', 'stash-pop', 'stash-files', 'stash-file-diff', 'reword', 'discard', 'cleanup-lock-file']),
   data: z.any().optional(), // Payload depends on action
 });
 
@@ -280,6 +280,21 @@ export async function POST(request: Request) {
         if (!data?.sourceBranch) throw new Error('Source branch is required for rebase conflict check');
         const hasRebaseConflicts = await git.willRebaseHaveConflicts(data.ontoBranch, data.sourceBranch);
         return NextResponse.json({ success: true, hasConflicts: hasRebaseConflicts });
+      case 'get-conflict-state':
+        const conflictState = await git.getConflictState();
+        return NextResponse.json({ success: true, ...conflictState });
+      case 'continue-merge':
+        await git.continueMerge();
+        break;
+      case 'abort-merge':
+        await git.abortMerge();
+        break;
+      case 'continue-rebase':
+        await git.continueRebase();
+        break;
+      case 'abort-rebase':
+        await git.abortRebase();
+        break;
       case 'get-remotes':
         const remotes = await git.getRemotes();
         return NextResponse.json({ success: true, remotes });

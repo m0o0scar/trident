@@ -1,8 +1,8 @@
 import { simpleGit, SimpleGit, SimpleGitOptions } from 'simple-git';
-import { GitStatus, GitLog, GitWorktree } from './types';
+import { GitStatus, GitLog, GitWorktree, GitConflictState } from './types';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, unlink } from 'node:fs/promises';
+import { mkdtemp, unlink, access } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -141,6 +141,53 @@ export class GitService {
     // except we might want to sanitize paths.
     // For now, we return it as is, casting to our interface (which matches simple-git mostly).
     return status as unknown as GitStatus;
+  }
+
+  private async hasRef(ref: string): Promise<boolean> {
+    try {
+      await this.git.revparse(['--verify', ref]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async gitPathExists(gitPathName: string): Promise<boolean> {
+    try {
+      const gitPath = (await this.git.raw(['rev-parse', '--git-path', gitPathName])).trim();
+      if (!gitPath) return false;
+      await access(gitPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async getConflictState(): Promise<GitConflictState> {
+    const status = await this.git.status();
+    const conflictedFiles = status.conflicted ?? [];
+    const hasConflicts = conflictedFiles.length > 0;
+
+    const [hasMergeHead, hasRebaseHead, hasRebaseApply, hasRebaseMerge] = await Promise.all([
+      this.hasRef('MERGE_HEAD'),
+      this.hasRef('REBASE_HEAD'),
+      this.gitPathExists('rebase-apply'),
+      this.gitPathExists('rebase-merge'),
+    ]);
+
+    let operation: GitConflictState['operation'] = null;
+    if (hasRebaseHead || hasRebaseApply || hasRebaseMerge) {
+      operation = 'rebase';
+    } else if (hasMergeHead) {
+      operation = 'merge';
+    }
+
+    return {
+      operation,
+      conflictedFiles,
+      hasConflicts,
+      canContinue: Boolean(operation) && !hasConflicts,
+    };
   }
 
   async getLog(limit: number = 100): Promise<GitLog> {
@@ -852,6 +899,22 @@ export class GitService {
 
   async abortCherryPick(): Promise<void> {
     await this.git.raw(['cherry-pick', '--abort']);
+  }
+
+  async continueMerge(): Promise<void> {
+    await this.git.raw(['merge', '--continue']);
+  }
+
+  async abortMerge(): Promise<void> {
+    await this.git.raw(['merge', '--abort']);
+  }
+
+  async continueRebase(): Promise<void> {
+    await this.git.raw(['rebase', '--continue']);
+  }
+
+  async abortRebase(): Promise<void> {
+    await this.git.raw(['rebase', '--abort']);
   }
 
   async rebase(ontoBranch: string, stashChanges: boolean = true): Promise<void> {
