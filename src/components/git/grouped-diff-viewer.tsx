@@ -145,24 +145,36 @@ function GroupedInlineDiff({
     [expandedByDiff, diffSignature]
   );
 
-  const { lineInformation, diffLines } = useMemo(
+  const { lineInformation } = useMemo(
     () => computeLineInformation(oldValue, newValue, true, undefined, linesOffset),
     [oldValue, newValue, linesOffset]
   );
 
+  // Compute changed-row indexes from rendered line data because upstream diffLines
+  // counters can drift for paired removed+added rows.
+  const changedLineIndexes = useMemo(() => {
+    const changedIndexes: number[] = [];
+    lineInformation.forEach((line, sourceIndex) => {
+      if (line.left?.type !== DiffType.DEFAULT || line.right?.type !== DiffType.DEFAULT) {
+        changedIndexes.push(sourceIndex);
+      }
+    });
+    return changedIndexes;
+  }, [lineInformation]);
+
   const entries = useMemo<InlineEntry[]>(() => {
     if (lineInformation.length === 0) return [];
 
-    if (!showDiffOnly || diffLines.length === 0) {
+    if (!showDiffOnly || changedLineIndexes.length === 0) {
       return lineInformation.map((line, sourceIndex) => ({ type: 'line', line, sourceIndex }));
     }
 
     const contextSize = Math.max(0, extraLinesSurroundingDiff);
     const visible = Array.from({ length: lineInformation.length }, () => false);
 
-    diffLines.forEach((diffIndex) => {
-      const start = Math.max(0, diffIndex - contextSize);
-      const end = Math.min(lineInformation.length - 1, diffIndex + contextSize);
+    changedLineIndexes.forEach((changedIndex) => {
+      const start = Math.max(0, changedIndex - contextSize);
+      const end = Math.min(lineInformation.length - 1, changedIndex + contextSize);
       for (let index = start; index <= end; index += 1) {
         visible[index] = true;
       }
@@ -206,7 +218,7 @@ function GroupedInlineDiff({
     }
 
     return nextEntries;
-  }, [lineInformation, diffLines, showDiffOnly, extraLinesSurroundingDiff, expandedBlocks]);
+  }, [lineInformation, changedLineIndexes, showDiffOnly, extraLinesSurroundingDiff, expandedBlocks]);
 
   const rows = useMemo(() => {
     const renderedRows: ReactNode[] = [];
