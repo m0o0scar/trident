@@ -8,15 +8,33 @@ import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
 import { CommitFileTreeItem, buildCommitFileTree, collectCommitFolderPaths, getParentPaths } from './commit-file-tree';
 
 // Component to show commit file diff
-export function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }: { repoPath: string; commitHash: string; filePath: string; splitView: boolean }) {
-  const { data, isLoading } = useCommitFileDiff(repoPath, commitHash, filePath);
+export function CommitFileDiffView({
+  repoPath,
+  commitHash,
+  fromCommitHash,
+  toCommitHash,
+  filePath,
+  splitView,
+}: {
+  repoPath: string;
+  commitHash: string | null;
+  fromCommitHash: string | null;
+  toCommitHash: string | null;
+  filePath: string;
+  splitView: boolean;
+}) {
+  const { data, isLoading } = useCommitFileDiff(repoPath, filePath, {
+    commitHash,
+    fromCommitHash,
+    toCommitHash,
+  });
   const { resolvedTheme } = useTheme();
   const [renderAnyway, setRenderAnyway] = useState(false);
 
-  // Reset renderAnyway when file or commit changes
+  // Reset renderAnyway when file or compared commits change
   useEffect(() => {
     setRenderAnyway(false);
-  }, [filePath, commitHash]);
+  }, [filePath, commitHash, fromCommitHash, toCommitHash]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8"><span className="loading loading-spinner text-base-content/50"></span></div>;
@@ -77,16 +95,32 @@ export function CommitFileDiffView({ repoPath, commitHash, filePath, splitView }
 }
 
 // Component to show commit changes
-export function CommitChangesView({ repoPath, commitHash }: { repoPath: string; commitHash: string }) {
-  const { data, isLoading } = useCommitDiff(repoPath, commitHash);
+export function CommitChangesView({
+  repoPath,
+  commitHash = null,
+  fromCommitHash = null,
+  toCommitHash = null,
+}: {
+  repoPath: string;
+  commitHash?: string | null;
+  fromCommitHash?: string | null;
+  toCommitHash?: string | null;
+}) {
+  const isCommitRangeSelection = !!fromCommitHash && !!toCommitHash;
+  const selectionKey = isCommitRangeSelection ? `${fromCommitHash}..${toCommitHash}` : (commitHash ?? 'none');
+  const { data, isLoading } = useCommitDiff(repoPath, {
+    commitHash,
+    fromCommitHash,
+    toCommitHash,
+  });
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [isFullPageDiff, setIsFullPageDiff] = useState(false);
   const [collapsedFoldersByCommit, setCollapsedFoldersByCommit] = useState<Record<string, Set<string>>>({});
   const fileTree = useMemo(() => buildCommitFileTree(data?.files ?? []), [data?.files]);
   const allFolderPaths = useMemo(() => collectCommitFolderPaths(fileTree), [fileTree]);
   const collapsedFolders = useMemo(
-    () => collapsedFoldersByCommit[commitHash] ?? new Set<string>(),
-    [collapsedFoldersByCommit, commitHash]
+    () => collapsedFoldersByCommit[selectionKey] ?? new Set<string>(),
+    [collapsedFoldersByCommit, selectionKey]
   );
   
   // Storage key for split view preference - same as in DiffView
@@ -115,7 +149,7 @@ export function CommitChangesView({ repoPath, commitHash }: { repoPath: string; 
   // Reset selected file when commit changes
   useEffect(() => {
     setSelectedFile(null);
-  }, [commitHash]);
+  }, [selectionKey]);
 
   // Auto-select first file when data loads and no file is selected
   useEffect(() => {
@@ -155,7 +189,7 @@ export function CommitChangesView({ repoPath, commitHash }: { repoPath: string; 
 
   const handleToggleFolder = useCallback((path: string) => {
     setCollapsedFoldersByCommit((prev) => {
-      const current = prev[commitHash] ?? new Set<string>();
+      const current = prev[selectionKey] ?? new Set<string>();
       const next = new Set(current);
       if (next.has(path)) {
         next.delete(path);
@@ -164,17 +198,21 @@ export function CommitChangesView({ repoPath, commitHash }: { repoPath: string; 
       }
       return {
         ...prev,
-        [commitHash]: next,
+        [selectionKey]: next,
       };
     });
-  }, [commitHash]);
+  }, [selectionKey]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8 h-full"><span className="loading loading-spinner text-base-content/50"></span></div>;
   }
 
   if (!data || data.files.length === 0) {
-    return <div className="flex items-center justify-center p-8 h-full opacity-50">No changes in this commit</div>;
+    return (
+      <div className="flex items-center justify-center p-8 h-full opacity-50">
+        {isCommitRangeSelection ? 'No changes in selected commit range' : 'No changes in this commit'}
+      </div>
+    );
   }
 
   return (
@@ -235,7 +273,14 @@ export function CommitChangesView({ repoPath, commitHash }: { repoPath: string; 
               </div>
             </div>
             <div className="flex-1 overflow-auto diff-viewer-wrapper">
-              <CommitFileDiffView repoPath={repoPath} commitHash={commitHash} filePath={selectedFile} splitView={splitView} />
+              <CommitFileDiffView
+                repoPath={repoPath}
+                commitHash={commitHash}
+                fromCommitHash={fromCommitHash}
+                toCommitHash={toCommitHash}
+                filePath={selectedFile}
+                splitView={splitView}
+              />
             </div>
           </div>
         ) : (

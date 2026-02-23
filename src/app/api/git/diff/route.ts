@@ -18,9 +18,21 @@ export async function GET(request: Request) {
   const repoPath = searchParams.get('path');
   const filePath = searchParams.get('file');
   const commitHash = searchParams.get('commit');
+  const fromCommitHash = searchParams.get('from');
+  const toCommitHash = searchParams.get('to');
+  const hasSingleCommit = !!commitHash;
+  const hasCommitRange = !!fromCommitHash && !!toCommitHash;
 
   if (!repoPath) {
     return NextResponse.json({ error: 'Repo path is required' }, { status: 400 });
+  }
+
+  if ((fromCommitHash && !toCommitHash) || (!fromCommitHash && toCommitHash)) {
+    return NextResponse.json({ error: 'Both from and to commit hashes are required for commit range diff' }, { status: 400 });
+  }
+
+  if (hasSingleCommit && hasCommitRange) {
+    return NextResponse.json({ error: 'Provide either commit or from/to parameters, not both' }, { status: 400 });
   }
 
   // Check if path exists
@@ -31,17 +43,26 @@ export async function GET(request: Request) {
   try {
     const git = new GitService(repoPath);
 
-    // If commit hash is provided, get commit diff
-    if (commitHash) {
-      // If file path is also provided, get diff for that specific file in the commit
+    // If commit hash or commit range is provided, get commit diff
+    if (hasSingleCommit || hasCommitRange) {
+      // If file path is also provided, get diff for that specific file in the commit / range
       if (filePath) {
         if (isImageFile(filePath)) {
           const mimeType = getImageMimeType(filePath);
-          const [beforeBuffer, afterBuffer, diff] = await Promise.all([
-            git.getFileContentBuffer(filePath, `${commitHash}^`),
-            git.getFileContentBuffer(filePath, commitHash),
-            git.getCommitFilePatch(commitHash, filePath),
-          ]);
+          const [beforeBuffer, afterBuffer, diff] = hasSingleCommit
+            ? await Promise.all([
+                git.getFileContentBuffer(filePath, `${commitHash!}^`),
+                git.getFileContentBuffer(filePath, commitHash!),
+                git.getCommitFilePatch(commitHash!, filePath),
+              ])
+            : await (async () => {
+                const { fromRef, toRef } = await git.getCommitRangeRefs(fromCommitHash!, toCommitHash!);
+                return Promise.all([
+                  git.getFileContentBuffer(filePath, fromRef),
+                  git.getFileContentBuffer(filePath, toRef),
+                  git.getCommitRangeFilePatch(fromCommitHash!, toCommitHash!, filePath),
+                ]);
+              })();
 
           return NextResponse.json({
             left: '',
@@ -54,12 +75,18 @@ export async function GET(request: Request) {
           });
         }
 
-        const { before, after, diff } = await git.getCommitFileDiff(commitHash, filePath);
+        const { before, after, diff } = hasSingleCommit
+          ? await git.getCommitFileDiff(commitHash!, filePath)
+          : await git.getCommitRangeFileDiff(fromCommitHash!, toCommitHash!, filePath);
+
         return NextResponse.json({ left: before, right: after, diff });
       }
       
-      // Otherwise, get the list of files changed in the commit
-      const { files, diff } = await git.getCommitDiff(commitHash);
+      // Otherwise, get the list of files changed in the commit / range
+      const { files, diff } = hasSingleCommit
+        ? await git.getCommitDiff(commitHash!)
+        : await git.getCommitRangeDiff(fromCommitHash!, toCommitHash!);
+
       return NextResponse.json({ files, diff });
     }
 

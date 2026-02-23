@@ -981,6 +981,27 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     () => (selectedHash ? log?.all.find((commit) => commit.hash === selectedHash) : null),
     [log?.all, selectedHash]
   );
+  const selectedCommitRange = useMemo(() => {
+    if (!log?.all || selectedCommitHashes.length < 2) return null;
+
+    const commitMap = new Map(log.all.map((commit) => [commit.hash, commit]));
+    const filteredOrderMap = new Map(filteredCommitHashes.map((hash, index) => [hash, index]));
+    const orderedSelection = Array.from(new Set(selectedCommitHashes))
+      .filter((hash) => filteredOrderMap.has(hash))
+      .sort((a, b) => (filteredOrderMap.get(a) ?? Number.MAX_SAFE_INTEGER) - (filteredOrderMap.get(b) ?? Number.MAX_SAFE_INTEGER));
+
+    if (orderedSelection.length < 2) return null;
+
+    const latestHash = orderedSelection[0];
+    const oldestHash = orderedSelection[orderedSelection.length - 1];
+    const latestCommit = commitMap.get(latestHash);
+    const oldestCommit = commitMap.get(oldestHash);
+
+    if (!latestCommit || !oldestCommit) return null;
+
+    return { latestHash, oldestHash, latestCommit, oldestCommit };
+  }, [filteredCommitHashes, log?.all, selectedCommitHashes]);
+  const isCommitRangeSelection = !!selectedCommitRange;
 
   useEffect(() => {
     if (filteredCommitHashes.length === 0) {
@@ -4006,12 +4027,27 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             {/* Header with commit info */}
             <div className="flex flex-row items-center py-2 px-4 border-b border-base-300 bg-base-100 shrink-0 justify-between gap-4">
               <div className="flex items-center gap-4 flex-1 min-w-0">
-                <span className="text-sm font-bold truncate">
-                  {selectedCommit?.message}
-                </span>
-                <span className="text-xs font-mono opacity-50 shrink-0">
-                  {selectedHash.substring(0, 7)}
-                </span>
+                {isCommitRangeSelection && selectedCommitRange ? (
+                  <>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-bold truncate">
+                        {selectedCommitRange.latestHash.substring(0, 7)}: {selectedCommitRange.latestCommit.message}
+                      </div>
+                      <div className="text-sm font-bold truncate opacity-75">
+                        {selectedCommitRange.oldestHash.substring(0, 7)}: {selectedCommitRange.oldestCommit.message}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-sm font-bold truncate">
+                      {selectedCommit?.message}
+                    </span>
+                    <span className="text-xs font-mono opacity-50 shrink-0">
+                      {selectedHash.substring(0, 7)}
+                    </span>
+                  </>
+                )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button
@@ -4024,48 +4060,63 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               </div>
             </div>
 
-            {/* Combined commit message and changes content */}
-            <div
-              ref={commitDetailsContentRef}
-              className="flex-1 overflow-hidden bg-base-100 grid"
-              style={{
-                gridTemplateRows: `${commitDetailsMessageRatio}fr 6px ${1 - commitDetailsMessageRatio}fr`,
-              }}
-            >
-              <div className="border-b border-base-300 bg-base-100 min-h-0 flex flex-col">
-                <div className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60">
-                  Message
-                </div>
-                <div className="px-4 pb-3 overflow-auto flex-1 min-h-0">
-                  <div className="text-xs opacity-70 whitespace-pre-wrap font-mono">
-                    {selectedCommit
-                      ? formatCommitMessageForDisplay(
-                          selectedCommit.body?.trim()
-                            ? `${selectedCommit.message}\n\n${selectedCommit.body}`
-                            : selectedCommit.message
-                        )
-                      : 'No additional message'}
-                  </div>
-                </div>
-              </div>
-              <div
-                className={cn(
-                  'cursor-ns-resize flex items-center justify-center hover:bg-base-200/60 transition-colors',
-                  isCommitDetailsRatioResizing && 'bg-base-200/60'
-                )}
-                onMouseDown={handleCommitDetailsRatioResizeStart}
-              >
-                <div className="w-8 h-1 rounded-full bg-base-300" />
-              </div>
-              <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+            {isCommitRangeSelection && selectedCommitRange ? (
+              <div className="flex-1 overflow-hidden min-h-0 flex flex-col bg-base-100">
                 <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60 border-b border-base-300 bg-base-100 shrink-0">
                   Changes
                 </div>
                 <div className="flex-1 min-h-0">
-                  <CommitChangesView repoPath={repoPath} commitHash={selectedHash} />
+                  <CommitChangesView
+                    repoPath={repoPath}
+                    fromCommitHash={selectedCommitRange.oldestHash}
+                    toCommitHash={selectedCommitRange.latestHash}
+                  />
                 </div>
               </div>
-            </div>
+            ) : (
+              /* Combined commit message and changes content */
+              <div
+                ref={commitDetailsContentRef}
+                className="flex-1 overflow-hidden bg-base-100 grid"
+                style={{
+                  gridTemplateRows: `${commitDetailsMessageRatio}fr 6px ${1 - commitDetailsMessageRatio}fr`,
+                }}
+              >
+                <div className="border-b border-base-300 bg-base-100 min-h-0 flex flex-col">
+                  <div className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60">
+                    Message
+                  </div>
+                  <div className="px-4 pb-3 overflow-auto flex-1 min-h-0">
+                    <div className="text-xs opacity-70 whitespace-pre-wrap font-mono">
+                      {selectedCommit
+                        ? formatCommitMessageForDisplay(
+                            selectedCommit.body?.trim()
+                              ? `${selectedCommit.message}\n\n${selectedCommit.body}`
+                              : selectedCommit.message
+                          )
+                        : 'No additional message'}
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className={cn(
+                    'cursor-ns-resize flex items-center justify-center hover:bg-base-200/60 transition-colors',
+                    isCommitDetailsRatioResizing && 'bg-base-200/60'
+                  )}
+                  onMouseDown={handleCommitDetailsRatioResizeStart}
+                >
+                  <div className="w-8 h-1 rounded-full bg-base-300" />
+                </div>
+                <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+                  <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60 border-b border-base-300 bg-base-100 shrink-0">
+                    Changes
+                  </div>
+                  <div className="flex-1 min-h-0">
+                    <CommitChangesView repoPath={repoPath} commitHash={selectedHash} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
