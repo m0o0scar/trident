@@ -241,12 +241,34 @@ export interface CommitFile {
   deletions: number;
 }
 
-export function useCommitDiff(repoPath: string | null, commitHash: string | null) {
+export interface CommitDiffQuery {
+  commitHash?: string | null;
+  fromCommitHash?: string | null;
+  toCommitHash?: string | null;
+}
+
+export function useCommitDiff(repoPath: string | null, query: CommitDiffQuery) {
+  const commitHash = query.commitHash ?? null;
+  const fromCommitHash = query.fromCommitHash ?? null;
+  const toCommitHash = query.toCommitHash ?? null;
+  const hasRange = !!fromCommitHash && !!toCommitHash;
+  const hasSingleCommit = !!commitHash;
+
   return useQuery<{ files: CommitFile[]; diff: string }>({
-    queryKey: ['git', repoPath, 'commit-diff', commitHash],
+    queryKey: ['git', repoPath, 'commit-diff', commitHash, fromCommitHash, toCommitHash],
     queryFn: async () => {
-      if (!repoPath || !commitHash) return null;
-      const res = await fetch(`${API_BASE}/git/diff?path=${encodeURIComponent(repoPath)}&commit=${encodeURIComponent(commitHash)}`);
+      if (!repoPath) return null;
+      if (!hasSingleCommit && !hasRange) return null;
+
+      const params = new URLSearchParams({ path: repoPath });
+      if (hasSingleCommit) {
+        params.set('commit', commitHash);
+      } else if (hasRange) {
+        params.set('from', fromCommitHash);
+        params.set('to', toCommitHash);
+      }
+
+      const res = await fetch(`${API_BASE}/git/diff?${params.toString()}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         const err = new Error(errorData.error || 'Failed to fetch commit diff') as GitError;
@@ -255,7 +277,7 @@ export function useCommitDiff(repoPath: string | null, commitHash: string | null
       }
       return res.json();
     },
-    enabled: !!repoPath && !!commitHash,
+    enabled: !!repoPath && (hasSingleCommit || hasRange),
     retry: (failureCount, error: GitError) => {
       if (error.status === 404 || error.status === 400) return false;
       return failureCount < 3;
@@ -263,12 +285,31 @@ export function useCommitDiff(repoPath: string | null, commitHash: string | null
   });
 }
 
-export function useCommitFileDiff(repoPath: string | null, commitHash: string | null, filePath: string | null) {
+export function useCommitFileDiff(repoPath: string | null, filePath: string | null, query: CommitDiffQuery) {
+  const commitHash = query.commitHash ?? null;
+  const fromCommitHash = query.fromCommitHash ?? null;
+  const toCommitHash = query.toCommitHash ?? null;
+  const hasRange = !!fromCommitHash && !!toCommitHash;
+  const hasSingleCommit = !!commitHash;
+
   return useQuery<FileDiffPayload>({
-    queryKey: ['git', repoPath, 'commit-file-diff', commitHash, filePath],
+    queryKey: ['git', repoPath, 'commit-file-diff', filePath, commitHash, fromCommitHash, toCommitHash],
     queryFn: async () => {
-      if (!repoPath || !commitHash || !filePath) return null;
-      const res = await fetch(`${API_BASE}/git/diff?path=${encodeURIComponent(repoPath)}&commit=${encodeURIComponent(commitHash)}&file=${encodeURIComponent(filePath)}`);
+      if (!repoPath || !filePath) return null;
+      if (!hasSingleCommit && !hasRange) return null;
+
+      const params = new URLSearchParams({
+        path: repoPath,
+        file: filePath,
+      });
+      if (hasSingleCommit) {
+        params.set('commit', commitHash);
+      } else if (hasRange) {
+        params.set('from', fromCommitHash);
+        params.set('to', toCommitHash);
+      }
+
+      const res = await fetch(`${API_BASE}/git/diff?${params.toString()}`);
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
         const err = new Error(errorData.error || 'Failed to fetch file diff') as GitError;
@@ -277,7 +318,7 @@ export function useCommitFileDiff(repoPath: string | null, commitHash: string | 
       }
       return res.json();
     },
-    enabled: !!repoPath && !!commitHash && !!filePath,
+    enabled: !!repoPath && !!filePath && (hasSingleCommit || hasRange),
     retry: (failureCount, error: GitError) => {
       if (error.status === 404 || error.status === 400) return false;
       return failureCount < 3;

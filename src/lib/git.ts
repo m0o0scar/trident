@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 const execFileAsync = promisify(execFile);
+const EMPTY_TREE_HASH = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
 function normalizeRemoteUrlForHttpAuth(remoteUrl: string): string | null {
   if (remoteUrl.startsWith('http://') || remoteUrl.startsWith('https://')) {
@@ -858,22 +859,60 @@ export class GitService {
     }
   }
 
+  private parseNameStatusDiff(diffStat: string): { path: string; additions: number; deletions: number; status: string }[] {
+    return diffStat
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        const [status, ...pathParts] = line.split('\t');
+        // For rename/copy entries (old + new path), keep the destination path.
+        const path = pathParts.length > 1 ? pathParts[pathParts.length - 1] : (pathParts[0] ?? '');
+        return { path, status, additions: 0, deletions: 0 };
+      });
+  }
+
+  private async getCommitParentOrEmptyTree(commitHash: string): Promise<string> {
+    try {
+      return (await this.git.revparse([`${commitHash}^`])).trim();
+    } catch {
+      // Root commit has no parent; compare against empty tree to include it in the range.
+      return EMPTY_TREE_HASH;
+    }
+  }
+
+  async getCommitRangeRefs(oldestCommitHash: string, latestCommitHash: string): Promise<{ fromRef: string; toRef: string }> {
+    const oldest = oldestCommitHash.trim();
+    const latest = latestCommitHash.trim();
+
+    if (!oldest || !latest) {
+      throw new Error('Both oldest and latest commit hashes are required');
+    }
+
+    const fromRef = await this.getCommitParentOrEmptyTree(oldest);
+    return { fromRef, toRef: latest };
+  }
+
   async getCommitDiff(commitHash: string): Promise<{ files: { path: string; additions: number; deletions: number; status: string }[]; diff: string }> {
     // Get the list of files changed in this commit with stats
     // Use -m --first-parent to handle merge commits properly:
     // - For regular commits: compares against the single parent (same behavior as before)
     // - For merge commits: compares against the first parent (the branch being merged INTO)
     const diffStat = await this.git.raw(['diff-tree', '-m', '--first-parent', '--no-commit-id', '--name-status', '-r', commitHash]);
-    const files = diffStat.trim().split('\n').filter(Boolean).map(line => {
-      const [status, ...pathParts] = line.split('\t');
-      const path = pathParts.join('\t'); // Handle paths with tabs (rare)
-      return { path, status, additions: 0, deletions: 0 };
-    });
+    const files = this.parseNameStatusDiff(diffStat);
 
     // Get the full diff for this commit
     // Use -m --first-parent for merge commits to show the diff against first parent
     const diff = await this.git.raw(['show', '-m', '--first-parent', '--format=', commitHash]);
 
+    return { files, diff };
+  }
+
+  async getCommitRangeDiff(oldestCommitHash: string, latestCommitHash: string): Promise<{ files: { path: string; additions: number; deletions: number; status: string }[]; diff: string }> {
+    const { fromRef, toRef } = await this.getCommitRangeRefs(oldestCommitHash, latestCommitHash);
+    const diffStat = await this.git.raw(['diff', '--name-status', fromRef, toRef]);
+    const files = this.parseNameStatusDiff(diffStat);
+    const diff = await this.git.raw(['diff', fromRef, toRef]);
     return { files, diff };
   }
 
@@ -901,12 +940,43 @@ export class GitService {
     return { before, after, diff };
   }
 
+  async getCommitRangeFileDiff(oldestCommitHash: string, latestCommitHash: string, filePath: string): Promise<{ before: string; after: string; diff: string }> {
+    const { fromRef, toRef } = await this.getCommitRangeRefs(oldestCommitHash, latestCommitHash);
+    let before = '';
+    let after = '';
+
+    try {
+      before = await this.git.show([`${fromRef}:${filePath}`]);
+    } catch {
+      before = '';
+    }
+
+    try {
+      after = await this.git.show([`${toRef}:${filePath}`]);
+    } catch {
+      after = '';
+    }
+
+    const diff = await this.getCommitRangeFilePatch(oldestCommitHash, latestCommitHash, filePath);
+    return { before, after, diff };
+  }
+
   async getCommitFilePatch(commitHash: string, filePath: string): Promise<string> {
     try {
       // Use show to get the diff (log message suppressed by format=)
       return await this.git.raw(['show', '--format=', commitHash, '--', filePath]);
     } catch (e) {
       console.warn('Failed to get commit file diff:', e);
+      return '';
+    }
+  }
+
+  async getCommitRangeFilePatch(oldestCommitHash: string, latestCommitHash: string, filePath: string): Promise<string> {
+    try {
+      const { fromRef, toRef } = await this.getCommitRangeRefs(oldestCommitHash, latestCommitHash);
+      return await this.git.raw(['diff', fromRef, toRef, '--', filePath]);
+    } catch (e) {
+      console.warn('Failed to get commit range file diff:', e);
       return '';
     }
   }
