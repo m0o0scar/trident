@@ -66,7 +66,7 @@ jobs:
         if: steps.resolve-tag.outputs.should_publish == 'true' && steps.verify-main.outputs.on_main == 'true'
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
@@ -76,5 +76,3 @@ jobs:
       - name: Publish package
         if: steps.resolve-tag.outputs.should_publish == 'true' && steps.verify-main.outputs.on_main == 'true'
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
