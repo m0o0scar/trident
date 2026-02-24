@@ -121,13 +121,43 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const initialBranchHeadSelectionAttemptKeyRef = useRef<string | null>(null);
   
   const [limit, setLimit] = useState(100);
-  const { data: log, isLoading, isError, error, refetch, isFetching } = useGitLog(repoPath, limit);
-  const { data: branchData, isLoading: isBranchesLoading } = useGitBranches(repoPath);
+  const { data: log, isLoading, isError, error, refetch: refetchLog, isFetching } = useGitLog(repoPath, limit);
+  const { data: branchData, isLoading: isBranchesLoading, refetch: refetchBranches } = useGitBranches(repoPath);
   const activeBranchFromData = branchData?.current?.trim() ?? '';
   const { data: statusData } = useGitStatus(repoPath);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [selectedCommitHashes, setSelectedCommitHashes] = useState<string[]>([]);
   const [selectionAnchorHash, setSelectionAnchorHash] = useState<string | null>(null);
+  const lastVisibilityRefreshAtRef = useRef(0);
+
+  const refreshBranchesAndHistory = useCallback(() => {
+    const now = Date.now();
+    if (now - lastVisibilityRefreshAtRef.current < 500) return;
+    lastVisibilityRefreshAtRef.current = now;
+    void Promise.all([refetchBranches(), refetchLog()]);
+  }, [refetchBranches, refetchLog]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshBranchesAndHistory();
+      }
+    };
+
+    const handleWindowFocus = () => {
+      if (document.visibilityState === 'visible') {
+        refreshBranchesAndHistory();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleWindowFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, [refreshBranchesAndHistory]);
 
   const selectSingleCommit = useCallback((hash: string | null) => {
     setSelectedHash(hash);
@@ -3052,7 +3082,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       <div className="flex items-center justify-center p-8 h-full flex-col gap-4">
         <p className="text-error font-medium">Error Loading History</p>
         <p className="text-sm opacity-70">{(error as Error)?.message || 'An unknown error occurred'}</p>
-        <button onClick={() => refetch()} className="btn btn-outline btn-sm">
+        <button onClick={() => void refetchLog()} className="btn btn-outline btn-sm">
             <i className="iconoir-refresh-circle text-[16px] mr-1" aria-hidden="true" />
             Try Again
         </button>
