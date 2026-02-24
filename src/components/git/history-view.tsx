@@ -2782,8 +2782,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     if (customBranchScripts.length > 0) {
       menuItems.push({
         label: 'Custom scripts',
+        icon: <i className="iconoir-terminal text-[14px]" aria-hidden="true" />,
         children: customBranchScripts.map((script) => ({
           label: script.name,
+          icon: <i className="iconoir-play text-[14px]" aria-hidden="true" />,
           onClick: () => {
             void handleRunCustomScript(script, options.branchRef);
           },
@@ -2818,6 +2820,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       return [
         {
           label: 'Delete Tag',
+          icon: <i className="iconoir-trash text-[14px]" aria-hidden="true" />,
           onClick: () => confirmDeleteTag(tagName),
           danger: true,
         },
@@ -2879,6 +2882,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 items={[
                   {
                     label: 'Delete',
+                    icon: <i className="iconoir-trash text-[14px]" aria-hidden="true" />,
                     onClick: () => confirmDeleteBranches(localGroupBranchRefs),
                     danger: true,
                     disabled: localGroupBranchRefs.length === 0,
@@ -2929,8 +2933,16 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           <>
             <ContextMenu
               items={[
-                { label: 'Fetch from all remotes', onClick: handleFetchFromAllRemotes },
-                { label: 'Add remote', onClick: confirmAddRemote },
+                {
+                  label: 'Fetch from all remotes',
+                  icon: <i className="iconoir-refresh-circle text-[14px]" aria-hidden="true" />,
+                  onClick: handleFetchFromAllRemotes,
+                },
+                {
+                  label: 'Add remote',
+                  icon: <i className="iconoir-plus-circle text-[14px]" aria-hidden="true" />,
+                  onClick: confirmAddRemote,
+                },
               ]}
             >
               <GroupHeader
@@ -2957,10 +2969,19 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                 <div key={remoteName}>
                   <ContextMenu
                     items={[
-                      { label: `Fetch from ${remoteName}`, onClick: () => handleFetchFromRemote(remoteName) },
-                      { label: 'Rename', onClick: () => confirmRenameRemote(remoteName) },
+                      {
+                        label: `Fetch from ${remoteName}`,
+                        icon: <i className="iconoir-refresh-circle text-[14px]" aria-hidden="true" />,
+                        onClick: () => handleFetchFromRemote(remoteName),
+                      },
+                      {
+                        label: 'Rename',
+                        icon: <i className="iconoir-edit-pencil text-[14px]" aria-hidden="true" />,
+                        onClick: () => confirmRenameRemote(remoteName),
+                      },
                       {
                         label: 'Delete',
+                        icon: <i className="iconoir-trash text-[14px]" aria-hidden="true" />,
                         onClick: () => confirmDeleteRemote(remoteName),
                         danger: true,
                       },
@@ -3071,6 +3092,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                   key={worktree.path}
                   items={[{
                     label: 'Delete worktree',
+                    icon: <i className="iconoir-trash text-[14px]" aria-hidden="true" />,
                     onClick: () => confirmDeleteWorktree(worktree.path),
                     danger: true,
                   }]}

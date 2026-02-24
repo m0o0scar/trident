@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 export interface ContextMenuItem {
     label: string;
     labelNode?: React.ReactNode;
+    icon?: React.ReactNode;
     onClick?: () => void;
     danger?: boolean;
     children?: ContextMenuItem[];
@@ -99,8 +100,11 @@ export function ContextMenu({
             items.forEach(item => {
                 tempElement.textContent = item.label;
                 const width = tempElement.getBoundingClientRect().width;
-                if (width > maxWidth) {
-                    maxWidth = width;
+                const iconWidth = item.icon ? 20 : 0;
+                const submenuArrowWidth = item.children?.length ? 16 : 0;
+                const totalWidth = width + iconWidth + submenuArrowWidth;
+                if (totalWidth > maxWidth) {
+                    maxWidth = totalWidth;
                 }
             });
 
@@ -159,13 +163,17 @@ export function ContextMenu({
                         setIsOpen(false);
                     }}
                     className={cn(
+                        "flex items-center gap-2",
                         "whitespace-nowrap",
                         item.danger && "text-error",
                         item.disabled && "opacity-40 pointer-events-none",
                         hasChildren && "flex items-center justify-between gap-3"
                     )}
                 >
-                    <span>{item.labelNode ?? item.label}</span>
+                    <span className="flex min-w-0 items-center gap-2">
+                        {item.icon && <span className="inline-flex shrink-0 opacity-80">{item.icon}</span>}
+                        <span>{item.labelNode ?? item.label}</span>
+                    </span>
                     {hasChildren && <i className="iconoir-nav-arrow-right text-[12px]" aria-hidden="true" />}
                 </a>
                 {hasChildren && (

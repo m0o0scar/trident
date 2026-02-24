@@ -258,30 +258,38 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                         {nodes.map((node) => {
                             const isSelected = selectedHashes ? selectedHashes.has(node.hash) : selectedHash === node.hash;
                             const selectedCount = selectedHashes?.size ?? (selectedHash ? 1 : 0);
-                            const menuItems = [
-                                { label: "Reset to here", onClick: () => onResetToCommit?.(node.hash) },
+                            const menuItems: ContextMenuItem[] = [
+                                {
+                                    label: "Reset to here",
+                                    icon: <i className="iconoir-refresh-circle text-[14px]" aria-hidden="true" />,
+                                    onClick: () => onResetToCommit?.(node.hash),
+                                },
                             ];
                             if (onRevertCommit) {
                                 menuItems.push({
                                     label: "Revert commit",
+                                    icon: <i className="iconoir-u-turn-arrow-left text-[14px]" aria-hidden="true" />,
                                     onClick: () => onRevertCommit(node.hash, node.message),
                                 });
                             }
                             if (onCreateTag) {
                                 menuItems.push({
                                     label: "Create tag",
+                                    icon: <i className="iconoir-bookmark text-[14px]" aria-hidden="true" />,
                                     onClick: () => onCreateTag(node.hash),
                                 });
                             }
                             if (onCherryPickCommit) {
                                 menuItems.push({
                                     label: "Cherry-pick commit",
+                                    icon: <i className="iconoir-git-fork text-[14px]" aria-hidden="true" />,
                                     onClick: () => onCherryPickCommit(node.hash, node.message),
                                 });
                             }
                             if (onCherryPickSelectedCommits && selectedCount > 1 && isSelected) {
                                 menuItems.push({
                                     label: `Cherry-pick ${selectedCount} selected commits`,
+                                    icon: <i className="iconoir-git-fork text-[14px]" aria-hidden="true" />,
                                     onClick: onCherryPickSelectedCommits,
                                 });
                             }
@@ -308,6 +316,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                 if (targetBranch) {
                                     menuItems.push({
                                         label: "Reword commit",
+                                        icon: <i className="iconoir-edit-pencil text-[14px]" aria-hidden="true" />,
                                         onClick: () => onRewordCommit(node.hash, node.message, node.body ?? '', targetBranch!),
                                     });
                                 }

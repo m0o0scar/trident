@@ -98,6 +98,7 @@ export function BranchTreeItem({
                 items={[
                   {
                     label: 'Delete',
+                    icon: <i className="iconoir-trash text-[14px]" aria-hidden="true" />,
                     onClick: () => onDeleteBranchGroup(deletableChildBranchRefs),
                     danger: true,
                     disabled: deletableChildBranchRefs.length === 0,
