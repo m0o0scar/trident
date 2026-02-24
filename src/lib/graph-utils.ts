@@ -115,9 +115,14 @@ export function generateGraphData(commits: Commit[], options: GenerateGraphOptio
   }
 
   commits.forEach((commit, index) => {
+      const matchingLanes: number[] = [];
+      for (let i = 0; i < lanes.length; i++) {
+        if (lanes[i] === commit.hash) matchingLanes.push(i);
+      }
+
       // 1. Identify which lane this commit belongs to.
       // It belongs to a lane if that lane is currently "looking for" this commit hash.
-      let lane = lanes.indexOf(commit.hash);
+      let lane = matchingLanes.length > 0 ? matchingLanes[0] : -1;
       
       // If no lane is looking for me, I am a new tip (e.g. a branch head).
       if (lane === -1) {
@@ -151,12 +156,14 @@ export function generateGraphData(commits: Commit[], options: GenerateGraphOptio
           paths: [],
           isMerge: commit.parents.length > 1
       };
+      const duplicateMatchingLanes = matchingLanes.filter((i) => i !== lane);
+      const duplicateLaneSet = new Set(duplicateMatchingLanes);
 
       // 3. Draw Vertical "Rails" for ALL other active lanes
       // These are connections from (lane, index) to (lane, index+1) 
       // for branches that just "pass through" this row.
       for (let i = 0; i < lanes.length; i++) {
-          if (i !== lane && lanes[i] !== null) {
+          if (i !== lane && lanes[i] !== null && !duplicateLaneSet.has(i)) {
                node.paths.push({
                    x1: i, y1: index,
                    x2: i, y2: index + 1,
@@ -172,37 +179,38 @@ export function generateGraphData(commits: Commit[], options: GenerateGraphOptio
       
       // Clear current lane (we reached the node)
       lanes[lane] = null;
+
+      // If multiple lanes were targeting the same commit hash, keep them parallel
+      // until this branch-out point and collapse them here.
+      for (const duplicateLane of duplicateMatchingLanes) {
+        node.paths.push({
+          x1: duplicateLane,
+          y1: index,
+          x2: lane,
+          y2: index + 1,
+          color: getColor(duplicateLane),
+          type: 'merge'
+        });
+        lanes[duplicateLane] = null;
+        laneBranchRefs[duplicateLane] = null;
+        laneColors[duplicateLane] = undefined;
+      }
       
       const parents = commit.parents;
       
       if (parents.length > 0) {
           // Parent 0 takes the current lane (usually)
           const p0 = parents[0];
-          
-          // Check if Parent 0 is ALREADY active in another lane?
-          // (e.g. two branches merging into p0, and we are the second one processing)
-          const existingP0Lane = lanes.indexOf(p0);
-          
-          if (existingP0Lane !== -1) {
-              // Merge TO existing lane
-              node.paths.push({
-                  x1: lane, y1: index,
-                  x2: existingP0Lane, y2: index + 1,
-                  color: color, 
-                  type: 'merge'
-              });
-              // We don't set lanes[lane] = p0, because p0 is already "owned" by existingP0Lane.
-              // This lane effectively ends (merges in).
-          } else {
-              // Standard continuation
-              lanes[lane] = p0;
-              node.paths.push({
-                  x1: lane, y1: index,
-                  x2: lane, y2: index + 1,
-                  color: color, 
-                  type: 'straight'
-              });
-          }
+
+          // Always continue parent 0 in-place so sibling branches remain parallel
+          // until the actual branch-out commit row.
+          lanes[lane] = p0;
+          node.paths.push({
+              x1: lane, y1: index,
+              x2: lane, y2: index + 1,
+              color: color, 
+              type: 'straight'
+          });
           
           // Other Parents (Merge Heads)
           // Other Parents (Merge Heads)
