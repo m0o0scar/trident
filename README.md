@@ -14,6 +14,8 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - **Stash Support** - Stash, reapply, and delete stashed changes
 - **Diff Viewer** - Syntax-highlighted diff view for reviewing changes
 - **Commit History** - Browse commit history with infinite scroll and branch filtering
+- **Branch Deep Links** - Open History with `?branch=<name>` to initialize branch checkout/head focus
+- **Iconized Context Menus** - Faster scanning with icons across branch/tag/commit/worktree actions
 - **Command Palette** - Quick access to common actions via Cmd/Ctrl+K
 - **Settings** - Configure default repository folder and preferences
 - **Dark/Light Mode** - Theme toggle for comfortable viewing
@@ -60,6 +62,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] Hard/soft/mixed reset to selected commit
 - [x] Cherry-pick single/multiple commits and abort cherry-pick
 - [x] Commit details and per-file commit diffs (split/inline)
+- [x] One-way history branch query initialization (`?branch=<name>`)
 
 #### Remote Operations
 - [x] Fetch default remote
@@ -74,6 +77,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] Delete remote tag
 - [x] Manage credentials (GitHub/GitLab) and associate per repository
 - [x] Run repository custom bash scripts from branch context menu (with live output/cancel)
+- [x] Automated release tagging on main PR merge and npm publish on release tags
 
 #### UX & Reliability
 - [x] Dark/light/system theme toggle
@@ -163,6 +167,8 @@ npm start
 ## Project Structure
 
 ```
+.github/workflows/         # CI/CD (release tagging + npm publish)
+bin/                       # Packaged CLI entrypoint
 src/
 ├── app/                    # Next.js App Router pages
 │   ├── api/               # API routes for Git operations
@@ -177,7 +183,7 @@ src/
 │   │   ├── history-view.tsx
 │   │   └── status-view.tsx
 │   ├── layout/           # Layout components
-│   └── ui/               # Reusable UI components (Radix-based)
+│   └── context-menu.tsx  # Shared context menu (supports action icons)
 ├── hooks/                # Custom React hooks
 ├── lib/                  # Utilities and services
 │   ├── git.ts           # Git service wrapper
@@ -192,10 +198,22 @@ src/
 |---------|-------------|
 | `npm run dev` | Start development server |
 | `npm run build` | Build for production |
+| `npm run prepack` | Clean `.next` and build package artifacts before publish |
 | `npm run start` | Start production server |
 | `npm run lint` | Run ESLint |
 | `npm run cli` | Start through the packaged CLI launcher |
 | `npm run pack:preview` | Preview npm package contents |
+
+## Release Automation
+
+The repository ships with GitHub Actions workflows for automated releases:
+
+1. On merged pull requests targeting `main`, `Release On Main Merge` bumps the npm minor version (`npm version minor`), creates a `v*` tag, and pushes both commit + tag.
+2. `Publish To NPM` runs on `v*` tag pushes (and also after successful release workflow completion), resolves the release tag, verifies the tagged commit is on `main`, and publishes with `npm publish --access public --provenance`.
+
+Required secret:
+
+- `NPM_TOKEN` with publish access to the `trident-git` package.
 
 ## License
 
