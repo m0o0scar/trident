@@ -3,6 +3,10 @@
   "version": "0.8.0",
   "private": false,
   "description": "A modern, web-based Git client.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/m0o0scar/trident"
+  },
   "bin": {
     "trident-git": "bin/trident-git.mjs"
   },
