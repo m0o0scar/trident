@@ -18,7 +18,7 @@ import { GroupHeader } from './group-header';
 import { BranchMenuOptions, BranchOperation, buildBranchContextMenuItems } from './branch-context-menu';
 import { BranchRowSelectModifiers, BranchTreeItem } from './branch-tree-item';
 import { CommitRowSelectModifiers } from './commit-row-select-modifiers';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 
 const MIN_HISTORY_PANEL_HEIGHT = 100;
@@ -27,24 +27,6 @@ const MIN_COMMIT_DETAILS_MESSAGE_RATIO = 0.15;
 const MAX_COMMIT_DETAILS_MESSAGE_RATIO = 0.75;
 const DEFAULT_COMMIT_DETAILS_MESSAGE_RATIO = 0.28;
 type MergeConflictStatus = 'checking' | 'no-conflict' | 'has-conflicts';
-
-let hasAppliedReloadBranchQueryBootstrapForCurrentDocument = false;
-
-function shouldApplyReloadBranchQueryBootstrap(): boolean {
-  if (typeof window === 'undefined') return false;
-
-  const navigationEntry = window.performance
-    .getEntriesByType('navigation')
-    .at(0) as PerformanceNavigationTiming | undefined;
-  const isReloadNavigation = navigationEntry?.type === 'reload';
-
-  if (!isReloadNavigation || hasAppliedReloadBranchQueryBootstrapForCurrentDocument) {
-    return false;
-  }
-
-  hasAppliedReloadBranchQueryBootstrapForCurrentDocument = true;
-  return true;
-}
 
 type ScriptExecutionStatus = 'idle' | 'starting' | 'running' | 'completed' | 'failed' | 'canceled';
 type ScriptExecutionState = {
@@ -133,20 +115,10 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
   const router = useRouter();
-  const pathname = usePathname();
   const searchParams = useSearchParams();
-  const shouldApplyInitialBranchQueryRef = useRef(shouldApplyReloadBranchQueryBootstrap());
   const requestedBranchFromQuery = (searchParams.get('branch') ?? '').trim();
-  const initialBranchQuerySnapshotRepoPathRef = useRef<string | null>(null);
-  const hadInitialBranchQueryRef = useRef(
-    shouldApplyInitialBranchQueryRef.current && searchParams.has('branch')
-  );
-  const initialRequestedBranchRef = useRef<string | null>(
-    shouldApplyInitialBranchQueryRef.current ? requestedBranchFromQuery || null : null
-  );
   const initialBranchCheckoutAttemptKeyRef = useRef<string | null>(null);
   const initialBranchHeadSelectionAttemptKeyRef = useRef<string | null>(null);
-  const isCheckingOutRequestedBranchRef = useRef(false);
   
   const [limit, setLimit] = useState(100);
   const { data: log, isLoading, isError, error, refetch, isFetching } = useGitLog(repoPath, limit);
@@ -192,20 +164,11 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   }, []);
 
   useEffect(() => {
-    if (initialBranchQuerySnapshotRepoPathRef.current === repoPath) return;
-
-    initialBranchQuerySnapshotRepoPathRef.current = repoPath;
-    const hasInitialBranchQuery =
-      shouldApplyInitialBranchQueryRef.current && searchParams.has('branch');
-    hadInitialBranchQueryRef.current = hasInitialBranchQuery;
-    initialRequestedBranchRef.current = hasInitialBranchQuery ? requestedBranchFromQuery || null : null;
     initialBranchCheckoutAttemptKeyRef.current = null;
     initialBranchHeadSelectionAttemptKeyRef.current = null;
-    isCheckingOutRequestedBranchRef.current = false;
-  }, [repoPath, requestedBranchFromQuery, searchParams]);
+  }, [repoPath]);
 
   useEffect(() => {
-    if (!shouldApplyInitialBranchQueryRef.current) return;
     if (!requestedBranchFromQuery || !branchData) return;
 
     const requestKey = `${repoPath}:${requestedBranchFromQuery}`;
@@ -227,7 +190,6 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
 
     initialBranchCheckoutAttemptKeyRef.current = requestKey;
-    isCheckingOutRequestedBranchRef.current = true;
 
     void (async () => {
       try {
@@ -238,32 +200,9 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
         });
       } catch (e) {
         console.error(e);
-      } finally {
-        isCheckingOutRequestedBranchRef.current = false;
       }
     })();
   }, [branchData, repoPath, requestedBranchFromQuery, runGitAction]);
-
-  useEffect(() => {
-    if (!activeBranchFromData || isCheckingOutRequestedBranchRef.current) return;
-
-    const requestKey = `${repoPath}:${requestedBranchFromQuery}`;
-    const hasPendingRequestedCheckout = Boolean(
-      shouldApplyInitialBranchQueryRef.current &&
-      requestedBranchFromQuery &&
-      requestedBranchFromQuery !== activeBranchFromData &&
-      initialBranchCheckoutAttemptKeyRef.current !== requestKey
-    );
-    if (hasPendingRequestedCheckout) return;
-
-    const queryBranch = (searchParams.get('branch') ?? '').trim();
-    if (queryBranch === activeBranchFromData) return;
-
-    const nextParams = new URLSearchParams(searchParams.toString());
-    nextParams.set('branch', activeBranchFromData);
-    const nextQuery = nextParams.toString();
-    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
-  }, [activeBranchFromData, pathname, repoPath, requestedBranchFromQuery, router, searchParams]);
 
   const [iscreateBranchOpen, setIsCreateBranchOpen] = useState(false);
   const [newBranchName, setNewBranchName] = useState('');
@@ -1240,18 +1179,15 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   }, [branchData?.branchCommits, log?.all, selectSingleCommit]);
 
   useEffect(() => {
-    if (!hadInitialBranchQueryRef.current) return;
+    if (!requestedBranchFromQuery || !branchData?.branchCommits) return;
+    if (activeBranchFromData !== requestedBranchFromQuery) return;
 
-    const initialRequestedBranch = initialRequestedBranchRef.current;
-    if (!initialRequestedBranch || !branchData?.branchCommits) return;
-    if (activeBranchFromData !== initialRequestedBranch) return;
-
-    const requestKey = `${repoPath}:${initialRequestedBranch}`;
+    const requestKey = `${repoPath}:${requestedBranchFromQuery}`;
     if (initialBranchHeadSelectionAttemptKeyRef.current === requestKey) return;
 
     initialBranchHeadSelectionAttemptKeyRef.current = requestKey;
-    scrollToBranchHeadCommit(initialRequestedBranch);
-  }, [activeBranchFromData, branchData?.branchCommits, repoPath, scrollToBranchHeadCommit]);
+    scrollToBranchHeadCommit(requestedBranchFromQuery);
+  }, [activeBranchFromData, branchData?.branchCommits, repoPath, requestedBranchFromQuery, scrollToBranchHeadCommit]);
 
   const handleBranchClick = useCallback((branch: string, modifiers?: BranchRowSelectModifiers) => {
     const isRangeSelect = modifiers?.isRangeSelect ?? false;
