@@ -1,11 +1,9 @@
 name: Release On Main Merge
 
 on:
-  pull_request:
+  push:
     branches:
       - main
-    types:
-      - closed
 
 permissions:
   contents: write
@@ -16,7 +14,7 @@ concurrency:
 
 jobs:
   bump-and-tag:
-    if: github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main'
+    if: ${{ !contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]') }}
     runs-on: ubuntu-latest
 
     steps:

@@ -208,7 +208,7 @@ src/
 
 The repository ships with GitHub Actions workflows for automated releases:
 
-1. On merged pull requests targeting `main`, `Release On Main Merge` bumps the npm minor version (`npm version minor`), creates a `v*` tag, and pushes both commit + tag.
+1. On pushes to `main` (including local merge commits pushed to GitHub), `Release On Main Merge` bumps the npm minor version (`npm version minor`), creates a `v*` tag, and pushes both commit + tag.
 2. `Publish To NPM` runs on `v*` tag pushes (and also after successful release workflow completion), resolves the release tag, verifies the tagged commit is on `main`, and publishes with `npm publish --access public --provenance`.
 
 Required secret:
