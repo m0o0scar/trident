@@ -1,5 +1,3 @@
-import keytar from 'keytar';
-
 // Service name for keytar storage
 const SERVICE_NAME = 'trident-git-credentials';
 
@@ -38,6 +36,47 @@ export interface CredentialMetadata {
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+
+type KeytarModule = {
+  getPassword(service: string, account: string): Promise<string | null>;
+  setPassword(service: string, account: string, password: string): Promise<void>;
+  deletePassword(service: string, account: string): Promise<boolean>;
+};
+
+let keytarPromise: Promise<KeytarModule | null> | null = null;
+let keytarUnavailableReason: string | null = null;
+let didLogKeytarWarning = false;
+
+function keytarUnavailableMessage() {
+  if (keytarUnavailableReason) {
+    return `Secure credential storage is unavailable: ${keytarUnavailableReason}`;
+  }
+  return 'Secure credential storage is unavailable in this runtime.';
+}
+
+async function loadKeytar(): Promise<KeytarModule | null> {
+  if (!keytarPromise) {
+    keytarPromise = import('keytar')
+      .then((module) => (module.default ?? module) as KeytarModule)
+      .catch((error: unknown) => {
+        keytarUnavailableReason = error instanceof Error ? error.message : String(error);
+        if (!didLogKeytarWarning) {
+          didLogKeytarWarning = true;
+          console.warn(`[credentials] ${keytarUnavailableMessage()}`);
+        }
+        return null;
+      });
+  }
+  return keytarPromise;
+}
+
+async function requireKeytar(): Promise<KeytarModule> {
+  const keytar = await loadKeytar();
+  if (!keytar) {
+    throw new Error(keytarUnavailableMessage());
+  }
+  return keytar;
+}
 
 // Get cross-platform app data directory
 function getAppDataDir(): string {
@@ -183,10 +222,21 @@ export async function getCredentialById(id: string): Promise<Credential | null> 
 }
 
 export async function getCredentialToken(id: string): Promise<string | null> {
+  const keytar = await loadKeytar();
+  if (!keytar) {
+    return null;
+  }
   return keytar.getPassword(SERVICE_NAME, getKeytarAccount(id));
 }
 
 export async function createGitHubCredential(token: string): Promise<{ success: boolean; credential?: GitHubCredential; error?: string }> {
+  let keytar: KeytarModule;
+  try {
+    keytar = await requireKeytar();
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+
   // Verify token first
   const verification = await verifyGitHubToken(token);
   if (!verification.valid || !verification.username) {
@@ -231,6 +281,13 @@ export async function createGitHubCredential(token: string): Promise<{ success: 
 }
 
 export async function createGitLabCredential(serverUrl: string, token: string): Promise<{ success: boolean; credential?: GitLabCredential; error?: string }> {
+  let keytar: KeytarModule;
+  try {
+    keytar = await requireKeytar();
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+
   // Normalize server URL
   const normalizedUrl = serverUrl.replace(/\/$/, '');
 
@@ -280,6 +337,13 @@ export async function createGitLabCredential(serverUrl: string, token: string): 
 }
 
 export async function updateCredential(id: string, token: string): Promise<{ success: boolean; credential?: Credential; error?: string }> {
+  let keytar: KeytarModule;
+  try {
+    keytar = await requireKeytar();
+  } catch (error) {
+    return { success: false, error: (error as Error).message };
+  }
+
   const metadata = getCredentialsMetadata();
   const index = metadata.findIndex((c) => c.id === id);
 
@@ -347,8 +411,11 @@ export async function deleteCredential(id: string): Promise<{ success: boolean; 
     return { success: false, error: 'Credential not found' };
   }
 
-  // Delete from keytar
-  await keytar.deletePassword(SERVICE_NAME, getKeytarAccount(id));
+  // Delete from keytar when secure storage is available.
+  const keytar = await loadKeytar();
+  if (keytar) {
+    await keytar.deletePassword(SERVICE_NAME, getKeytarAccount(id));
+  }
 
   // Remove from metadata
   metadata.splice(index, 1);
