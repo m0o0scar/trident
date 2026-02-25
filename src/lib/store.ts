@@ -3,23 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { Repository, AppSettings } from './types';
-
-// Get cross-platform app data directory
-function getAppDataDir(): string {
-  const platform = process.platform;
-  const homeDir = os.homedir();
-  
-  if (platform === 'win32') {
-    // Windows: %APPDATA%\trident
-    return path.join(process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming'), 'trident');
-  } else if (platform === 'darwin') {
-    // macOS: ~/Library/Application Support/trident
-    return path.join(homeDir, 'Library', 'Application Support', 'trident');
-  } else {
-    // Linux/others: ~/.config/trident
-    return path.join(process.env.XDG_CONFIG_HOME || path.join(homeDir, '.config'), 'trident');
-  }
-}
+import { getAppDataDir } from './platform-utils';
 
 // Store the list of known repositories in a shared app data directory.
 // This allows all instances of the app to share the same repository list.
