@@ -218,11 +218,18 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                     if (path.type === 'straight') {
                                         d = `M ${x1} ${y1} L ${x2} ${y2}`;
                                     } else {
-                                        // Fork/Merge styled Bezier
-                                        // Standard cubic bezier: ctrl points at mid-y
-                                        const cy1 = y1 + ROW_HEIGHT * 0.5;
-                                        const cy2 = y2 - ROW_HEIGHT * 0.5;
-                                        d = `M ${x1} ${y1} C ${x1} ${cy1}, ${x2} ${cy2}, ${x2} ${y2}`;
+                                        // Keep same-row merge junctions arching upward so
+                                        // branch starts feel natural at the commit row.
+                                        if (path.type === 'merge' && path.y1 === path.y2) {
+                                            const lift = ROW_HEIGHT * 0.6;
+                                            d = `M ${x1} ${y1} C ${x1} ${y1 - lift}, ${x2} ${y2 - lift}, ${x2} ${y2}`;
+                                        } else {
+                                            // Fork/Merge styled Bezier
+                                            // Standard cubic bezier: ctrl points at mid-y
+                                            const cy1 = y1 + ROW_HEIGHT * 0.5;
+                                            const cy2 = y2 - ROW_HEIGHT * 0.5;
+                                            d = `M ${x1} ${y1} C ${x1} ${cy1}, ${x2} ${cy2}, ${x2} ${y2}`;
+                                        }
                                     }
 
                                     return (
