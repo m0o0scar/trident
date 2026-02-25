@@ -251,9 +251,6 @@ export function StatusView({ repoPath }: { repoPath: string }) {
     };
 
     const files = status?.files ?? EMPTY_FILES;
-    useEscapeDismiss(stashDialogOpen, () => setStashDialogOpen(false));
-    useEscapeDismiss(discardDialogOpen, () => setDiscardDialogOpen(false));
-    useEscapeDismiss(firstCommitDialogOpen, () => setFirstCommitDialogOpen(false));
     const isFirstCommit = !!branches && branches.branches.length === 0;
 
     // Group files
@@ -404,6 +401,25 @@ export function StatusView({ repoPath }: { repoPath: string }) {
         setSelectedFile(null);
         setFirstCommitDialogOpen(false);
     };
+
+    useEscapeDismiss(stashDialogOpen, () => setStashDialogOpen(false), () => {
+        if (action.isPending) {
+            return;
+        }
+        void handleStash();
+    });
+    useEscapeDismiss(discardDialogOpen, () => setDiscardDialogOpen(false), () => {
+        if (action.isPending) {
+            return;
+        }
+        void handleDiscard();
+    });
+    useEscapeDismiss(firstCommitDialogOpen, () => setFirstCommitDialogOpen(false), () => {
+        if (action.isPending || !initialBranchName.trim()) {
+            return;
+        }
+        void handleFirstCommitConfirm();
+    });
 
     const handleCommitShortcut = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {

@@ -51,7 +51,12 @@ export function HomeSettingsModal({ open, onOpenChange, onSettingsChange }: Home
     }
   }, [open]);
 
-  useEscapeDismiss(open, () => onOpenChange(false));
+  useEscapeDismiss(open, () => onOpenChange(false), () => {
+    if (isSaving || isLoading) {
+      return;
+    }
+    void handleSave();
+  });
 
   const handleSave = async () => {
     setIsSaving(true);

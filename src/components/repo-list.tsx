@@ -69,14 +69,6 @@ export function RepoList() {
         setCloneFolderBrowserOpen(false);
         setCloneDialogOpen(false);
     };
-    useEscapeDismiss(deleteDialogOpen, () => setDeleteDialogOpen(false));
-    useEscapeDismiss(cloneDialogOpen, closeCloneDialog);
-    useEscapeDismiss(initRepoDialogOpen, () => {
-        setInitRepoDialogOpen(false);
-        setSelectedNonRepoPath(null);
-        setBrowserOpen(true);
-    });
-
     // Load settings on mount
     useEffect(() => {
         const loadSettings = async () => {
@@ -288,6 +280,29 @@ export function RepoList() {
             });
         }
     };
+
+    useEscapeDismiss(deleteDialogOpen, () => setDeleteDialogOpen(false), () => {
+        if (deleteRepo.isPending) {
+            return;
+        }
+        void handleDeleteConfirm(false);
+    });
+    useEscapeDismiss(cloneDialogOpen, closeCloneDialog, () => {
+        if (cloneRepo.isPending) {
+            return;
+        }
+        void handleClone();
+    });
+    useEscapeDismiss(initRepoDialogOpen, () => {
+        setInitRepoDialogOpen(false);
+        setSelectedNonRepoPath(null);
+        setBrowserOpen(true);
+    }, () => {
+        if (addRepo.isPending) {
+            return;
+        }
+        void handleConfirmInitRepo();
+    });
 
     if (isLoading) return <div className="p-12 text-center opacity-70">Loading repositories...</div>;
 

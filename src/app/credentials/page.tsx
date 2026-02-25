@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useCredentials, useCreateCredential, useUpdateCredential, useDeleteCredential } from '@/hooks/use-credentials';
 import type { Credential, GitLabCredential } from '@/hooks/use-credentials';
 import Image from 'next/image';
@@ -52,6 +52,7 @@ export default function CredentialsPage() {
   const [serverUrl, setServerUrl] = useState('');
   const [showToken, setShowToken] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const credentialFormRef = useRef<HTMLFormElement | null>(null);
 
   const resetForm = () => {
     setFormType(null);
@@ -105,8 +106,18 @@ export default function CredentialsPage() {
   };
 
   const isSubmitting = createCredential.isPending || updateCredential.isPending;
-  useEscapeDismiss(formType !== null, resetForm);
-  useEscapeDismiss(deletingCredential !== null, () => setDeletingCredential(null));
+  useEscapeDismiss(formType !== null, resetForm, () => {
+    if (isSubmitting) {
+      return;
+    }
+    credentialFormRef.current?.requestSubmit();
+  });
+  useEscapeDismiss(deletingCredential !== null, () => setDeletingCredential(null), () => {
+    if (!deletingCredential || deleteCredential.isPending) {
+      return;
+    }
+    void handleDelete();
+  });
 
   return (
     <main className="min-h-screen bg-base-100">
@@ -234,7 +245,7 @@ export default function CredentialsPage() {
                         : 'Enter your GitLab server URL and personal access token.'}
                 </p>
 
-                <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <form ref={credentialFormRef} onSubmit={handleSubmit} className="flex flex-col gap-4">
                     {formType === 'gitlab' && !editingCredential && (
                         <div className="form-control w-full">
                             <label className="label"><span className="label-text">Server URL</span></label>

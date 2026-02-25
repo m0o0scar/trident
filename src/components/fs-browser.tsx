@@ -76,7 +76,17 @@ export function FileSystemBrowser({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialPath]);
 
-  useEscapeDismiss(open, () => onOpenChange(false));
+  const handleSelectCurrentPath = () => {
+    onSelect(currentPath, { isRepo: selectionMode === 'folder' ? true : !!data?.isRepo });
+    onOpenChange(false);
+  };
+
+  useEscapeDismiss(open, () => onOpenChange(false), () => {
+    if (isLoading || isCreatingFolder) {
+      return;
+    }
+    handleSelectCurrentPath();
+  });
 
   const handleNavigate = (path: string) => {
       loadPath(path);
@@ -219,7 +229,7 @@ export function FileSystemBrowser({
                  )}
                </button>
              )}
-             <button className="btn btn-primary btn-sm" onClick={() => { onSelect(currentPath, { isRepo: selectionMode === 'folder' ? true : !!data?.isRepo }); onOpenChange(false); }}>
+             <button className="btn btn-primary btn-sm" onClick={handleSelectCurrentPath}>
                  {selectionMode === 'folder' ? 'Use Current Folder' : 'Select Current Folder'}
              </button>
            </div>

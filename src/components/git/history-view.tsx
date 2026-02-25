@@ -420,6 +420,12 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setNewMessageBody('');
   }, []);
 
+  const closeScriptExecutionDialog = useCallback(() => {
+    setScriptExecution(DEFAULT_SCRIPT_EXECUTION);
+    setDidCopyScriptOutput(false);
+    setIsCancelingScriptExecution(false);
+  }, []);
+
   const closeTopPopup = useCallback(() => {
     if (isAbortCherryPickOpen) {
       setIsAbortCherryPickOpen(false);
@@ -514,9 +520,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       return;
     }
     if (scriptExecution.isOpen && isScriptExecutionFinished) {
-      setScriptExecution(DEFAULT_SCRIPT_EXECUTION);
-      setDidCopyScriptOutput(false);
-      setIsCancelingScriptExecution(false);
+      closeScriptExecutionDialog();
     }
   }, [
     isAbortCherryPickOpen,
@@ -548,7 +552,136 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     isBranchPopoverOpen,
     scriptExecution.isOpen,
     isScriptExecutionFinished,
+    closeScriptExecutionDialog,
   ]);
+
+  const confirmTopPopup = () => {
+    if (isAbortCherryPickOpen) {
+      if (!isAbortingCherryPick) {
+        void handleAbortCherryPick();
+      }
+      return;
+    }
+    if (isCheckoutToLocalOpen) {
+      if (checkoutLocalBranchName && !isCheckingOutToLocal) {
+        void handleCheckoutToLocal();
+      }
+      return;
+    }
+    if (iscreateBranchOpen) {
+      if (newBranchName && !isCreating) {
+        void handleCreateBranch();
+      }
+      return;
+    }
+    if (isCreateTagOpen) {
+      if (newTagName.trim() && !isCreatingTag) {
+        void handleCreateTag();
+      }
+      return;
+    }
+    if (isPullOpen) {
+      if (!isPulling && pullRemotes.length > 0 && pullSelectedRemote && pullSelectedRemoteBranch) {
+        void handlePullFromRemote();
+      }
+      return;
+    }
+    if (isPushOpen) {
+      if (!isPushing && pushRemotes.length > 0 && pushSelectedRemote && pushSelectedRemoteBranch) {
+        void handlePushToRemote();
+      }
+      return;
+    }
+    if (isMergeOpen) {
+      if (!isMerging) {
+        void handleMerge();
+      }
+      return;
+    }
+    if (isRebaseOpen) {
+      if (!isRebasing) {
+        void handleRebase();
+      }
+      return;
+    }
+    if (isRenameOpen) {
+      const isSameName = remoteBranchToRename
+        ? newBranchNameForRename === remoteBranchToRename.branch
+        : newBranchNameForRename === branchToRename;
+      if (newBranchNameForRename && !isSameName && !isRenaming) {
+        void handleRenameBranch();
+      }
+      return;
+    }
+    if (isRenameRemoteOpen) {
+      const trimmedNewName = newRemoteNameForRename.trim();
+      if (
+        trimmedNewName &&
+        trimmedNewName !== (remoteToRename ?? '').trim() &&
+        !isRenamingRemote
+      ) {
+        void handleRenameRemote();
+      }
+      return;
+    }
+    if (isDeleteRemoteOpen) {
+      if (remoteToDelete && !isDeletingRemote) {
+        void handleDeleteRemote();
+      }
+      return;
+    }
+    if (isAddRemoteOpen) {
+      if (newRemoteName.trim() && newRemoteUrl.trim() && !isAddingRemote) {
+        void handleAddRemote();
+      }
+      return;
+    }
+    if (isCherryPickOpen) {
+      if (!isCherryPicking) {
+        void handleCherryPickCommit();
+      }
+      return;
+    }
+    if (isDeleteOpen) {
+      if (!isDeleting) {
+        void handleDeleteBranch();
+      }
+      return;
+    }
+    if (isDeleteWorktreeOpen) {
+      if (worktreeToDelete && !isDeletingWorktree) {
+        void handleDeleteWorktree();
+      }
+      return;
+    }
+    if (isDeleteTagOpen) {
+      if (tagToDelete && !isDeletingTag) {
+        void handleDeleteTag();
+      }
+      return;
+    }
+    if (isRewordOpen) {
+      if (newMessageSubject.trim() && !isRewording) {
+        void handleReword();
+      }
+      return;
+    }
+    if (isResetOpen) {
+      if (!isResetting) {
+        void handleConfirmReset();
+      }
+      return;
+    }
+    if (isRevertOpen) {
+      if (!isReverting) {
+        void handleConfirmRevert();
+      }
+      return;
+    }
+    if (scriptExecution.isOpen && isScriptExecutionFinished) {
+      closeScriptExecutionDialog();
+    }
+  };
 
   const isAnyPopupOpen =
     isResetOpen ||
@@ -573,7 +706,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     isBranchPopoverOpen ||
     scriptExecution.isOpen;
 
-  useEscapeDismiss(isAnyPopupOpen, closeTopPopup);
+  useEscapeDismiss(isAnyPopupOpen, closeTopPopup, confirmTopPopup);
 
   // Resizable bottom panel state - load from global settings or fallback to localStorage
   const panelHeightStorageKey = 'git-web:history-panel-height';
@@ -3458,7 +3591,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           <div className="modal-box">
             <h3 className="font-bold text-lg">{remoteBranchToRename ? 'Rename Remote Branch' : 'Rename Branch'}</h3>
             <p className="py-4 break-words">
-              Enter a new name for the branch <span className="font-bold break-all">{branchToRename}</span>. Press <kbd className="kbd kbd-sm">Cmd</kbd>+<kbd className="kbd kbd-sm">Enter</kbd> to confirm.
+              Enter a new name for the branch <span className="font-bold break-all">{branchToRename}</span>. Press <kbd className="kbd kbd-sm">Enter</kbd> to confirm.
             </p>
             <input
                 type="text"
@@ -3531,7 +3664,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           <div className="modal-box">
             <h3 className="font-bold text-lg">Rename Remote</h3>
             <p className="py-4 break-words">
-              Enter a new name for remote <span className="font-bold break-all">{remoteToRename}</span>. Press <kbd className="kbd kbd-sm">Cmd</kbd>+<kbd className="kbd kbd-sm">Enter</kbd> to confirm.
+              Enter a new name for remote <span className="font-bold break-all">{remoteToRename}</span>. Press <kbd className="kbd kbd-sm">Enter</kbd> to confirm.
             </p>
             <input
               type="text"
@@ -3619,7 +3752,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           <div className="modal-box">
             <h3 className="font-bold text-lg">Add Remote</h3>
             <p className="py-4 break-words">
-              Add a new remote by providing a name and URL. Press <kbd className="kbd kbd-sm">Cmd</kbd>+<kbd className="kbd kbd-sm">Enter</kbd> to confirm.
+              Add a new remote by providing a name and URL. Press <kbd className="kbd kbd-sm">Enter</kbd> to confirm.
             </p>
             <div className="space-y-3">
               <div>
@@ -3969,6 +4102,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && newTagName.trim() && !isCreatingTag) {
+                  e.preventDefault();
                   handleCreateTag();
                 }
               }}
@@ -4039,6 +4173,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                     autoFocus
                     onKeyDown={e => {
                         if (e.key === 'Enter' && newBranchName && !isCreating) {
+                            e.preventDefault();
                             handleCreateBranch();
                         }
                     }}
@@ -4089,6 +4224,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
                         autoFocus
                         onKeyDown={e => {
                             if (e.key === 'Enter' && checkoutLocalBranchName && !isCheckingOutToLocal) {
+                                e.preventDefault();
                                 handleCheckoutToLocal();
                             }
                         }}
