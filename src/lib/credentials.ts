@@ -34,8 +34,8 @@ export interface CredentialMetadata {
 }
 
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
+import { getAppDataDir } from './platform-utils';
 
 type KeytarModule = {
   getPassword(service: string, account: string): Promise<string | null>;
@@ -78,22 +78,6 @@ async function requireKeytar(): Promise<KeytarModule> {
   return keytar;
 }
 
-// Get cross-platform app data directory
-function getAppDataDir(): string {
-  const platform = process.platform;
-  const homeDir = os.homedir();
-  
-  if (platform === 'win32') {
-    // Windows: %APPDATA%\trident
-    return path.join(process.env.APPDATA || path.join(homeDir, 'AppData', 'Roaming'), 'trident');
-  } else if (platform === 'darwin') {
-    // macOS: ~/Library/Application Support/trident
-    return path.join(homeDir, 'Library', 'Application Support', 'trident');
-  } else {
-    // Linux/others: ~/.config/trident
-    return path.join(process.env.XDG_CONFIG_HOME || path.join(homeDir, '.config'), 'trident');
-  }
-}
 
 const DATA_DIR = getAppDataDir();
 const CREDENTIALS_FILE = path.join(DATA_DIR, 'credentials.json');
