@@ -31,6 +31,9 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] Shared repository/settings storage across app instances
 - [x] Set repository display name
 - [x] Configure default root folder for browsing repositories
+- [x] Clone repositories from URL (HTTPS/SSH with optional credentials)
+- [x] Initialize a new repository when opening a non-Git folder
+- [x] GitHub repository picker in clone dialog (credential-aware)
 
 #### Working Directory & Staging
 - [x] View working tree and index status
@@ -47,6 +50,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 
 #### Branching, History & Graph
 - [x] Visual commit graph with branch lanes
+- [x] Improved branch-junction rendering for same-row merges and aligned branch starts
 - [x] Branch visibility filters persisted per repository
 - [x] List local/remote branches with ahead/behind tracking info
 - [x] Create branch from current HEAD or selected ref
@@ -60,6 +64,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] Preflight conflict checks for merge/rebase
 - [x] Conflict resolver page for merge/rebase (stage resolved files, continue/abort)
 - [x] Hard/soft/mixed reset to selected commit
+- [x] Revert commits with confirmation
 - [x] Cherry-pick single/multiple commits and abort cherry-pick
 - [x] Commit details and per-file commit diffs (split/inline)
 - [x] One-way history branch query initialization (`?branch=<name>`)
@@ -70,6 +75,7 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 - [x] Fetch all remotes (prune)
 - [x] Pull from remote branch (rebase option)
 - [x] Push to remote branch (force, set-upstream, rebase-first, squash, local-tags)
+- [x] Manage remotes (add/rename/remove remote definitions)
 
 #### Tags, Credentials, and Automation
 - [x] Create local tag and optionally push to remote
@@ -81,16 +87,13 @@ A modern, web-based Git client built with Next.js. Manage your repositories, vie
 
 #### UX & Reliability
 - [x] Dark/light/system theme toggle
+- [x] Enter key confirms primary action across modal dialogs
 - [x] Image diff support and binary file detection
 - [x] Large-diff protection to prevent UI freeze
 - [x] Persist key UI state (sidebar/panel sizes/folders/filters)
 - [x] Git error handling with actionable messages + lock file cleanup action
 
 ### TODO
-- [x] Clone repository from URL
-- [ ] Initialize a new repository
-- [ ] Manage remotes (add/edit/remove remote definitions)
-- [x] Revert commits
 - [ ] Commit signing (GPG/SSH)
 - [ ] Co-author commit support
 - [ ] Interactive rebase UI
