@@ -186,10 +186,12 @@ export function generateGraphData(commits: Commit[], options: GenerateGraphOptio
         node.paths.push({
           x1: duplicateLane,
           y1: index,
+          // Collapse on the current commit row so the branch junction aligns
+          // with the actual commit, instead of appearing one row too low.
           x2: lane,
-          y2: index + 1,
+          y2: index,
           color: getColor(duplicateLane),
-          type: 'merge'
+          type: 'straight'
         });
         lanes[duplicateLane] = null;
         laneBranchRefs[duplicateLane] = null;
