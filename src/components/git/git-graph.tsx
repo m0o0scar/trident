@@ -218,22 +218,11 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                     if (path.type === 'straight') {
                                         d = `M ${x1} ${y1} L ${x2} ${y2}`;
                                     } else {
-                                        // Keep same-row merge junctions arching upward so
-                                        // branch starts feel natural at the commit row.
-                                        if (path.type === 'merge' && path.y1 === path.y2) {
-                                            const dx = x2 - x1;
-                                            const lift = Math.min(ROW_HEIGHT * 0.35, Math.abs(dx) * 0.8);
-                                            const c1x = x1 + dx * 0.35;
-                                            const c2x = x1 + dx * 0.65;
-                                            const cy = y1 - lift;
-                                            d = `M ${x1} ${y1} C ${c1x} ${cy}, ${c2x} ${cy}, ${x2} ${y2}`;
-                                        } else {
-                                            // Fork/Merge styled Bezier
-                                            // Standard cubic bezier: ctrl points at mid-y
-                                            const cy1 = y1 + ROW_HEIGHT * 0.5;
-                                            const cy2 = y2 - ROW_HEIGHT * 0.5;
-                                            d = `M ${x1} ${y1} C ${x1} ${cy1}, ${x2} ${cy2}, ${x2} ${y2}`;
-                                        }
+                                        // Fork/Merge styled Bezier
+                                        // Standard cubic bezier: ctrl points at mid-y
+                                        const cy1 = y1 + ROW_HEIGHT * 0.5;
+                                        const cy2 = y2 - ROW_HEIGHT * 0.5;
+                                        d = `M ${x1} ${y1} C ${x1} ${cy1}, ${x2} ${cy2}, ${x2} ${y2}`;
                                     }
 
                                     return (

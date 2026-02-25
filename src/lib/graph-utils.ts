@@ -183,11 +183,24 @@ export function generateGraphData(commits: Commit[], options: GenerateGraphOptio
       // If multiple lanes were targeting the same commit hash, keep them parallel
       // until this branch-out point and collapse them here.
       for (const duplicateLane of duplicateMatchingLanes) {
+        // Replace the previous-row straight segment with a direct merge edge
+        // into this commit, so we avoid a vertical+horizontal "hook" shape.
+        if (index > 0) {
+          const previousNode = nodes[nodes.length - 1];
+          if (previousNode) {
+            previousNode.paths = previousNode.paths.filter((path) => !(
+              path.type === 'straight' &&
+              path.x1 === duplicateLane &&
+              path.y1 === index - 1 &&
+              path.x2 === duplicateLane &&
+              path.y2 === index
+            ));
+          }
+        }
+
         node.paths.push({
           x1: duplicateLane,
-          y1: index,
-          // Collapse on the current commit row so the branch junction aligns
-          // with the actual commit, instead of appearing one row too low.
+          y1: index - 1,
           x2: lane,
           y2: index,
           color: getColor(duplicateLane),
