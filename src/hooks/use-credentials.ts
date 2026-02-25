@@ -7,6 +7,17 @@ import type { Credential, CredentialType } from '@/lib/credentials';
 export type { Credential, CredentialType };
 export type { GitHubCredential, GitLabCredential } from '@/lib/credentials';
 
+export interface GitHubRepositoryOption {
+  id: number;
+  name: string;
+  fullName: string;
+  private: boolean;
+  updatedAt: string;
+  htmlUrl: string;
+  cloneUrl: string;
+  sshUrl: string;
+}
+
 async function fetchCredentials(): Promise<Credential[]> {
   const res = await fetch('/api/credentials');
   if (!res.ok) {
@@ -19,6 +30,23 @@ export function useCredentials() {
   return useQuery({
     queryKey: ['credentials'],
     queryFn: fetchCredentials,
+  });
+}
+
+async function fetchGitHubRepositories(credentialId: string): Promise<GitHubRepositoryOption[]> {
+  const res = await fetch(`/api/credentials/github/repos?credentialId=${encodeURIComponent(credentialId)}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to fetch GitHub repositories');
+  }
+  return data;
+}
+
+export function useGitHubRepositories(credentialId: string | null) {
+  return useQuery({
+    queryKey: ['credentials', 'github-repos', credentialId],
+    queryFn: () => fetchGitHubRepositories(credentialId!),
+    enabled: !!credentialId,
   });
 }
 

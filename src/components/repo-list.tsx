@@ -1,7 +1,7 @@
 'use client';
 
 import { useRepositories, useAddRepository, useDeleteRepository, useCloneRepository } from '@/hooks/use-git';
-import { useCredentials, type Credential } from '@/hooks/use-credentials';
+import { useCredentials, useGitHubRepositories, type Credential } from '@/hooks/use-credentials';
 import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -116,6 +116,18 @@ export function RepoList() {
             ...credentials.filter((cred) => !matchingIds.has(cred.id)),
         ];
     }, [credentials, matchingCredentials]);
+    const selectedCredential = useMemo(() => {
+        if (cloneCredentialId === 'auto') {
+            return null;
+        }
+        return orderedCredentials.find((credential) => credential.id === cloneCredentialId) ?? null;
+    }, [cloneCredentialId, orderedCredentials]);
+    const selectedGithubCredentialId = selectedCredential?.type === 'github' ? selectedCredential.id : null;
+    const {
+        data: githubRepositories,
+        isLoading: isGitHubRepositoriesLoading,
+        error: githubRepositoriesError,
+    } = useGitHubRepositories(selectedGithubCredentialId);
 
     const handleAdd = async (path: string) => {
         if (!path) return;
@@ -465,6 +477,49 @@ export function RepoList() {
                                             No matching credential found for this URL. Clone will run without stored credentials unless you pick one.
                                         </span>
                                     </label>
+                                )}
+                                {selectedGithubCredentialId && (
+                                    <div className="mt-3 border border-base-300 rounded-lg bg-base-200/30 p-2">
+                                        <p className="text-xs font-bold opacity-70 px-2 pb-2">
+                                            Your GitHub repositories (recently updated first)
+                                        </p>
+                                        {isGitHubRepositoriesLoading && (
+                                            <div className="px-2 py-3 text-sm opacity-70">Loading repositories...</div>
+                                        )}
+                                        {!isGitHubRepositoriesLoading && githubRepositoriesError && (
+                                            <div className="px-2 py-3 text-sm text-error">
+                                                {githubRepositoriesError instanceof Error
+                                                    ? githubRepositoriesError.message
+                                                    : 'Failed to load repositories'}
+                                            </div>
+                                        )}
+                                        {!isGitHubRepositoriesLoading && !githubRepositoriesError && githubRepositories?.length === 0 && (
+                                            <div className="px-2 py-3 text-sm opacity-70">
+                                                No accessible repositories found for this account.
+                                            </div>
+                                        )}
+                                        {!isGitHubRepositoriesLoading && !githubRepositoriesError && (githubRepositories?.length ?? 0) > 0 && (
+                                            <div className="max-h-56 overflow-y-auto">
+                                                {githubRepositories?.map((repo) => (
+                                                    <button
+                                                        key={repo.id}
+                                                        type="button"
+                                                        className={`w-full text-left px-2 py-2 rounded-md hover:bg-base-300/60 transition-colors ${cloneUrl.trim() === repo.cloneUrl ? 'bg-base-300/60' : ''}`}
+                                                        onClick={() => handleCloneUrlChange(repo.cloneUrl)}
+                                                        title={repo.cloneUrl}
+                                                    >
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="text-sm font-medium truncate">{repo.fullName}</span>
+                                                            {repo.private && (
+                                                                <span className="text-[10px] uppercase tracking-wide opacity-70">Private</span>
+                                                            )}
+                                                        </div>
+                                                        <div className="text-xs font-mono opacity-60 truncate">{repo.cloneUrl}</div>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                         </div>
