@@ -191,7 +191,7 @@ export function generateGraphData(commits: Commit[], options: GenerateGraphOptio
           x2: lane,
           y2: index,
           color: getColor(duplicateLane),
-          type: 'straight'
+          type: 'merge'
         });
         lanes[duplicateLane] = null;
         laneBranchRefs[duplicateLane] = null;
