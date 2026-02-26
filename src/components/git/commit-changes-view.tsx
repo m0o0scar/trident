@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { useCommitDiff, useCommitFileDiff } from '@/hooks/use-git';
 import { cn, isFileBinary, isImageFile, getChangedLineCountFromDiff } from '@/lib/utils';
@@ -29,12 +29,18 @@ export function CommitFileDiffView({
     toCommitHash,
   });
   const { resolvedTheme } = useTheme();
-  const [renderAnyway, setRenderAnyway] = useState(false);
+  const diffSelectionKey = `${commitHash ?? ''}:${fromCommitHash ?? ''}:${toCommitHash ?? ''}:${filePath}`;
+  const [renderAnywayDiffKey, setRenderAnywayDiffKey] = useState<string | null>(null);
+  const renderAnyway = renderAnywayDiffKey === diffSelectionKey;
+  const diffScrollContainerRef = useRef<HTMLDivElement>(null);
 
-  // Reset renderAnyway when file or compared commits change
   useEffect(() => {
-    setRenderAnyway(false);
-  }, [filePath, commitHash, fromCommitHash, toCommitHash]);
+    const frame = requestAnimationFrame(() => {
+      diffScrollContainerRef.current?.scrollTo({ top: 0, left: 0 });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [filePath, commitHash, fromCommitHash, toCommitHash, isLoading]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8"><span className="loading loading-spinner text-base-content/50"></span></div>;
@@ -75,7 +81,7 @@ export function CommitFileDiffView({
             This diff is large ({Math.round(contentSize / 1024)}KB, ~{lineCount} changed lines) and may freeze your browser if rendered.
           </p>
         </div>
-        <button className="btn btn-outline" onClick={() => setRenderAnyway(true)}>
+        <button className="btn btn-outline" onClick={() => setRenderAnywayDiffKey(diffSelectionKey)}>
           Show Diff Anyway
         </button>
       </div>
@@ -83,7 +89,7 @@ export function CommitFileDiffView({
   }
 
   return (
-    <div className="overflow-auto h-full">
+    <div ref={diffScrollContainerRef} className="overflow-auto h-full">
       <GroupedDiffViewer
         oldValue={data.left || ''}
         newValue={data.right || ''}
@@ -113,7 +119,7 @@ export function CommitChangesView({
     fromCommitHash,
     toCommitHash,
   });
-  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [selectedFileBySelection, setSelectedFileBySelection] = useState<Record<string, string | null>>({});
   const [isFullPageDiff, setIsFullPageDiff] = useState(false);
   const [collapsedFoldersByCommit, setCollapsedFoldersByCommit] = useState<Record<string, Set<string>>>({});
   const fileTree = useMemo(() => buildCommitFileTree(data?.files ?? []), [data?.files]);
@@ -136,6 +142,30 @@ export function CommitChangesView({
       return true;
     }
   });
+  const diffViewportRef = useRef<HTMLDivElement>(null);
+  const selectedFile = useMemo(() => {
+    const files = data?.files ?? [];
+    if (files.length === 0) return null;
+
+    const savedSelection = selectedFileBySelection[selectionKey] ?? null;
+    if (savedSelection && files.some((file) => file.path === savedSelection)) {
+      return savedSelection;
+    }
+
+    return files[0].path;
+  }, [data?.files, selectedFileBySelection, selectionKey]);
+  const handleSelectFile = useCallback((path: string) => {
+    setSelectedFileBySelection((previous) => {
+      if ((previous[selectionKey] ?? null) === path) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        [selectionKey]: path,
+      };
+    });
+  }, [selectionKey]);
 
   // Save split view preference when it changes
   useEffect(() => {
@@ -146,17 +176,15 @@ export function CommitChangesView({
     }
   }, [splitView]);
 
-  // Reset selected file when commit changes
   useEffect(() => {
-    setSelectedFile(null);
-  }, [selectionKey]);
+    if (!selectedFile) return;
 
-  // Auto-select first file when data loads and no file is selected
-  useEffect(() => {
-    if (!selectedFile && data?.files && data.files.length > 0) {
-      setSelectedFile(data.files[0].path);
-    }
-  }, [data?.files, selectedFile]);
+    const frame = requestAnimationFrame(() => {
+      diffViewportRef.current?.scrollTo({ top: 0, left: 0 });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [selectedFile, selectionKey]);
 
   useEscapeDismiss(isFullPageDiff, () => setIsFullPageDiff(false));
 
@@ -234,7 +262,7 @@ export function CommitChangesView({
               selectedFile={selectedFile}
               expandedFolders={expandedFolders}
               onToggleFolder={handleToggleFolder}
-              onSelectFile={setSelectedFile}
+              onSelectFile={handleSelectFile}
             />
           </div>
         </div>
@@ -272,8 +300,9 @@ export function CommitChangesView({
                 </button>
               </div>
             </div>
-            <div className="flex-1 overflow-auto diff-viewer-wrapper">
+            <div ref={diffViewportRef} className="flex-1 overflow-auto diff-viewer-wrapper">
               <CommitFileDiffView
+                key={`${selectionKey}:${selectedFile}`}
                 repoPath={repoPath}
                 commitHash={commitHash}
                 fromCommitHash={fromCommitHash}
