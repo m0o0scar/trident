@@ -1,7 +1,7 @@
 'use client';
 
 import { useGitDiff } from '@/hooks/use-git';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTheme } from 'next-themes';
 import { getChangedLineCountFromDiff, isFileBinary, isImageFile } from '@/lib/utils';
 import { GroupedDiffViewer } from './grouped-diff-viewer';
@@ -9,6 +9,7 @@ import { ImageDiffView } from './image-diff-view';
 
 export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: string }) {
   const { data, isLoading } = useGitDiff(repoPath, filePath);
+  const diffScrollContainerRef = useRef<HTMLDivElement>(null);
   
   // Storage key for split view preference
   const storageKey = 'git-web:diff-view-split';
@@ -24,14 +25,10 @@ export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: s
     }
   });
 
-  const [renderAnyway, setRenderAnyway] = useState(false);
+  const [renderAnywayFilePath, setRenderAnywayFilePath] = useState<string | null>(null);
+  const renderAnyway = renderAnywayFilePath === filePath;
   
   const { resolvedTheme } = useTheme();
-
-  // Reset renderAnyway when filePath changes
-  useEffect(() => {
-    setRenderAnyway(false);
-  }, [filePath]);
 
   // Save split view preference when it changes
   useEffect(() => {
@@ -41,6 +38,17 @@ export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: s
       console.error('Failed to save split view preference:', e);
     }
   }, [splitView]);
+
+  // Reset diff scroll position when switching files.
+  useEffect(() => {
+    if (isLoading) return;
+
+    const frame = requestAnimationFrame(() => {
+      diffScrollContainerRef.current?.scrollTo({ top: 0, left: 0 });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [filePath, isLoading]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center p-8 h-full"><span className="loading loading-spinner text-base-content/50"></span></div>;
@@ -109,7 +117,7 @@ export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: s
           />
         </div>
       </div>
-      <div className="flex-1 overflow-auto diff-viewer-wrapper">
+      <div ref={diffScrollContainerRef} className="flex-1 overflow-auto diff-viewer-wrapper">
         {isLargeDiff && !renderAnyway ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-center p-4">
             <i className="iconoir-warning-triangle text-[40px] text-warning" aria-hidden="true" />
@@ -119,7 +127,7 @@ export function DiffView({ repoPath, filePath }: { repoPath: string, filePath: s
                 This diff is large ({Math.round(contentSize / 1024)}KB, ~{lineCount} changed lines) and may freeze your browser if rendered.
               </p>
             </div>
-            <button className="btn btn-outline" onClick={() => setRenderAnyway(true)}>
+            <button className="btn btn-outline" onClick={() => setRenderAnywayFilePath(filePath)}>
               Show Diff Anyway
             </button>
           </div>
