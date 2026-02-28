@@ -60,6 +60,15 @@ function formatCommitMessageForDisplay(message: string): string {
     .replace(/\\n/g, '\n');
 }
 
+function parseTrackingUpstream(upstream: string): { remote: string; branch: string } | null {
+  const slashIndex = upstream.indexOf('/');
+  if (slashIndex <= 0 || slashIndex >= upstream.length - 1) return null;
+  return {
+    remote: upstream.slice(0, slashIndex),
+    branch: upstream.slice(slashIndex + 1),
+  };
+}
+
 async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -339,6 +348,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [pullTrackingBranch, setPullTrackingBranch] = useState<{ remote: string; branch: string } | null>(null);
   const [pullRebase, setPullRebase] = useState(true);
   const [isPulling, setIsPulling] = useState(false);
+  const [isPullingAllBranches, setIsPullingAllBranches] = useState(false);
   const [pullError, setPullError] = useState<string | null>(null);
   const [pullLoadingRemotes, setPullLoadingRemotes] = useState(false);
   const [pullLoadingBranches, setPullLoadingBranches] = useState(false);
@@ -2832,21 +2842,37 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     if (!currentBranch) return null;
     const tracking = trackingInfoByBranch?.[currentBranch];
     if (!tracking?.upstream) return null;
-    const slashIndex = tracking.upstream.indexOf('/');
-    if (slashIndex <= 0) return null;
+    const parsed = parseTrackingUpstream(tracking.upstream);
+    if (!parsed) return null;
 
-    return {
-      upstream: tracking.upstream,
-      remote: tracking.upstream.slice(0, slashIndex),
-      branch: tracking.upstream.slice(slashIndex + 1),
-    };
+    return { upstream: tracking.upstream, ...parsed };
   }, [currentBranch, trackingInfoByBranch]);
+  const pullAllTargets = useMemo(() => {
+    const targets: Array<{ localBranch: string; remote: string; remoteBranch: string }> = [];
+    for (const localBranch of branchData?.branches ?? []) {
+      const upstream = trackingInfoByBranch?.[localBranch]?.upstream;
+      if (!upstream) continue;
+      const parsed = parseTrackingUpstream(upstream);
+      if (!parsed) continue;
+      targets.push({
+        localBranch,
+        remote: parsed.remote,
+        remoteBranch: parsed.branch,
+      });
+    }
+    return targets;
+  }, [branchData?.branches, trackingInfoByBranch]);
   const pullActionDisabledReason = useMemo(() => {
     if (isBranchesLoading) return 'Loading branches...';
     if (!currentBranch) return 'Not on a local branch';
     if (!currentTrackingBranch) return `Branch "${currentBranch}" has no tracking remote branch`;
     return null;
   }, [currentBranch, currentTrackingBranch, isBranchesLoading]);
+  const pullAllActionDisabledReason = useMemo(() => {
+    if (isBranchesLoading) return 'Loading branches...';
+    if (pullAllTargets.length === 0) return 'No local branches with tracking remote branches';
+    return null;
+  }, [isBranchesLoading, pullAllTargets.length]);
   const pushActionDisabledReason = useMemo(() => {
     if (isBranchesLoading) return 'Loading branches...';
     if (!currentBranch) return 'Not on a local branch';
@@ -2861,6 +2887,53 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const confirmPushCurrentBranch = () => {
     if (!currentBranch || pushActionDisabledReason) return;
     void confirmPushToRemote(currentBranch);
+  };
+
+  const handlePullAllBranches = async () => {
+    if (isPullingAllBranches || pullAllTargets.length === 0) return;
+
+    setIsPullingAllBranches(true);
+    const pulledBranches: string[] = [];
+
+    try {
+      for (const target of pullAllTargets) {
+        try {
+          await runGitAction({
+            repoPath,
+            action: 'pull-from-remote',
+            data: {
+              localBranch: target.localBranch,
+              remote: target.remote,
+              remoteBranch: target.remoteBranch,
+              rebase: true,
+            },
+            suppressErrorToast: true,
+          });
+          pulledBranches.push(target.localBranch);
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          const pulledSummary = pulledBranches.length > 0
+            ? `Pulled ${pulledBranches.length} branch${pulledBranches.length === 1 ? '' : 'es'} before failure.`
+            : 'No branches were updated.';
+
+          toast({
+            type: 'error',
+            title: `Pull All Failed on "${target.localBranch}"`,
+            description: `${errorMessage} ${pulledSummary}`,
+            duration: 12000,
+          });
+          return;
+        }
+      }
+
+      toast({
+        type: 'success',
+        title: pulledBranches.length === 1 ? 'Pulled 1 Branch' : `Pulled ${pulledBranches.length} Branches`,
+        description: 'Updated all local branches that have tracking remote branches.',
+      });
+    } finally {
+      setIsPullingAllBranches(false);
+    }
   };
 
   const getBranchContextMenuItems = (options: BranchMenuOptions): ContextMenuItem[] => {
@@ -4353,7 +4426,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               <button
                 className="btn btn-sm gap-2"
                 onClick={() => void handleFetchFromAllRemotes()}
-                disabled={isFetchingAllRemotes || isPullOpen || isPushOpen}
+                disabled={isFetchingAllRemotes || isPullingAllBranches || isPullOpen || isPushOpen}
                 title="Fetch latest changes from all remotes"
               >
                 {isFetchingAllRemotes ? (
@@ -4366,7 +4439,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               <button
                 className="btn btn-sm gap-2"
                 onClick={confirmPullCurrentBranch}
-                disabled={!!pullActionDisabledReason || isPullOpen || isPushOpen}
+                disabled={!!pullActionDisabledReason || isPullingAllBranches || isPullOpen || isPushOpen}
                 title={pullActionDisabledReason || `Pull from ${currentTrackingBranch?.upstream}`}
               >
                 {pullLoadingRemotes ? (
@@ -4378,8 +4451,21 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               </button>
               <button
                 className="btn btn-sm gap-2"
+                onClick={() => void handlePullAllBranches()}
+                disabled={!!pullAllActionDisabledReason || isPullOpen || isPushOpen || isPullingAllBranches}
+                title={pullAllActionDisabledReason || 'Pull all local branches from tracking remote branches'}
+              >
+                {isPullingAllBranches ? (
+                  <span className="loading loading-spinner loading-xs"></span>
+                ) : (
+                  <i className="iconoir-arrow-down text-[16px]" aria-hidden="true" />
+                )}
+                Pull All
+              </button>
+              <button
+                className="btn btn-sm gap-2"
                 onClick={confirmPushCurrentBranch}
-                disabled={!!pushActionDisabledReason || isPullOpen || isPushOpen}
+                disabled={!!pushActionDisabledReason || isPullingAllBranches || isPullOpen || isPushOpen}
                 title={pushActionDisabledReason || (currentTrackingBranch ? `Push to ${currentTrackingBranch.upstream}` : 'Push current branch to remote')}
               >
                 {pushLoadingRemotes ? (
