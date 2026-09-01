@@ -108,8 +108,8 @@ export const GitGraph = forwardRef<GitGraphHandle, {
     }, []);
 
     const nodes = useMemo(
-        () => generateGraphData(commits, { localBranches }),
-        [commits, localBranches]
+        () => generateGraphData(commits, { localBranches, currentBranch }),
+        [commits, localBranches, currentBranch]
     );
     const scrollRef = useRef<HTMLDivElement>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
@@ -240,53 +240,58 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                         ))}
 
                         {/* Draw Nodes on top of all paths to avoid overlap ugliness */}
-                        {nodes.map((node) => (
-                            <circle
-                                key={`dot-${node.hash}`}
-                                cx={node.x * LANE_WIDTH + LANE_WIDTH / 2}
-                                cy={node.y * ROW_HEIGHT + ROW_HEIGHT / 2}
-                                r={DOT_SIZE}
-                                fill={node.color}
-                                stroke={node.color}
-                                strokeWidth={STROKE_WIDTH}
-                            />
-                        ))}
+                        {nodes.map((node) => {
+                            const isLocalChanges = node.hash === '__LOCAL_CHANGES__';
+                            return (
+                                <circle
+                                    key={`dot-${node.hash}`}
+                                    cx={node.x * LANE_WIDTH + LANE_WIDTH / 2}
+                                    cy={node.y * ROW_HEIGHT + ROW_HEIGHT / 2}
+                                    r={DOT_SIZE}
+                                    fill={isLocalChanges ? 'var(--fallback-b1, oklch(var(--b1)))' : node.color}
+                                    stroke={node.color}
+                                    strokeWidth={STROKE_WIDTH}
+                                    className={isLocalChanges ? 'fill-base-100' : undefined}
+                                />
+                            );
+                        })}
                     </svg>
 
                     {/* List Rows */}
                     <div style={{ width: '100%' }}>
                         {nodes.map((node) => {
+                            const isLocalChanges = node.hash === '__LOCAL_CHANGES__';
                             const isSelected = selectedHashes ? selectedHashes.has(node.hash) : selectedHash === node.hash;
                             const selectedCount = selectedHashes?.size ?? (selectedHash ? 1 : 0);
-                            const menuItems: ContextMenuItem[] = [
+                            const menuItems: ContextMenuItem[] = isLocalChanges ? [] : [
                                 {
                                     label: "Reset to here",
                                     icon: <i className="iconoir-refresh-circle text-[14px]" aria-hidden="true" />,
                                     onClick: () => onResetToCommit?.(node.hash),
                                 },
                             ];
-                            if (onRevertCommit) {
+                            if (!isLocalChanges && onRevertCommit) {
                                 menuItems.push({
                                     label: "Revert commit",
                                     icon: <i className="iconoir-u-turn-arrow-left text-[14px]" aria-hidden="true" />,
                                     onClick: () => onRevertCommit(node.hash, node.message),
                                 });
                             }
-                            if (onCreateTag) {
+                            if (!isLocalChanges && onCreateTag) {
                                 menuItems.push({
                                     label: "Create tag",
                                     icon: <i className="iconoir-bookmark text-[14px]" aria-hidden="true" />,
                                     onClick: () => onCreateTag(node.hash),
                                 });
                             }
-                            if (onCherryPickCommit) {
+                            if (!isLocalChanges && onCherryPickCommit) {
                                 menuItems.push({
                                     label: "Cherry-pick commit",
                                     icon: <i className="iconoir-git-fork text-[14px]" aria-hidden="true" />,
                                     onClick: () => onCherryPickCommit(node.hash, node.message),
                                 });
                             }
-                            if (onCherryPickSelectedCommits && selectedCount > 1 && isSelected) {
+                            if (!isLocalChanges && onCherryPickSelectedCommits && selectedCount > 1 && isSelected) {
                                 menuItems.push({
                                     label: `Cherry-pick ${selectedCount} selected commits`,
                                     icon: <i className="iconoir-git-fork text-[14px]" aria-hidden="true" />,
@@ -294,7 +299,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                 });
                             }
 
-                            if (onRewordCommit && localBranches && localBranches.length > 0) {
+                            if (!isLocalChanges && onRewordCommit && localBranches && localBranches.length > 0) {
                                 // Clean up refs: remove parentheses and split
                                 const refs = node.refs ? node.refs.replace(/[()]/g, '').split(',').map(r => r.trim()) : [];
                                 let targetBranch: string | null = null;
@@ -325,7 +330,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
 
                             // Process refs to combine local and tracking remote branches
                             const processRefs = () => {
-                                if (!node.refs) return [];
+                                if (!node.refs || isLocalChanges) return [];
 
                                 const rawRefs = node.refs.replace(/^\s*\((.*)\)\s*$/, '$1').split(',').map(r => {
                                     const isHead = r.startsWith('HEAD -> ');
@@ -400,8 +405,7 @@ export const GitGraph = forwardRef<GitGraphHandle, {
 
                             const processedTags = processRefs();
 
-                            return (
-                            <ContextMenu key={node.hash} items={menuItems}>
+                            const rowContent = (
                                 <div
                                     className={cn(
                                         "flex items-center hover:bg-base-200 border-b border-base-200 last:border-0 cursor-pointer transition-colors text-xs",
@@ -462,24 +466,33 @@ export const GitGraph = forwardRef<GitGraphHandle, {
                                                     </ContextMenu>
                                                 );
                                             })}
-                                            <span className={cn("truncate min-w-0 max-w-[600px]", isSelected ? "font-semibold" : "")} title={node.message}>
+                                            <span className={cn("truncate min-w-0 max-w-[600px]", isLocalChanges ? "italic text-base-content/80" : "", isSelected ? "font-semibold text-primary" : "")} title={node.message}>
                                                 <HighlightedText text={node.message} searchQuery={searchQuery} />
                                             </span>
                                         </div>
                                         <div className="w-32 truncate opacity-70 text-right">
-                                            <HighlightedText text={node.author_name} searchQuery={searchQuery} />
+                                            {isLocalChanges ? null : <HighlightedText text={node.author_name} searchQuery={searchQuery} />}
                                         </div>
                                         <div className="w-20 truncate opacity-50 font-mono text-right">
-                                            <HighlightedText text={node.hash.substring(0, 7)} searchQuery={searchQuery} />
+                                            {isLocalChanges ? null : <HighlightedText text={node.hash.substring(0, 7)} searchQuery={searchQuery} />}
                                         </div>
                                         <div className="w-32 truncate opacity-70 text-right">
-                                            {new Date(node.date).toLocaleString(undefined, {
+                                            {isLocalChanges ? null : new Date(node.date).toLocaleString(undefined, {
                                                 month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
                                             })}
                                         </div>
                                     </div>
                                 </div>
-                            </ContextMenu>
+                            );
+
+                            if (menuItems.length === 0) {
+                                return <div key={node.hash}>{rowContent}</div>;
+                            }
+
+                            return (
+                                <ContextMenu key={node.hash} items={menuItems}>
+                                    {rowContent}
+                                </ContextMenu>
                             );
                         })}
                         

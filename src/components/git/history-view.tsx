@@ -1,19 +1,17 @@
 'use client';
 
-import { useGitLog, useGitBranches, useGitStatus, useGitAction, useCommitDiff, useCommitFileDiff, CommitFile, useRepository, useUpdateRepository, useSettings, useUpdateSettings } from '@/hooks/use-git';
+import { useGitLog, useGitBranches, useGitStatus, useGitAction, useRepository, useUpdateRepository, useSettings, useUpdateSettings } from '@/hooks/use-git';
 import { useQueryClient } from '@tanstack/react-query';
-import { Repository, RepositoryCustomScript, BranchTrackingInfo } from '@/lib/types';
+import { Repository, RepositoryCustomScript, Commit } from '@/lib/types';
 import { GitGraph, GitGraphHandle } from './git-graph';
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { useTheme } from 'next-themes';
-import { cn, sanitizeBranchName, isFileBinary, isImageFile, getChangedLineCountFromDiff } from '@/lib/utils';
+import { cn, sanitizeBranchName } from '@/lib/utils';
 import { ContextMenu, ContextMenuItem } from '@/components/context-menu';
-import { GroupedDiffViewer } from './grouped-diff-viewer';
-import { ImageDiffView } from './image-diff-view';
 import { useEscapeDismiss } from '@/hooks/use-escape-dismiss';
 import { toast } from '@/hooks/use-toast';
 import { CommitChangesView } from './commit-changes-view';
-import { BranchTreeNode, VisibilityMap, buildBranchTree, buildRemoteBranchTree, getEffectiveVisibility, collectAllBranchRefs, collectVisibleBranchRefs } from './branch-tree-utils';
+import { StatusView } from './status-view';
+import { VisibilityMap, buildBranchTree, buildRemoteBranchTree, getEffectiveVisibility, collectAllBranchRefs, collectVisibleBranchRefs } from './branch-tree-utils';
 import { GroupHeader } from './group-header';
 import { BranchMenuOptions, BranchOperation, buildBranchContextMenuItems } from './branch-context-menu';
 import { BranchRowSelectModifiers, BranchTreeItem } from './branch-tree-item';
@@ -103,22 +101,6 @@ const DEFAULT_SCRIPT_EXECUTION: ScriptExecutionState = {
 };
 
 
-// File status icon component
-function FileStatusIcon({ status }: { status: string }) {
-  switch (status) {
-    case 'A':
-      return <i className="iconoir-plus-circle text-[16px] text-success" aria-hidden="true" />;
-    case 'D':
-      return <i className="iconoir-minus-circle text-[16px] text-error" aria-hidden="true" />;
-    case 'M':
-      return <i className="iconoir-edit-pencil text-[16px] text-warning" aria-hidden="true" />;
-    default:
-      return <i className="iconoir-page text-[16px] opacity-50" aria-hidden="true" />;
-  }
-}
-
-
-
 export function HistoryView({ repoPath }: { repoPath: string }) {
   const queryClient = useQueryClient();
   const { data: settings } = useSettings();
@@ -133,7 +115,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const { data: log, isLoading, isError, error, refetch: refetchLog, isFetching } = useGitLog(repoPath, limit);
   const { data: branchData, isLoading: isBranchesLoading, refetch: refetchBranches } = useGitBranches(repoPath);
   const activeBranchFromData = branchData?.current?.trim() ?? '';
-  const { data: statusData } = useGitStatus(repoPath);
+  const { data: statusData, refetch: refetchStatus } = useGitStatus(repoPath);
+  const hasLocalChanges = Boolean(statusData?.files && statusData.files.length > 0);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [selectedCommitHashes, setSelectedCommitHashes] = useState<string[]>([]);
   const [selectionAnchorHash, setSelectionAnchorHash] = useState<string | null>(null);
@@ -143,8 +126,8 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     const now = Date.now();
     if (now - lastVisibilityRefreshAtRef.current < 500) return;
     lastVisibilityRefreshAtRef.current = now;
-    void Promise.all([refetchBranches(), refetchLog()]);
-  }, [refetchBranches, refetchLog]);
+    void Promise.all([refetchBranches(), refetchLog(), refetchStatus()]);
+  }, [refetchBranches, refetchLog, refetchStatus]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -180,6 +163,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setSelectedBranchRefs([]);
     setBranchSelectionAnchor(null);
   }, [repoPath, selectSingleCommit]);
+
+  // If local changes were selected and all changes get committed or discarded, reset selection
+  useEffect(() => {
+    if (!hasLocalChanges && selectedHash === '__LOCAL_CHANGES__') {
+      selectSingleCommit(null);
+    }
+  }, [hasLocalChanges, selectedHash, selectSingleCommit]);
 
   const { mutateAsync: runGitAction } = useGitAction();
 
@@ -1153,14 +1143,45 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     return log.all;
   }, [log?.all, branchData?.branches, branchData?.branchCommits, branchData?.remotes, visibilityMap, getBranchEffectiveVisibility]);
 
+  const currentBranch = branchData?.current?.trim() || statusData?.current?.trim() || '';
+
+  const currentHeadHash = useMemo(() => {
+    if (currentBranch && branchData?.branchCommits?.[currentBranch]) {
+      return branchData.branchCommits[currentBranch];
+    }
+    if (log?.all && log.all.length > 0) {
+      return log.all[0].hash;
+    }
+    return null;
+  }, [currentBranch, branchData?.branchCommits, log?.all]);
+
+  const commitsWithLocalChanges = useMemo(() => {
+    if (!hasLocalChanges) {
+      return filteredCommits;
+    }
+
+    const localChangesCommit: Commit = {
+      hash: '__LOCAL_CHANGES__',
+      message: '(local changes)',
+      date: new Date().toISOString(),
+      refs: '',
+      body: '',
+      author_name: '',
+      author_email: '',
+      parents: currentHeadHash ? [currentHeadHash] : [],
+    };
+
+    return [localChangesCommit, ...filteredCommits];
+  }, [hasLocalChanges, filteredCommits, currentHeadHash]);
+
   const selectedCommitHashSet = useMemo(() => new Set(selectedCommitHashes), [selectedCommitHashes]);
-  const filteredCommitHashes = useMemo(() => filteredCommits.map((commit) => commit.hash), [filteredCommits]);
+  const filteredCommitHashes = useMemo(() => commitsWithLocalChanges.map((commit) => commit.hash), [commitsWithLocalChanges]);
   const selectedCommit = useMemo(
-    () => (selectedHash ? log?.all.find((commit) => commit.hash === selectedHash) : null),
+    () => (selectedHash && selectedHash !== '__LOCAL_CHANGES__' ? log?.all.find((commit) => commit.hash === selectedHash) : null),
     [log?.all, selectedHash]
   );
   const selectedCommitRange = useMemo(() => {
-    if (!log?.all || selectedCommitHashes.length < 2) return null;
+    if (!log?.all || selectedCommitHashes.length < 2 || selectedCommitHashes.includes('__LOCAL_CHANGES__')) return null;
 
     const commitMap = new Map(log.all.map((commit) => [commit.hash, commit]));
     const filteredOrderMap = new Map(filteredCommitHashes.map((hash, index) => [hash, index]));
@@ -2809,7 +2830,6 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     }
   };
 
-  const currentBranch = branchData?.current;
   const trackingInfoByBranch = branchData?.trackingInfo;
   const remoteNames = useMemo(() => {
     const names = Object.keys(branchData?.remoteUrls ?? {});
@@ -4516,7 +4536,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
           ) : (
             <GitGraph
               ref={gitGraphRef}
-              commits={filteredCommits}
+              commits={commitsWithLocalChanges}
               selectedHash={selectedHash || undefined}
               selectedHashes={selectedCommitHashSet}
               onSelectCommit={handleSelectCommit}
@@ -4557,98 +4577,106 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
               <div className="w-8 h-1 rounded-full bg-base-300 group-hover:bg-base-content/20 transition-colors" />
             </div>
 
-            {/* Header with commit info */}
-            <div className="flex flex-row items-center py-2 px-4 border-b border-base-300 bg-base-100 shrink-0 justify-between gap-4">
-              <div className="flex items-center gap-4 flex-1 min-w-0">
-                {isCommitRangeSelection && selectedCommitRange ? (
-                  <>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold truncate">
-                        {selectedCommitRange.latestHash.substring(0, 7)}: {selectedCommitRange.latestCommit.message}
-                      </div>
-                      <div className="text-sm font-bold truncate opacity-75">
-                        {selectedCommitRange.oldestHash.substring(0, 7)}: {selectedCommitRange.oldestCommit.message}
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-sm font-bold truncate">
-                      {selectedCommit?.message}
-                    </span>
-                    <span className="text-xs font-mono opacity-50 shrink-0">
-                      {selectedHash.substring(0, 7)}
-                    </span>
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  className="ml-2 btn btn-ghost btn-xs btn-square"
-                  onClick={() => selectSingleCommit(null)}
-                  title="Close"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {isCommitRangeSelection && selectedCommitRange ? (
-              <div className="flex-1 overflow-hidden min-h-0 flex flex-col bg-base-100">
-                <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60 border-b border-base-300 bg-base-100 shrink-0">
-                  Changes
-                </div>
-                <div className="flex-1 min-h-0">
-                  <CommitChangesView
-                    repoPath={repoPath}
-                    fromCommitHash={selectedCommitRange.oldestHash}
-                    toCommitHash={selectedCommitRange.latestHash}
-                  />
-                </div>
+            {selectedHash === '__LOCAL_CHANGES__' ? (
+              <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+                <StatusView repoPath={repoPath} onClose={() => selectSingleCommit(null)} />
               </div>
             ) : (
-              /* Combined commit message and changes content */
-              <div
-                ref={commitDetailsContentRef}
-                className="flex-1 overflow-hidden bg-base-100 grid"
-                style={{
-                  gridTemplateRows: `${commitDetailsMessageRatio}fr 6px ${1 - commitDetailsMessageRatio}fr`,
-                }}
-              >
-                <div className="border-b border-base-300 bg-base-100 min-h-0 flex flex-col">
-                  <div className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60">
-                    Message
+              <>
+                {/* Header with commit info */}
+                <div className="flex flex-row items-center py-2 px-4 border-b border-base-300 bg-base-100 shrink-0 justify-between gap-4">
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    {isCommitRangeSelection && selectedCommitRange ? (
+                      <>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-bold truncate">
+                            {selectedCommitRange.latestHash.substring(0, 7)}: {selectedCommitRange.latestCommit.message}
+                          </div>
+                          <div className="text-sm font-bold truncate opacity-75">
+                            {selectedCommitRange.oldestHash.substring(0, 7)}: {selectedCommitRange.oldestCommit.message}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-sm font-bold truncate">
+                          {selectedCommit?.message}
+                        </span>
+                        <span className="text-xs font-mono opacity-50 shrink-0">
+                          {selectedHash.substring(0, 7)}
+                        </span>
+                      </>
+                    )}
                   </div>
-                  <div className="px-4 pb-3 overflow-auto flex-1 min-h-0">
-                    <div className="text-xs opacity-70 whitespace-pre-wrap font-mono">
-                      {selectedCommit
-                        ? formatCommitMessageForDisplay(
-                            selectedCommit.body?.trim()
-                              ? `${selectedCommit.message}\n\n${selectedCommit.body}`
-                              : selectedCommit.message
-                          )
-                        : 'No additional message'}
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      className="ml-2 btn btn-ghost btn-xs btn-square"
+                      onClick={() => selectSingleCommit(null)}
+                      title="Close"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                {isCommitRangeSelection && selectedCommitRange ? (
+                  <div className="flex-1 overflow-hidden min-h-0 flex flex-col bg-base-100">
+                    <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60 border-b border-base-300 bg-base-100 shrink-0">
+                      Changes
+                    </div>
+                    <div className="flex-1 min-h-0">
+                      <CommitChangesView
+                        repoPath={repoPath}
+                        fromCommitHash={selectedCommitRange.oldestHash}
+                        toCommitHash={selectedCommitRange.latestHash}
+                      />
                     </div>
                   </div>
-                </div>
-                <div
-                  className={cn(
-                    'cursor-ns-resize flex items-center justify-center hover:bg-base-200/60 transition-colors',
-                    isCommitDetailsRatioResizing && 'bg-base-200/60'
-                  )}
-                  onMouseDown={handleCommitDetailsRatioResizeStart}
-                >
-                  <div className="w-8 h-1 rounded-full bg-base-300" />
-                </div>
-                <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
-                  <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60 border-b border-base-300 bg-base-100 shrink-0">
-                    Changes
+                ) : (
+                  /* Combined commit message and changes content */
+                  <div
+                    ref={commitDetailsContentRef}
+                    className="flex-1 overflow-hidden bg-base-100 grid"
+                    style={{
+                      gridTemplateRows: `${commitDetailsMessageRatio}fr 6px ${1 - commitDetailsMessageRatio}fr`,
+                    }}
+                  >
+                    <div className="border-b border-base-300 bg-base-100 min-h-0 flex flex-col">
+                      <div className="px-4 pt-3 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60">
+                        Message
+                      </div>
+                      <div className="px-4 pb-3 overflow-auto flex-1 min-h-0">
+                        <div className="text-xs opacity-70 whitespace-pre-wrap font-mono">
+                          {selectedCommit
+                            ? formatCommitMessageForDisplay(
+                                selectedCommit.body?.trim()
+                                  ? `${selectedCommit.message}\n\n${selectedCommit.body}`
+                                  : selectedCommit.message
+                              )
+                            : 'No additional message'}
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      className={cn(
+                        'cursor-ns-resize flex items-center justify-center hover:bg-base-200/60 transition-colors',
+                        isCommitDetailsRatioResizing && 'bg-base-200/60'
+                      )}
+                      onMouseDown={handleCommitDetailsRatioResizeStart}
+                    >
+                      <div className="w-8 h-1 rounded-full bg-base-300" />
+                    </div>
+                    <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+                      <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wider font-bold opacity-60 border-b border-base-300 bg-base-100 shrink-0">
+                        Changes
+                      </div>
+                      <div className="flex-1 min-h-0">
+                        <CommitChangesView repoPath={repoPath} commitHash={selectedHash} />
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1 min-h-0">
-                    <CommitChangesView repoPath={repoPath} commitHash={selectedHash} />
-                  </div>
-                </div>
-              </div>
+                )}
+              </>
             )}
           </div>
         )}

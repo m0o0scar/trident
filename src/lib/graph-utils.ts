@@ -86,6 +86,7 @@ function shouldReplaceLaneRef(nextRef: string, currentRef: string | null, localB
 
 interface GenerateGraphOptions {
   localBranches?: string[];
+  currentBranch?: string;
 }
 
 export function generateGraphData(commits: Commit[], options: GenerateGraphOptions = {}): GraphNode[] {
@@ -134,6 +135,10 @@ export function generateGraphData(commits: Commit[], options: GenerateGraphOptio
         lanes.push(null);
         laneBranchRefs.push(null);
         laneColors.push(undefined);
+      }
+
+      if (commit.hash === '__LOCAL_CHANGES__' && options.currentBranch) {
+        laneBranchRefs[lane] = options.currentBranch;
       }
 
       const preferredRef = choosePreferredRef(parseBranchRefs(commit.refs), localBranches);

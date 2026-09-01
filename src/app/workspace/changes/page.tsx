@@ -1,27 +1,28 @@
 'use client';
 
-import { useSearchParams } from 'next/navigation';
-import { StatusView } from '@/components/git/status-view';
-import { Suspense } from 'react';
-import { useWorkspaceTitle } from '@/hooks/use-workspace-title';
+import { useSearchParams, useRouter } from 'next/navigation';
+import { useEffect, Suspense } from 'react';
 
-function WorkspaceChangesContent() {
+function WorkspaceChangesRedirect() {
   const searchParams = useSearchParams();
-  const repoPath = searchParams.get('path');
+  const router = useRouter();
 
-  useWorkspaceTitle(repoPath, 'Changes');
+  useEffect(() => {
+    const params = searchParams.toString();
+    router.replace(params ? `/workspace?${params}` : '/workspace');
+  }, [router, searchParams]);
 
-  if (!repoPath) {
-    return <div className="p-8">No repository path specified.</div>;
-  }
-
-  return <StatusView repoPath={repoPath} />;
+  return (
+    <div className="flex items-center justify-center h-full">
+      <span className="loading loading-spinner"></span>
+    </div>
+  );
 }
 
 export default function WorkspaceChangesPage() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-full"><span className="loading loading-spinner"></span></div>}>
-      <WorkspaceChangesContent />
+      <WorkspaceChangesRedirect />
     </Suspense>
   );
 }

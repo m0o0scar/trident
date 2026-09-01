@@ -30,7 +30,6 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
   
   // Fetch git status to get uncommitted changes count
   const { data: gitStatus } = useGitStatus(repoPath || null);
-  const changesCount = gitStatus?.files?.length ?? 0;
   const conflictsCount = gitStatus?.conflicted?.length ?? 0;
   const currentBranch = gitStatus?.current?.trim();
   const repoDisplayName = repository
@@ -78,8 +77,7 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
     return `/workspace${subPath}?${p.toString()}`;
   };
 
-  const isActive = (view: 'status' | 'history' | 'conflicts' | 'custom-scripts' | 'settings' | 'stashes') => {
-    if (view === 'status') return pathname === '/workspace/changes';
+  const isActive = (view: 'history' | 'conflicts' | 'custom-scripts' | 'settings' | 'stashes') => {
     if (view === 'history') return pathname === '/workspace' || pathname.startsWith('/workspace/history');
     if (view === 'conflicts') return pathname.startsWith('/workspace/conflicts');
     if (view === 'custom-scripts') return pathname.startsWith('/workspace/custom-scripts');
@@ -173,31 +171,6 @@ export function Sidebar({ className, initialCollapsed = false }: SidebarPropsWit
             >
               <i className={cn("iconoir-git-fork text-[20px]", !isCollapsed && "mr-2")} aria-hidden="true" />
               {!isCollapsed && "History"}
-            </Link>
-
-            <Link
-              href={getHref('/changes')}
-              className={cn(
-                "btn btn-ghost w-full justify-start font-normal",
-                isCollapsed ? "px-0 justify-center" : "",
-                isActive('status') && "btn-active font-medium"
-              )}
-              title={isCollapsed ? `Changes${changesCount > 0 ? ` (${changesCount})` : ''}` : undefined}
-            >
-              <div className={cn("relative flex items-center", !isCollapsed && "mr-2")}>
-                  <i className="iconoir-clock text-[20px]" aria-hidden="true" />
-                  {isCollapsed && changesCount > 0 && (
-                    <span className="absolute -top-1 -right-1 badge badge-primary badge-xs scale-75">
-                      {changesCount > 99 ? '99+' : changesCount}
-                    </span>
-                  )}
-              </div>
-              {!isCollapsed && (
-                  <span className="flex-1 flex justify-between items-center">
-                      Changes
-                      {changesCount > 0 && <span className="badge badge-sm">{changesCount}</span>}
-                  </span>
-              )}
             </Link>
 
             <Link
