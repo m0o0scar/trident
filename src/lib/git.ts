@@ -643,44 +643,151 @@ export class GitService {
     };
   }
 
-  async checkout(branch: string): Promise<void> {
-    await this.git.checkout(branch);
+  async checkout(
+    branch: string,
+    options: { switchStrategy?: 'stash-and-reapply' | 'discard' } = {}
+  ): Promise<void> {
+    const { switchStrategy } = options;
+
+    if (switchStrategy === 'stash-and-reapply') {
+      const status = await this.git.status();
+      const hasChanges = status.files.length > 0;
+      let stashed = false;
+      if (hasChanges) {
+        await this.stash(`auto-stash before checkout to ${branch}`);
+        stashed = true;
+      }
+
+      try {
+        await this.git.checkout(branch);
+      } catch (checkoutErr) {
+        if (stashed) {
+          try {
+            await this.git.stash(['pop']);
+          } catch (popErr) {
+            console.warn('Failed to restore stash after failed checkout:', popErr);
+          }
+        }
+        throw checkoutErr;
+      }
+
+      if (stashed) {
+        try {
+          await this.git.stash(['pop']);
+        } catch (popErr) {
+          console.warn('Failed to pop stash after checkout:', popErr);
+          throw new Error(
+            `Switched to branch "${branch}", but conflicts occurred when reapplying stashed changes. Your changes are preserved in the stash list.`
+          );
+        }
+      }
+    } else if (switchStrategy === 'discard') {
+      if (await this.hasHeadCommit()) {
+        await this.git.raw(['reset', '--hard', 'HEAD']);
+      } else {
+        try {
+          await this.git.raw(['rm', '-rf', '--cached', '.']);
+        } catch {
+          // ignore if index was already empty
+        }
+      }
+      await this.git.raw(['clean', '-fd']);
+      await this.git.checkout(branch);
+    } else {
+      await this.git.checkout(branch);
+    }
   }
 
-  async checkoutRemoteToLocal(remoteBranch: string, localBranch: string): Promise<void> {
-    // remoteBranch is in format: remotes/origin/branch-name
-    // We need to extract origin/branch-name for the tracking setup
-    
-    // First, verify the remote branch exists
-    try {
-      await this.git.revparse(['--verify', `refs/${remoteBranch}`]);
-    } catch {
-      throw new Error(`Remote branch '${remoteBranch}' does not exist`);
-    }
-    
-    // Check if local branch already exists
-    try {
-      await this.git.revparse(['--verify', `refs/heads/${localBranch}`]);
-      throw new Error(`Local branch '${localBranch}' already exists`);
-    } catch (e) {
-      // Branch doesn't exist, which is what we want (unless it's our "already exists" error)
-      if ((e as Error).message.includes('already exists')) {
-        throw e;
+  async checkoutRemoteToLocal(
+    remoteBranch: string,
+    localBranch: string,
+    options: { switchStrategy?: 'stash-and-reapply' | 'discard' } = {}
+  ): Promise<void> {
+    const { switchStrategy } = options;
+
+    const performCheckout = async () => {
+      // remoteBranch is in format: remotes/origin/branch-name
+      // We need to extract origin/branch-name for the tracking setup
+      
+      // First, verify the remote branch exists
+      try {
+        await this.git.revparse(['--verify', `refs/${remoteBranch}`]);
+      } catch {
+        throw new Error(`Remote branch '${remoteBranch}' does not exist`);
       }
+      
+      // Check if local branch already exists
+      try {
+        await this.git.revparse(['--verify', `refs/heads/${localBranch}`]);
+        throw new Error(`Local branch '${localBranch}' already exists`);
+      } catch (e) {
+        // Branch doesn't exist, which is what we want (unless it's our "already exists" error)
+        if ((e as Error).message.includes('already exists')) {
+          throw e;
+        }
+      }
+      
+      // Extract the remote name and branch name from remotes/origin/branch-name
+      const withoutRemotesPrefix = remoteBranch.replace(/^remotes\//, '');
+      const slashIndex = withoutRemotesPrefix.indexOf('/');
+      if (slashIndex <= 0) {
+        throw new Error(`Invalid remote branch format: ${remoteBranch}`);
+      }
+      const remoteName = withoutRemotesPrefix.slice(0, slashIndex);
+      const remoteBranchName = withoutRemotesPrefix.slice(slashIndex + 1);
+      
+      // Create local branch from remote branch and set up tracking
+      // git checkout -b <local-branch> --track <remote>/<branch>
+      await this.git.checkout(['-b', localBranch, '--track', `${remoteName}/${remoteBranchName}`]);
+    };
+
+    if (switchStrategy === 'stash-and-reapply') {
+      const status = await this.git.status();
+      const hasChanges = status.files.length > 0;
+      let stashed = false;
+      if (hasChanges) {
+        await this.stash(`auto-stash before checkout to ${localBranch}`);
+        stashed = true;
+      }
+
+      try {
+        await performCheckout();
+      } catch (err) {
+        if (stashed) {
+          try {
+            await this.git.stash(['pop']);
+          } catch (popErr) {
+            console.warn('Failed to restore stash after failed checkout:', popErr);
+          }
+        }
+        throw err;
+      }
+
+      if (stashed) {
+        try {
+          await this.git.stash(['pop']);
+        } catch (popErr) {
+          console.warn('Failed to pop stash after checkout:', popErr);
+          throw new Error(
+            `Checked out "${localBranch}", but conflicts occurred when reapplying stashed changes. Your changes are preserved in the stash list.`
+          );
+        }
+      }
+    } else if (switchStrategy === 'discard') {
+      if (await this.hasHeadCommit()) {
+        await this.git.raw(['reset', '--hard', 'HEAD']);
+      } else {
+        try {
+          await this.git.raw(['rm', '-rf', '--cached', '.']);
+        } catch {
+          // ignore if index was already empty
+        }
+      }
+      await this.git.raw(['clean', '-fd']);
+      await performCheckout();
+    } else {
+      await performCheckout();
     }
-    
-    // Extract the remote name and branch name from remotes/origin/branch-name
-    const withoutRemotesPrefix = remoteBranch.replace(/^remotes\//, '');
-    const slashIndex = withoutRemotesPrefix.indexOf('/');
-    if (slashIndex <= 0) {
-      throw new Error(`Invalid remote branch format: ${remoteBranch}`);
-    }
-    const remoteName = withoutRemotesPrefix.slice(0, slashIndex);
-    const remoteBranchName = withoutRemotesPrefix.slice(slashIndex + 1);
-    
-    // Create local branch from remote branch and set up tracking
-    // git checkout -b <local-branch> --track <remote>/<branch>
-    await this.git.checkout(['-b', localBranch, '--track', `${remoteName}/${remoteBranchName}`]);
   }
 
   async createBranch(branch: string, fromRef?: string): Promise<void> {

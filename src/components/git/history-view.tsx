@@ -352,6 +352,16 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   const [checkoutLocalBranchName, setCheckoutLocalBranchName] = useState('');
   const [isCheckingOutToLocal, setIsCheckingOutToLocal] = useState(false);
 
+  // Switch branch with uncommitted changes warning dialog state
+  const [isSwitchBranchModalOpen, setIsSwitchBranchModalOpen] = useState(false);
+  const [pendingBranchSwitch, setPendingBranchSwitch] = useState<
+    | { type: 'local'; branch: string }
+    | { type: 'remote'; remoteBranch: string; localBranch: string }
+    | null
+  >(null);
+  const [switchBranchStrategy, setSwitchBranchStrategy] = useState<'stash-and-reapply' | 'discard'>('stash-and-reapply');
+  const [isSwitchingBranch, setIsSwitchingBranch] = useState(false);
+
   // Reset to commit dialog state
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [resetCommitHash, setResetCommitHash] = useState<string | null>(null);
@@ -427,6 +437,13 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   }, []);
 
   const closeTopPopup = useCallback(() => {
+    if (isSwitchBranchModalOpen) {
+      if (!isSwitchingBranch) {
+        setIsSwitchBranchModalOpen(false);
+        setPendingBranchSwitch(null);
+      }
+      return;
+    }
     if (isAbortCherryPickOpen) {
       setIsAbortCherryPickOpen(false);
       setCommitsToCherryPick([]);
@@ -553,9 +570,17 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     scriptExecution.isOpen,
     isScriptExecutionFinished,
     closeScriptExecutionDialog,
+    isSwitchBranchModalOpen,
+    isSwitchingBranch,
   ]);
 
   const confirmTopPopup = () => {
+    if (isSwitchBranchModalOpen) {
+      if (!isSwitchingBranch) {
+        void handleConfirmSwitchBranch();
+      }
+      return;
+    }
     if (isAbortCherryPickOpen) {
       if (!isAbortingCherryPick) {
         void handleAbortCherryPick();
@@ -703,6 +728,7 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     iscreateBranchOpen ||
     isCreateTagOpen ||
     isCheckoutToLocalOpen ||
+    isSwitchBranchModalOpen ||
     isBranchPopoverOpen ||
     scriptExecution.isOpen;
 
@@ -2460,8 +2486,27 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
     setIsCheckoutToLocalOpen(true);
   }
 
+  const targetBranchDisplayName = useMemo(() => {
+    if (!pendingBranchSwitch) return '';
+    if (pendingBranchSwitch.type === 'local') {
+      return pendingBranchSwitch.branch;
+    }
+    return pendingBranchSwitch.localBranch;
+  }, [pendingBranchSwitch]);
+
   const handleCheckoutToLocal = async () => {
     if (!checkoutRemoteBranch || !checkoutLocalBranchName) return;
+
+    if (hasLocalChanges) {
+      const remoteBranch = checkoutRemoteBranch;
+      const localBranch = checkoutLocalBranchName;
+      setIsCheckoutToLocalOpen(false);
+      setPendingBranchSwitch({ type: 'remote', remoteBranch, localBranch });
+      setSwitchBranchStrategy('stash-and-reapply');
+      setIsSwitchBranchModalOpen(true);
+      return;
+    }
+
     setIsCheckingOutToLocal(true);
     try {
       await runGitAction({
@@ -2575,6 +2620,14 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
   }
 
   const handleCheckout = async (branchName: string) => {
+    if (branchName === currentBranch) return;
+
+    if (hasLocalChanges) {
+      setPendingBranchSwitch({ type: 'local', branch: branchName });
+      setSwitchBranchStrategy('stash-and-reapply');
+      setIsSwitchBranchModalOpen(true);
+      return;
+    }
 
     try {
       await runGitAction({
@@ -2584,6 +2637,41 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
       });
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const handleConfirmSwitchBranch = async () => {
+    if (!pendingBranchSwitch) return;
+    setIsSwitchingBranch(true);
+    try {
+      if (pendingBranchSwitch.type === 'local') {
+        await runGitAction({
+          repoPath,
+          action: 'checkout',
+          data: {
+            branch: pendingBranchSwitch.branch,
+            switchStrategy: switchBranchStrategy,
+          },
+        });
+      } else {
+        await runGitAction({
+          repoPath,
+          action: 'checkout-to-local',
+          data: {
+            remoteBranch: pendingBranchSwitch.remoteBranch,
+            localBranch: pendingBranchSwitch.localBranch,
+            switchStrategy: switchBranchStrategy,
+          },
+        });
+        setCheckoutRemoteBranch(null);
+        setCheckoutLocalBranchName('');
+      }
+      setIsSwitchBranchModalOpen(false);
+      setPendingBranchSwitch(null);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSwitchingBranch(false);
     }
   };
 
@@ -4333,6 +4421,122 @@ export function HistoryView({ repoPath }: { repoPath: string }) {
             <form method="dialog" className="modal-backdrop">
                 <button onClick={() => setIsCheckoutToLocalOpen(false)}>close</button>
             </form>
+        </dialog>
+      )}
+
+      {isSwitchBranchModalOpen && (
+        <dialog className="modal modal-open">
+          <div className="modal-box">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-warning/15 text-warning flex items-center justify-center shrink-0">
+                <i className="iconoir-warning-triangle text-[20px]" aria-hidden="true" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-lg">Uncommitted Changes</h3>
+                <p className="text-sm opacity-80 mt-1">
+                  You have uncommitted changes in your workspace. Choose how to handle your changes before switching to branch{' '}
+                  <span className="font-bold font-mono text-primary break-all">{targetBranchDisplayName}</span>:
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 my-5">
+              <label
+                className={cn(
+                  "flex items-start gap-3 p-3.5 rounded-lg border cursor-pointer transition-colors select-none",
+                  switchBranchStrategy === 'stash-and-reapply'
+                    ? "border-primary bg-primary/5 shadow-xs"
+                    : "border-base-300 hover:bg-base-200/50"
+                )}
+                onClick={() => setSwitchBranchStrategy('stash-and-reapply')}
+              >
+                <input
+                  type="radio"
+                  name="switchBranchStrategy"
+                  className="radio radio-primary radio-sm mt-0.5"
+                  checked={switchBranchStrategy === 'stash-and-reapply'}
+                  onChange={() => setSwitchBranchStrategy('stash-and-reapply')}
+                  disabled={isSwitchingBranch}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm flex items-center gap-2">
+                    <span>Stash and reapply</span>
+                    <span className="badge badge-xs badge-primary/20 text-primary font-normal">Default</span>
+                  </div>
+                  <p className="text-xs opacity-70 mt-0.5 leading-relaxed">
+                    Stash current changes, switch to <span className="font-mono font-medium">{targetBranchDisplayName}</span>, and reapply your changes.
+                  </p>
+                </div>
+              </label>
+
+              <label
+                className={cn(
+                  "flex items-start gap-3 p-3.5 rounded-lg border cursor-pointer transition-colors select-none",
+                  switchBranchStrategy === 'discard'
+                    ? "border-error bg-error/5 shadow-xs"
+                    : "border-base-300 hover:bg-base-200/50"
+                )}
+                onClick={() => setSwitchBranchStrategy('discard')}
+              >
+                <input
+                  type="radio"
+                  name="switchBranchStrategy"
+                  className="radio radio-error radio-sm mt-0.5"
+                  checked={switchBranchStrategy === 'discard'}
+                  onChange={() => setSwitchBranchStrategy('discard')}
+                  disabled={isSwitchingBranch}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm text-error flex items-center gap-1.5">
+                    <i className="iconoir-trash text-[14px]" aria-hidden="true" />
+                    <span>Discard changes</span>
+                  </div>
+                  <p className="text-xs opacity-70 mt-0.5 leading-relaxed">
+                    Permanently discard all uncommitted changes before switching. <span className="text-error font-medium">This cannot be undone.</span>
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <div className="modal-action">
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setIsSwitchBranchModalOpen(false);
+                  setPendingBranchSwitch(null);
+                }}
+                disabled={isSwitchingBranch}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "btn",
+                  switchBranchStrategy === 'discard' ? "btn-error" : "btn-primary"
+                )}
+                onClick={handleConfirmSwitchBranch}
+                disabled={isSwitchingBranch}
+              >
+                {isSwitchingBranch && <span className="loading loading-spinner loading-xs"></span>}
+                Confirm
+              </button>
+            </div>
+          </div>
+          <form method="dialog" className="modal-backdrop">
+            <button
+              type="button"
+              onClick={() => {
+                if (!isSwitchingBranch) {
+                  setIsSwitchBranchModalOpen(false);
+                  setPendingBranchSwitch(null);
+                }
+              }}
+            >
+              close
+            </button>
+          </form>
         </dialog>
       )}
 

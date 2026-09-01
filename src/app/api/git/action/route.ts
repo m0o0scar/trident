@@ -119,12 +119,16 @@ export async function POST(request: Request) {
         break;
       case 'checkout':
         if (!data?.branch) throw new Error('Branch name is required for checkout');
-        await git.checkout(data.branch);
+        await git.checkout(data.branch, {
+          switchStrategy: data?.switchStrategy,
+        });
         break;
       case 'checkout-to-local':
         if (!data?.remoteBranch) throw new Error('Remote branch is required for checkout-to-local');
         if (!data?.localBranch) throw new Error('Local branch name is required for checkout-to-local');
-        await git.checkoutRemoteToLocal(data.remoteBranch, data.localBranch);
+        await git.checkoutRemoteToLocal(data.remoteBranch, data.localBranch, {
+          switchStrategy: data?.switchStrategy,
+        });
         break;
       case 'branch':
         if (!data?.branch) throw new Error('Branch name is required to create branch');
