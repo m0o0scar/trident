@@ -5,7 +5,7 @@
   "description": "A modern, web-based Git client.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/m0o0scar/trident"
+    "url": "https://github.com/oscarqht/trident"
   },
   "bin": {
     "trident-git": "bin/trident-git.mjs"
